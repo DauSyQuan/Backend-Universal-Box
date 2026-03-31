@@ -1,0 +1,17 @@
+{
+  "name": "@mcu/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "pg": "^8.16.3"
+  },
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "build": "echo \"api build placeholder\"",
+    "lint": "echo \"api lint placeholder\"",
+    "typecheck": "echo \"api typecheck placeholder\""
+  }
+}

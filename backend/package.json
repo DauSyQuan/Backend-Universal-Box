@@ -1,0 +1,26 @@
+{
+  "name": "mcu-backend-platform",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "services/api",
+    "services/worker"
+  ],
+  "scripts": {
+    "setup": "npm install",
+    "dev": "npm run dev:api",
+    "dev:api": "npm run dev -w services/api",
+    "dev:worker": "npm run dev -w services/worker",
+    "start:api": "npm run start -w services/api",
+    "start:worker": "npm run start -w services/worker",
+    "db:migrate": "node ./scripts/db-migrate.mjs",
+    "db:reset-local": "node ./scripts/db-reset-local.mjs",
+    "test:smoke": "node ./scripts/smoke-test.mjs",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  }
+}
