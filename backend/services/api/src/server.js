@@ -3,9 +3,6 @@ import { createServer } from "node:http";
 import { getHealth, getReady } from "./health.js";
 import { pingDb } from "./db.js";
 import { getMcuEdgeDetail, listMcuEdges, registerMcuEdge } from "./mcu.js";
-import { getLiveCollectorStatus, getLiveMcuEdgeDetail, listLiveMcuEdges } from "./live-mcu.js";
-
-const fallbackToLive = String(process.env.MCU_EDGES_FALLBACK_TO_LIVE ?? "true").toLowerCase() !== "false";
 
 const sendJson = (res, statusCode, data) => {
   res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
@@ -66,23 +63,10 @@ const server = createServer(async (req, res) => {
       onlineSeconds: url.searchParams.get("online_seconds")
     };
 
-    const source = String(url.searchParams.get("source") || "").toLowerCase();
-    if (source === "live") {
-      const data = listLiveMcuEdges(query);
-      sendJson(res, 200, data);
-      return;
-    }
-
     try {
       const data = await listMcuEdges(query);
       sendJson(res, 200, data);
     } catch (error) {
-      if (fallbackToLive) {
-        console.warn("[api/mcu/edges] db failed, fallback to live:", error?.message || String(error));
-        const data = listLiveMcuEdges(query);
-        sendJson(res, 200, data);
-        return;
-      }
       console.error("[api/mcu/edges] failed:", error);
       sendJson(res, 500, { error: "mcu_edges_query_failed" });
     }
@@ -100,24 +84,6 @@ const server = createServer(async (req, res) => {
     const vesselCode = parts[4];
     const edgeCode = parts[5];
     const onlineSeconds = url.searchParams.get("online_seconds");
-    const source = String(url.searchParams.get("source") || "").toLowerCase();
-
-    if (source === "live") {
-      const detail = getLiveMcuEdgeDetail({
-        tenantCode,
-        vesselCode,
-        edgeCode,
-        onlineSeconds
-      });
-
-      if (!detail) {
-        sendJson(res, 404, { error: "edge_not_found" });
-        return;
-      }
-
-      sendJson(res, 200, detail);
-      return;
-    }
 
     try {
       const detail = await getMcuEdgeDetail({
@@ -134,66 +100,9 @@ const server = createServer(async (req, res) => {
 
       sendJson(res, 200, detail);
     } catch (error) {
-      if (fallbackToLive) {
-        console.warn("[api/mcu/edge-detail] db failed, fallback to live:", error?.message || String(error));
-        const detail = getLiveMcuEdgeDetail({
-          tenantCode,
-          vesselCode,
-          edgeCode,
-          onlineSeconds
-        });
-        if (!detail) {
-          sendJson(res, 404, { error: "edge_not_found" });
-          return;
-        }
-        sendJson(res, 200, detail);
-        return;
-      }
       console.error("[api/mcu/edges/:tenant/:vessel/:edge] failed:", error);
       sendJson(res, 500, { error: "mcu_edge_detail_failed" });
     }
-    return;
-  }
-
-  if (url.pathname === "/api/mcu/live/status" && req.method === "GET") {
-    sendJson(res, 200, {
-      source: "mqtt_live",
-      collector: getLiveCollectorStatus()
-    });
-    return;
-  }
-
-  if (url.pathname === "/api/mcu/live/edges" && req.method === "GET") {
-    const data = listLiveMcuEdges({
-      tenantCode: url.searchParams.get("tenant") ?? url.searchParams.get("tenant_code"),
-      vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
-      limit: url.searchParams.get("limit"),
-      onlineSeconds: url.searchParams.get("online_seconds")
-    });
-    sendJson(res, 200, data);
-    return;
-  }
-
-  if (url.pathname.startsWith("/api/mcu/live/edges/") && req.method === "GET") {
-    const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length !== 7) {
-      sendJson(res, 400, { error: "invalid_path" });
-      return;
-    }
-
-    const detail = getLiveMcuEdgeDetail({
-      tenantCode: parts[4],
-      vesselCode: parts[5],
-      edgeCode: parts[6],
-      onlineSeconds: url.searchParams.get("online_seconds")
-    });
-
-    if (!detail) {
-      sendJson(res, 404, { error: "edge_not_found" });
-      return;
-    }
-
-    sendJson(res, 200, detail);
     return;
   }
 

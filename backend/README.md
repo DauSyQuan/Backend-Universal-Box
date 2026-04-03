@@ -72,24 +72,6 @@ npm run dev:worker
 npm run test:smoke
 ```
 
-## No-DB live mode (MQTT only)
-
-Use this mode when PostgreSQL is not installed yet and you only need to monitor MCU live traffic:
-
-```bash
-npm run mqtt:broker
-npm run dev:api
-```
-
-Then query:
-
-```bash
-curl "http://localhost:3000/api/mcu/live/status"
-curl "http://localhost:3000/api/mcu/live/edges"
-```
-
-`/api/mcu/edges*` also auto-falls back to live MQTT if DB is unavailable.
-
 ## Phase 2 verification
 
 1. Seed baseline entities (tenant/vessel/edge/user):
