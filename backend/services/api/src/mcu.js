@@ -25,6 +25,71 @@ function isOnline(heartbeatAt, onlineSeconds) {
   return Date.now() - last <= onlineSeconds * 1000;
 }
 
+function asFiniteNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function firstPresent(payload, keys) {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(payload, key)) {
+      const value = payload[key];
+      if (value !== null && value !== undefined && value !== "") {
+        return value;
+      }
+    }
+  }
+  return undefined;
+}
+
+function normalizeTrafficSample(row) {
+  const payload = row?.payload && typeof row.payload === "object" ? row.payload : {};
+  const rxKbps = asFiniteNumber(firstPresent(payload, ["rx_kbps", "download_kbps", "rx_rate_kbps"]));
+  const txKbps = asFiniteNumber(firstPresent(payload, ["tx_kbps", "upload_kbps", "tx_rate_kbps"]));
+  const throughputRaw = asFiniteNumber(firstPresent(payload, ["throughput_kbps", "total_kbps", "bandwidth_kbps"]));
+  const throughputKbps = throughputRaw ?? ((rxKbps ?? 0) + (txKbps ?? 0));
+
+  const interfacesRaw = Array.isArray(payload.interfaces) ? payload.interfaces : [];
+  const interfaces = interfacesRaw
+    .map((iface) => ({
+      name: String(iface?.name ?? iface?.interface ?? iface?.if ?? "").trim(),
+      rx_kbps: asFiniteNumber(firstPresent(iface ?? {}, ["rx_kbps", "download_kbps", "rx_rate_kbps"])),
+      tx_kbps: asFiniteNumber(firstPresent(iface ?? {}, ["tx_kbps", "upload_kbps", "tx_rate_kbps"])),
+      throughput_kbps:
+        asFiniteNumber(firstPresent(iface ?? {}, ["throughput_kbps", "total_kbps", "bandwidth_kbps"])) ??
+        ((asFiniteNumber(firstPresent(iface ?? {}, ["rx_kbps", "download_kbps", "rx_rate_kbps"])) ?? 0) +
+          (asFiniteNumber(firstPresent(iface ?? {}, ["tx_kbps", "upload_kbps", "tx_rate_kbps"])) ?? 0)),
+      total_gb: asFiniteNumber(firstPresent(iface ?? {}, ["total_gb", "total_traffic_gb", "cum_gb"]))
+    }))
+    .filter((iface) => iface.name);
+
+  return {
+    observed_at: row.observed_at,
+    active_interface: String(
+      firstPresent(payload, ["active_interface", "active_uplink", "interface", "wan_interface", "uplink_if"]) ?? ""
+    ),
+    rx_kbps: rxKbps,
+    tx_kbps: txKbps,
+    throughput_kbps: throughputKbps,
+    source: String(firstPresent(payload, ["source"]) ?? "unknown"),
+    mk_status: String(firstPresent(payload, ["mk_status", "status"]) ?? "unknown"),
+    total_gb: asFiniteNumber(firstPresent(payload, ["total_gb", "total_traffic_gb", "cum_gb"])),
+    interfaces,
+    raw: payload
+  };
+}
+
+function avg(values) {
+  if (values.length === 0) {
+    return 0;
+  }
+  const sum = values.reduce((acc, value) => acc + value, 0);
+  return sum / values.length;
+}
+
 export async function listMcuEdges({ tenantCode = null, vesselCode = null, limit = 50, onlineSeconds = 120 }) {
   ensurePool();
 
@@ -331,4 +396,96 @@ export async function registerMcuEdge(input) {
   } finally {
     client.release();
   }
+}
+
+export async function getMcuEdgeTraffic({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  windowMinutes = 60,
+  limit = 300
+}) {
+  ensurePool();
+
+  const safeWindowMinutes = Math.max(1, Math.min(1440, toInt(windowMinutes, 60)));
+  const safeLimit = Math.max(1, Math.min(2000, toInt(limit, 300)));
+
+  const edge = await pool.query(
+    `
+      select
+        t.id as tenant_id,
+        t.code as tenant_code,
+        v.id as vessel_id,
+        v.code as vessel_code,
+        e.id as edge_id,
+        e.edge_code
+      from edge_boxes e
+      join vessels v on v.id = e.vessel_id
+      join tenants t on t.id = v.tenant_id
+      where t.code = $1 and v.code = $2 and e.edge_code = $3
+      limit 1
+    `,
+    [tenantCode, vesselCode, edgeCode]
+  );
+
+  if (edge.rowCount === 0) {
+    return null;
+  }
+
+  const samplesResult = await pool.query(
+    `
+      select
+        coalesce((im.payload->>'timestamp')::timestamptz, im.received_at) as observed_at,
+        im.payload
+      from ingest_messages im
+      where im.channel = 'telemetry'
+        and im.tenant_code = $1
+        and im.vessel_code = $2
+        and im.edge_code = $3
+        and im.received_at >= now() - make_interval(mins => $4::int)
+      order by observed_at desc
+      limit $5
+    `,
+    [tenantCode, vesselCode, edgeCode, safeWindowMinutes, safeLimit]
+  );
+
+  const samples = samplesResult.rows.map(normalizeTrafficSample).sort((a, b) => {
+    const ta = new Date(a.observed_at).getTime();
+    const tb = new Date(b.observed_at).getTime();
+    return ta - tb;
+  });
+
+  const rxSeries = samples.map((s) => s.rx_kbps ?? 0);
+  const txSeries = samples.map((s) => s.tx_kbps ?? 0);
+  const throughputSeries = samples.map((s) => s.throughput_kbps ?? 0);
+
+  const latest = samples.length > 0 ? samples[samples.length - 1] : null;
+  const uniqueInterfaces = Array.from(
+    new Set(
+      samples
+        .flatMap((sample) => {
+          const byActive = sample.active_interface ? [sample.active_interface] : [];
+          const byInterfaces = sample.interfaces.map((iface) => iface.name);
+          return [...byActive, ...byInterfaces];
+        })
+        .filter(Boolean)
+    )
+  ).sort();
+
+  return {
+    edge: edge.rows[0],
+    window_minutes: safeWindowMinutes,
+    sample_count: samples.length,
+    latest,
+    summary: {
+      avg_rx_kbps: Number(avg(rxSeries).toFixed(2)),
+      avg_tx_kbps: Number(avg(txSeries).toFixed(2)),
+      avg_throughput_kbps: Number(avg(throughputSeries).toFixed(2)),
+      peak_rx_kbps: Number((rxSeries.length ? Math.max(...rxSeries) : 0).toFixed(2)),
+      peak_tx_kbps: Number((txSeries.length ? Math.max(...txSeries) : 0).toFixed(2)),
+      peak_throughput_kbps: Number((throughputSeries.length ? Math.max(...throughputSeries) : 0).toFixed(2)),
+      interfaces_seen: uniqueInterfaces
+    },
+    samples
+  };
 }

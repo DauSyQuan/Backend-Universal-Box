@@ -2,7 +2,7 @@ import "dotenv/config";
 import { createServer } from "node:http";
 import { getHealth, getReady } from "./health.js";
 import { pingDb } from "./db.js";
-import { getMcuEdgeDetail, listMcuEdges, registerMcuEdge } from "./mcu.js";
+import { getMcuEdgeDetail, getMcuEdgeTraffic, listMcuEdges, registerMcuEdge } from "./mcu.js";
 
 const sendJson = (res, statusCode, data) => {
   res.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
@@ -75,6 +75,33 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname.startsWith("/api/mcu/edges/") && req.method === "GET") {
     const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length === 7 && parts[6] === "traffic") {
+      const tenantCode = parts[3];
+      const vesselCode = parts[4];
+      const edgeCode = parts[5];
+
+      try {
+        const traffic = await getMcuEdgeTraffic({
+          tenantCode,
+          vesselCode,
+          edgeCode,
+          windowMinutes: url.searchParams.get("window_minutes"),
+          limit: url.searchParams.get("limit")
+        });
+
+        if (!traffic) {
+          sendJson(res, 404, { error: "edge_not_found" });
+          return;
+        }
+
+        sendJson(res, 200, traffic);
+      } catch (error) {
+        console.error("[api/mcu/edges/:tenant/:vessel/:edge/traffic] failed:", error);
+        sendJson(res, 500, { error: "mcu_edge_traffic_failed" });
+      }
+      return;
+    }
+
     if (parts.length !== 6) {
       sendJson(res, 400, { error: "invalid_path" });
       return;

@@ -7,3 +7,4 @@ Current endpoints:
 3. `GET /api/mcu/edges?tenant=...&vessel=...&online_seconds=120`
 4. `GET /api/mcu/edges/{tenant}/{vessel}/{edge}`
 5. `POST /api/mcu/register`
+6. `GET /api/mcu/edges/{tenant}/{vessel}/{edge}/traffic?window_minutes=60&limit=300`
