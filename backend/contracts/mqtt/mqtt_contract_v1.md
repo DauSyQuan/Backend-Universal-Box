@@ -53,3 +53,18 @@
 - Server rejects unknown `schema_version`.
 - Payload-specific fields validated at worker layer.
 
+## RouterOS compatibility
+
+Worker normalizes common RouterOS payload aliases into canonical v1 fields.
+Examples:
+
+- heartbeat aliases:
+  - `cpu_load` -> `cpu_usage_pct`
+  - `memory_used_pct` -> `ram_usage_pct`
+  - `routeros_version` -> `firmware_version`
+- telemetry aliases:
+  - `active_interface` -> `active_uplink`
+  - `rtt_ms` -> `latency_ms`
+  - `packet_loss_pct` -> `loss_pct`
+  - `ping_jitter_ms` -> `jitter_ms`
+  - `rx_kbps` + `tx_kbps` -> `throughput_kbps`

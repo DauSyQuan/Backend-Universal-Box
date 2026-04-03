@@ -107,6 +107,24 @@ create table if not exists ingest_messages (
 create index if not exists idx_ingest_messages_received
   on ingest_messages(received_at desc);
 
+create unique index if not exists idx_ingest_messages_msg_id_unique
+  on ingest_messages(msg_id)
+  where msg_id is not null;
+
+create table if not exists ingest_errors (
+  id uuid primary key default gen_random_uuid(),
+  topic text not null,
+  channel text,
+  msg_id text,
+  reason text not null,
+  detail text,
+  raw jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_ingest_errors_created
+  on ingest_errors(created_at desc);
+
 create table if not exists edge_heartbeats (
   id uuid primary key default gen_random_uuid(),
   tenant_code text not null,
@@ -138,6 +156,9 @@ create table if not exists user_usage (
 create index if not exists idx_user_usage_user_observed
   on user_usage(user_id, observed_at desc);
 
+create index if not exists idx_user_usage_vessel_observed
+  on user_usage(vessel_id, observed_at desc);
+
 create table if not exists vms_positions (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -161,6 +182,12 @@ create table if not exists events (
   observed_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+
+create index if not exists idx_events_vessel_observed
+  on events(vessel_id, observed_at desc);
+
+create index if not exists idx_vms_positions_vessel_observed
+  on vms_positions(vessel_id, observed_at desc);
 
 create table if not exists command_jobs (
   id uuid primary key default gen_random_uuid(),

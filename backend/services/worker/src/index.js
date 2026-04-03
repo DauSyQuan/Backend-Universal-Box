@@ -3,12 +3,26 @@ import path from "node:path";
 import process from "node:process";
 import mqtt from "mqtt";
 import {
+  insertEvent,
   insertHeartbeat,
+  insertIngestError,
   insertIngestMessage,
   insertTelemetry,
-  resolveEdgeContext
+  insertUsage,
+  insertVms,
+  markEdgeLastSeen,
+  pool,
+  resolveEdgeContext,
+  resolveTenantVesselContext,
+  resolveUserId
 } from "./db.js";
-import { parseEnvelope, parseTopic, toObservedAt } from "./parser.js";
+import {
+  parseEnvelope,
+  parseTopic,
+  toObservedAt,
+  validateAndNormalizePayload,
+  validateEnvelope
+} from "./parser.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/.env") });
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/env.example"), override: false });
@@ -24,6 +38,15 @@ const client = mqtt.connect(mqttUrl, {
   password: mqttPassword,
   reconnectPeriod: 2_000
 });
+
+async function saveIngestError(errorData) {
+  try {
+    await insertIngestError(errorData);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.error("[worker] failed to persist ingest error:", message);
+  }
+}
 
 client.on("connect", () => {
   console.log(`[worker] connected to broker ${mqttUrl}`);
@@ -49,37 +72,102 @@ client.on("message", async (topic, payloadBuffer) => {
   const parsedTopic = parseTopic(topic);
   if (!parsedTopic) {
     console.warn(`[worker] ignore invalid topic: ${topic}`);
+    await saveIngestError({
+      topic,
+      reason: "invalid_topic",
+      detail: "Topic format must be mcu/{tenant}/{vessel}/{edge}/{channel}"
+    });
     return;
   }
 
+  let envelope;
   try {
-    const envelope = parseEnvelope(payloadBuffer);
-    const observedAt = toObservedAt(envelope.timestamp);
+    envelope = parseEnvelope(payloadBuffer);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.error(`[worker] failed parsing payload topic=${topic}: ${message}`);
+    await saveIngestError({
+      topic,
+      channel: parsedTopic.channel,
+      reason: "invalid_json",
+      detail: message,
+      raw: { raw_text: payloadBuffer.toString("utf8") }
+    });
+    return;
+  }
 
-    await insertIngestMessage({
+  const observedAt = toObservedAt(envelope.timestamp);
+  const ingest = await insertIngestMessage({
+    topic,
+    channel: parsedTopic.channel,
+    msgId: envelope.msgId,
+    tenantCode: parsedTopic.tenantCode,
+    vesselCode: parsedTopic.vesselCode,
+    edgeCode: parsedTopic.edgeCode,
+    schemaVersion: envelope.schemaVersion,
+    payload: envelope.payload,
+    raw: envelope.raw
+  });
+
+  if (!ingest.inserted) {
+    console.log(`[worker] duplicate message skipped msg_id=${envelope.msgId ?? "n/a"}`);
+    return;
+  }
+
+  const envelopeValidation = validateEnvelope(envelope);
+  if (!envelopeValidation.valid) {
+    await saveIngestError({
       topic,
       channel: parsedTopic.channel,
       msgId: envelope.msgId,
-      tenantCode: parsedTopic.tenantCode,
-      vesselCode: parsedTopic.vesselCode,
-      edgeCode: parsedTopic.edgeCode,
-      schemaVersion: envelope.schemaVersion,
-      payload: envelope.payload,
+      reason: "invalid_envelope",
+      detail: envelopeValidation.errors.join("; "),
       raw: envelope.raw
     });
+    return;
+  }
 
+  const payloadValidation = validateAndNormalizePayload(parsedTopic.channel, envelope.payload);
+  if (!payloadValidation.valid) {
+    await saveIngestError({
+      topic,
+      channel: parsedTopic.channel,
+      msgId: envelope.msgId,
+      reason: "invalid_payload",
+      detail: payloadValidation.errors.join("; "),
+      raw: envelope.raw
+    });
+    return;
+  }
+
+  const payload = payloadValidation.payload;
+
+  try {
     if (parsedTopic.channel === "heartbeat") {
       await insertHeartbeat({
         tenantCode: parsedTopic.tenantCode,
         vesselCode: parsedTopic.vesselCode,
         edgeCode: parsedTopic.edgeCode,
-        firmwareVersion: envelope.payload.firmware_version,
-        cpuUsagePct: envelope.payload.cpu_usage_pct,
-        ramUsagePct: envelope.payload.ram_usage_pct,
-        status: envelope.payload.status ?? "online",
+        firmwareVersion: payload.firmware_version,
+        cpuUsagePct: payload.cpu_usage_pct,
+        ramUsagePct: payload.ram_usage_pct,
+        status: payload.status ?? "online",
         observedAt
       });
-      console.log(`[worker] heartbeat stored topic=${topic} msg_id=${envelope.msgId ?? "n/a"}`);
+
+      const context = await resolveEdgeContext({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        edgeCode: parsedTopic.edgeCode
+      });
+      if (context?.edge_box_id) {
+        await markEdgeLastSeen({
+          vesselId: context.vessel_id,
+          edgeCode: parsedTopic.edgeCode,
+          observedAt
+        });
+      }
+      console.log(`[worker] heartbeat stored topic=${topic} msg_id=${envelope.msgId}`);
       return;
     }
 
@@ -91,31 +179,128 @@ client.on("message", async (topic, payloadBuffer) => {
       });
 
       if (!context) {
-        console.warn(
-          `[worker] telemetry context missing tenant=${parsedTopic.tenantCode} vessel=${parsedTopic.vesselCode} edge=${parsedTopic.edgeCode}`
-        );
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "context_missing",
+          detail: "Unable to resolve tenant/vessel by code"
+        });
         return;
       }
 
-      await insertTelemetry({
-        context,
-        payload: envelope.payload,
-        observedAt
-      });
-      console.log(`[worker] telemetry stored topic=${topic} msg_id=${envelope.msgId ?? "n/a"}`);
+      await insertTelemetry({ context, payload, observedAt });
+      console.log(`[worker] telemetry stored topic=${topic} msg_id=${envelope.msgId}`);
       return;
     }
 
-    console.log(`[worker] ${parsedTopic.channel} raw stored topic=${topic} msg_id=${envelope.msgId ?? "n/a"}`);
+    if (parsedTopic.channel === "usage") {
+      const context = await resolveTenantVesselContext({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode
+      });
+
+      if (!context) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "context_missing",
+          detail: "Unable to resolve tenant/vessel by code"
+        });
+        return;
+      }
+
+      const userId = await resolveUserId({
+        tenantId: context.tenant_id,
+        userId: payload.user_id,
+        username: payload.username
+      });
+
+      if (!userId) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "user_not_found",
+          detail: "usage payload must map to an existing user"
+        });
+        return;
+      }
+
+      await insertUsage({ context, userId, payload, observedAt });
+      console.log(`[worker] usage stored topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
+    if (parsedTopic.channel === "event") {
+      const context = await resolveEdgeContext({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        edgeCode: parsedTopic.edgeCode
+      });
+
+      if (!context) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "context_missing",
+          detail: "Unable to resolve tenant/vessel by code"
+        });
+        return;
+      }
+
+      await insertEvent({ context, payload, observedAt });
+      console.log(`[worker] event stored topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
+    if (parsedTopic.channel === "vms") {
+      const context = await resolveTenantVesselContext({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode
+      });
+
+      if (!context) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "context_missing",
+          detail: "Unable to resolve tenant/vessel by code"
+        });
+        return;
+      }
+
+      await insertVms({ context, payload, observedAt });
+      console.log(`[worker] vms stored topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
+    console.log(`[worker] ${parsedTopic.channel} raw stored topic=${topic} msg_id=${envelope.msgId}`);
   } catch (error) {
     const message = error?.message || String(error);
     console.error(`[worker] failed processing topic=${topic}:`, message);
+    await saveIngestError({
+      topic,
+      channel: parsedTopic.channel,
+      msgId: envelope.msgId,
+      reason: "processing_error",
+      detail: message,
+      raw: envelope.raw
+    });
   }
 });
 
-process.on("SIGINT", () => {
+async function shutdown() {
   console.log("[worker] shutting down");
-  client.end(true, () => process.exit(0));
-});
+  client.end(true);
+  await pool.end();
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 console.log(`[worker] bootstrap started at ${new Date().toISOString()}`);

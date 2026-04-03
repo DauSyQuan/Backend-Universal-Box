@@ -8,16 +8,17 @@ dotenv.config({ path: path.resolve(process.cwd(), "../../ops/env.example"), over
 
 const databaseUrl = process.env.DATABASE_URL;
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required for API service");
-}
-
-export const pool = new Pool({
-  connectionString: databaseUrl
-});
+export const pool = databaseUrl
+  ? new Pool({
+      connectionString: databaseUrl
+    })
+  : null;
 
 export async function pingDb() {
+  if (!pool) {
+    return false;
+  }
+
   const result = await pool.query("select 1 as ok");
   return result.rows[0]?.ok === 1;
 }
-

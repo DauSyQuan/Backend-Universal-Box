@@ -17,9 +17,27 @@
   - db migration/reset scripts
   - smoke test script
 
+## 2026-04-01
+
+- Completed Phase 2 ingest expansion:
+  - worker channel ingest for usage/event/vms
+  - validation layer for envelope + per-channel payload
+  - idempotency for duplicate `msg_id`
+  - ingest error persistence table + worker logging
+  - phase2 scripts: seed, sample publish, ingest report
+  - phase2 docs and checklists
+
+## 2026-04-02
+
+- Added MCU visibility backend for Raspberry Pi 4 onboarding:
+  - API endpoint to register edge (`POST /api/mcu/register`)
+  - API endpoint to list MCU status (`GET /api/mcu/edges`)
+  - API endpoint for edge detail (`GET /api/mcu/edges/{tenant}/{vessel}/{edge}`)
+  - Pi4 agent script + systemd unit and onboarding runbook
+
 ## Next checkpoint
 
-- Start Phase 2:
-  - define stable message schemas per channel
-  - implement usage/event/vms typed ingestion
-  - add retry queue and dead-letter strategy
+- Start Phase 3:
+  - command orchestration (`command`, `ack`, `result`) state machine
+  - alert engine and policy sync jobs
+  - captain-facing usage summary endpoints

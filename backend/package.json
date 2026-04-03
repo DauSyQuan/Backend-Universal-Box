@@ -5,6 +5,12 @@
   "engines": {
     "node": ">=22"
   },
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "dotenv": "^16.6.1",
+    "mqtt": "^5.14.1",
+    "pg": "^8.16.3"
+  },
   "workspaces": [
     "services/api",
     "services/worker"
@@ -18,6 +24,10 @@
     "start:worker": "npm run start -w services/worker",
     "db:migrate": "node ./scripts/db-migrate.mjs",
     "db:reset-local": "node ./scripts/db-reset-local.mjs",
+    "db:seed:phase2": "node ./scripts/db-seed-phase2.mjs",
+    "mqtt:publish:phase2": "node ./scripts/publish-phase2-samples.mjs",
+    "mqtt:broker": "node ./scripts/mqtt-broker.mjs",
+    "phase2:report": "node ./scripts/phase2-report.mjs",
     "test:smoke": "node ./scripts/smoke-test.mjs",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
