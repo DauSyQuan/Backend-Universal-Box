@@ -33,6 +33,7 @@ const mqttUrl = process.env.MQTT_URL || "mqtt://localhost:1883";
 const mqttUsername = process.env.MQTT_USERNAME || undefined;
 const mqttPassword = process.env.MQTT_PASSWORD || undefined;
 const qos = Number(process.env.MQTT_QOS ?? "1");
+const observedAtMaxSkewSeconds = Number(process.env.OBSERVED_AT_MAX_SKEW_SECONDS ?? "300");
 const topicFilter = "mcu/+/+/+/+";
 
 const client = mqtt.connect(mqttUrl, {
@@ -98,7 +99,9 @@ client.on("message", async (topic, payloadBuffer) => {
     return;
   }
 
-  const observedAt = toObservedAt(envelope.timestamp);
+  const observedAt = toObservedAt(envelope.timestamp, {
+    maxSkewSeconds: Number.isFinite(observedAtMaxSkewSeconds) ? observedAtMaxSkewSeconds : 300
+  });
   const ingest = await insertIngestMessage({
     topic,
     channel: parsedTopic.channel,

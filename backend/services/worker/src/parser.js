@@ -323,14 +323,25 @@ export function validateAndNormalizePayload(channel, payload) {
   };
 }
 
-export function toObservedAt(value) {
+export function toObservedAt(value, options = {}) {
+  const now = new Date();
+  const fallback = now.toISOString();
+  const maxSkewSeconds = Number.isFinite(options.maxSkewSeconds) ? options.maxSkewSeconds : null;
+
   if (!value) {
-    return new Date().toISOString();
+    return fallback;
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString();
+    return fallback;
+  }
+
+  if (maxSkewSeconds !== null) {
+    const skewMs = Math.abs(now.getTime() - date.getTime());
+    if (skewMs > maxSkewSeconds * 1000) {
+      return fallback;
+    }
   }
 
   return date.toISOString();

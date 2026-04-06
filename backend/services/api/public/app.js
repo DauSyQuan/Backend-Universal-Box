@@ -171,6 +171,80 @@ function extractTelemetryTotalGb(telemetry, traffic) {
   return estimateTrafficTotalGb(traffic);
 }
 
+function extractTelemetryInterfaces(telemetry, traffic) {
+  const telemetryInterfaces = Array.isArray(telemetry?.interfaces) ? telemetry.interfaces : [];
+  if (telemetryInterfaces.length) {
+    return telemetryInterfaces;
+  }
+
+  const trafficInterfaces = Array.isArray(traffic?.latest?.interfaces) ? traffic.latest.interfaces : [];
+  return trafficInterfaces;
+}
+
+function findInterfaceTotalGb(interfaces, interfaceName) {
+  if (!Array.isArray(interfaces) || !interfaceName) {
+    return null;
+  }
+
+  const matched = interfaces.find((iface) => String(iface?.name || "").trim() === String(interfaceName).trim());
+  if (!matched) {
+    return null;
+  }
+
+  const total = Number(matched.total_gb);
+  return Number.isFinite(total) ? total : null;
+}
+
+function renderInterfaceUsage(interfaces, activeUplink) {
+  if (!Array.isArray(interfaces) || interfaces.length === 0) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>Chua co du lieu tung port</h3>
+        <p>MCU chua gui danh sach interfaces kem tong dung luong cho moi cong.</p>
+      </div>
+    `;
+  }
+
+  const rows = [...interfaces]
+    .sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || "")))
+    .map((iface) => {
+      const name = String(iface?.name || "unknown");
+      const isActive = activeUplink && name === activeUplink;
+      return `
+        <tr>
+          <td>
+            <div class="port-name-cell">
+              <strong>${escapeHtml(name)}</strong>
+              ${isActive ? '<span class="port-active-chip">Active</span>' : ""}
+            </div>
+          </td>
+          <td>${escapeHtml(formatKbps(iface?.rx_kbps))}</td>
+          <td>${escapeHtml(formatKbps(iface?.tx_kbps))}</td>
+          <td>${escapeHtml(formatKbps(iface?.throughput_kbps))}</td>
+          <td>${escapeHtml(formatDataVolumeGb(iface?.total_gb))}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="port-usage-table-wrap">
+      <table class="port-usage-table">
+        <thead>
+          <tr>
+            <th>Port</th>
+            <th>RX</th>
+            <th>TX</th>
+            <th>Throughput</th>
+            <th>Total data</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function statusMarkup(online) {
   const label = online ? "Online" : "Offline";
   const statusClass = online ? "status-good" : "status-bad";
@@ -524,6 +598,115 @@ function renderTrafficChart(samples) {
   `;
 }
 
+function summarizePortSeries(samples) {
+  const portMap = new Map();
+
+  samples.forEach((sample) => {
+    const interfaces = Array.isArray(sample?.interfaces) ? sample.interfaces : [];
+    interfaces.forEach((iface) => {
+      const name = String(iface?.name || "").trim();
+      if (!name) {
+        return;
+      }
+
+      const entry = portMap.get(name) || {
+        name,
+        samples: [],
+        latestTotalGb: null,
+        latestRxKbps: null,
+        latestTxKbps: null,
+        latestThroughputKbps: null,
+        maxThroughputKbps: 0
+      };
+
+      const throughput = Number(iface?.throughput_kbps || 0);
+      const rx = Number(iface?.rx_kbps || 0);
+      const tx = Number(iface?.tx_kbps || 0);
+      const totalGb = Number(iface?.total_gb);
+
+      entry.samples.push({
+        observed_at: sample.observed_at,
+        throughput_kbps: Number.isFinite(throughput) ? throughput : 0
+      });
+      entry.latestThroughputKbps = Number.isFinite(throughput) ? throughput : null;
+      entry.latestRxKbps = Number.isFinite(rx) ? rx : null;
+      entry.latestTxKbps = Number.isFinite(tx) ? tx : null;
+      entry.latestTotalGb = Number.isFinite(totalGb) ? totalGb : entry.latestTotalGb;
+      entry.maxThroughputKbps = Math.max(entry.maxThroughputKbps, Number.isFinite(throughput) ? throughput : 0);
+
+      portMap.set(name, entry);
+    });
+  });
+
+  return Array.from(portMap.values())
+    .sort((left, right) => {
+      const rightWeight = Number(right.latestTotalGb ?? right.maxThroughputKbps ?? 0);
+      const leftWeight = Number(left.latestTotalGb ?? left.maxThroughputKbps ?? 0);
+      return rightWeight - leftWeight;
+    });
+}
+
+function renderPortSparkline(values, stroke) {
+  if (!values.length) {
+    return "";
+  }
+
+  const width = 240;
+  const height = 72;
+  const path = linePath(values, width, height, 8, 8, Math.max(1, ...values));
+
+  return `
+    <svg class="port-sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${path}" fill="none" stroke="${stroke}" stroke-width="2.5"></path>
+    </svg>
+  `;
+}
+
+function renderPortCharts(samples, activeUplink) {
+  const ports = summarizePortSeries(samples);
+
+  if (!ports.length) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>Chua co chart tung port</h3>
+        <p>Can them telemetry theo interface de ve bieu do theo tung cong.</p>
+      </div>
+    `;
+  }
+
+  const palette = ["#68e1fd", "#53e2a1", "#ff9d5c", "#ff6f91", "#ffd166", "#b892ff"];
+
+  return `
+    <div class="port-chart-grid">
+      ${ports
+        .map((port, index) => {
+          const color = palette[index % palette.length];
+          const values = port.samples.map((sample) => Number(sample.throughput_kbps || 0));
+          const isActive = activeUplink && port.name === activeUplink;
+          return `
+            <article class="port-chart-card">
+              <div class="port-chart-header">
+                <div class="port-name-cell">
+                  <strong>${escapeHtml(port.name)}</strong>
+                  ${isActive ? '<span class="port-active-chip">Active</span>' : ""}
+                </div>
+                <span class="tiny-note">Peak ${escapeHtml(formatKbps(port.maxThroughputKbps))}</span>
+              </div>
+              ${renderPortSparkline(values, color)}
+              <div class="port-chart-metrics">
+                <span><strong>Now</strong> ${escapeHtml(formatKbps(port.latestThroughputKbps))}</span>
+                <span><strong>RX</strong> ${escapeHtml(formatKbps(port.latestRxKbps))}</span>
+                <span><strong>TX</strong> ${escapeHtml(formatKbps(port.latestTxKbps))}</span>
+                <span><strong>Total</strong> ${escapeHtml(formatDataVolumeGb(port.latestTotalGb))}</span>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
 function renderListItems(items, renderItem, emptyTitle, emptyText) {
   if (!items.length) {
     return `
@@ -560,6 +743,8 @@ function renderDetail() {
   const usage24h = detail.usage_24h || {};
   const totalUsageMb24h = Number(usage24h.upload_mb_24h || 0) + Number(usage24h.download_mb_24h || 0);
   const cumulativeTelemetryGb = extractTelemetryTotalGb(latestTelemetry, traffic);
+  const interfaceUsage = extractTelemetryInterfaces(latestTelemetry, traffic);
+  const activeInterfaceTotalGb = findInterfaceTotalGb(interfaceUsage, latestTelemetry.active_uplink);
 
   setTextContent(elements.detailTitle, summary.edge_code || "Edge detail");
   setTextContent(elements.detailMeta, `${summary.tenant_code || "-"} / ${summary.vessel_code || "-"} / direct Ethernet`);
@@ -608,8 +793,8 @@ function renderDetail() {
         <strong>${escapeHtml(formatKbps(latestTelemetry.tx_kbps))}</strong>
       </article>
       <article class="metric-card">
-        <span>Total data</span>
-        <strong>${escapeHtml(cumulativeTelemetryGb != null ? formatDataVolumeGb(cumulativeTelemetryGb) : formatDataVolumeMb(totalUsageMb24h))}</strong>
+        <span>Active port total</span>
+        <strong>${escapeHtml(activeInterfaceTotalGb != null ? formatDataVolumeGb(activeInterfaceTotalGb) : cumulativeTelemetryGb != null ? formatDataVolumeGb(cumulativeTelemetryGb) : formatDataVolumeMb(totalUsageMb24h))}</strong>
       </article>
       <article class="metric-card">
         <span>Latency</span>
@@ -658,6 +843,26 @@ function renderDetail() {
         </div>
       </div>
       ${renderTrafficChart(trafficSamples)}
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-header">
+        <div>
+          <h3>Port usage breakdown</h3>
+          <p class="chart-note">Dung luong va bang thong duoc tach rieng theo tung cong MCU/MikroTik.</p>
+        </div>
+      </div>
+      ${renderInterfaceUsage(interfaceUsage, latestTelemetry.active_uplink)}
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-header">
+        <div>
+          <h3>Port traffic over time</h3>
+          <p class="chart-note">Mini-chart rieng cho tung port de xem cong nao dang an bang thong va dung luong nhieu nhat.</p>
+        </div>
+      </div>
+      ${renderPortCharts(trafficSamples, latestTelemetry.active_uplink)}
     </section>
 
     <section class="history-grid">
