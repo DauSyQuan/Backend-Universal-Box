@@ -96,6 +96,17 @@ function formatCoordinate(value) {
   return formatNumber(value, 5);
 }
 
+function isRecentTimestamp(value, seconds = 120) {
+  if (!value) {
+    return false;
+  }
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) {
+    return false;
+  }
+  return Date.now() - timestamp <= seconds * 1000;
+}
+
 function formatDataVolumeGb(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "No data";
@@ -410,7 +421,7 @@ function renderEdgeList() {
             ${statusMarkup(edge.online)}
           </div>
           <div class="edge-meta">
-            <span class="meta-chip"><strong>Seen</strong> ${escapeHtml(formatDate(edge.heartbeat_at || edge.last_seen_at))}</span>
+            <span class="meta-chip"><strong>Seen</strong> ${escapeHtml(formatDate(edge.telemetry_at || edge.heartbeat_at || edge.last_seen_at))}</span>
             <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(edge.active_uplink || "No data")}</span>
             <span class="meta-chip"><strong>Traffic</strong> ${escapeHtml(formatKbps(edge.throughput_kbps))}</span>
           </div>
@@ -565,7 +576,7 @@ function renderDetail() {
       </div>
       <div class="detail-hero-meta">
         <span class="meta-chip"><strong>Firmware</strong> ${escapeHtml(summary.edge_firmware_version || latestHeartbeat.firmware_version || "Unknown")}</span>
-        <span class="meta-chip"><strong>Last seen</strong> ${escapeHtml(formatDate(summary.last_seen_at || latestHeartbeat.observed_at))}</span>
+        <span class="meta-chip"><strong>Last seen</strong> ${escapeHtml(formatDate(latestTelemetry.observed_at || summary.last_seen_at || latestHeartbeat.observed_at))}</span>
         <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(latestTelemetry.active_uplink || "No data")}</span>
       </div>
     </section>
@@ -714,14 +725,24 @@ function mergeLiveTelemetry(telemetry) {
     return;
   }
 
+  const normalizedTelemetry = {
+    ...telemetry,
+    active_uplink: telemetry.active_uplink || telemetry.active_interface || null
+  };
+
   state.detail.latest = state.detail.latest || {};
-  state.detail.latest.telemetry = telemetry;
+  state.detail.latest.telemetry = normalizedTelemetry;
+  state.detail.summary = state.detail.summary || {};
+  state.detail.summary.last_seen_at = normalizedTelemetry.observed_at;
+  state.detail.summary.online = isRecentTimestamp(normalizedTelemetry.observed_at, 120);
 
   const summary = selectedEdge();
   if (summary) {
-    summary.throughput_kbps = telemetry.throughput_kbps;
-    summary.active_uplink = telemetry.active_interface;
-    summary.telemetry_at = telemetry.observed_at;
+    summary.throughput_kbps = normalizedTelemetry.throughput_kbps;
+    summary.active_uplink = normalizedTelemetry.active_uplink;
+    summary.telemetry_at = normalizedTelemetry.observed_at;
+    summary.last_seen_at = normalizedTelemetry.observed_at;
+    summary.online = isRecentTimestamp(normalizedTelemetry.observed_at, 120);
   }
 
   if (!state.traffic) {
@@ -732,12 +753,12 @@ function mergeLiveTelemetry(telemetry) {
   }
 
   const nextSample = {
-    observed_at: telemetry.observed_at,
-    rx_kbps: telemetry.rx_kbps,
-    tx_kbps: telemetry.tx_kbps,
-    throughput_kbps: telemetry.throughput_kbps,
-    active_interface: telemetry.active_interface,
-    interfaces: Array.isArray(telemetry.interfaces) ? telemetry.interfaces : []
+    observed_at: normalizedTelemetry.observed_at,
+    rx_kbps: normalizedTelemetry.rx_kbps,
+    tx_kbps: normalizedTelemetry.tx_kbps,
+    throughput_kbps: normalizedTelemetry.throughput_kbps,
+    active_interface: normalizedTelemetry.active_uplink,
+    interfaces: Array.isArray(normalizedTelemetry.interfaces) ? normalizedTelemetry.interfaces : []
   };
 
   const existing = new Map((state.traffic.samples || []).map((sample) => [sample.observed_at, sample]));
