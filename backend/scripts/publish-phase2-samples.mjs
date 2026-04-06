@@ -12,6 +12,7 @@ const qos = Number(process.env.MQTT_QOS ?? "1");
 const tenantCode = process.env.PHASE2_TENANT_CODE || "tnr13";
 const vesselCode = process.env.PHASE2_VESSEL_CODE || "vsl-001";
 const edgeCode = process.env.PHASE2_EDGE_CODE || "edge-001";
+const publicWanIp = process.env.PHASE2_PUBLIC_WAN_IP || "65.181.17.76";
 
 function envelope(payload, msgId = randomUUID()) {
   return {
@@ -58,7 +59,8 @@ async function run() {
         firmware_version: "1.0.0",
         cpu_usage_pct: 23.5,
         ram_usage_pct: 54.2,
-        status: "online"
+        status: "online",
+        public_wan_ip: publicWanIp
       })
     },
     {
@@ -69,7 +71,22 @@ async function run() {
           latency_ms: 41.5,
           loss_pct: 0.05,
           jitter_ms: 5.2,
-          throughput_kbps: 9820
+          throughput_kbps: 9820,
+          rx_kbps: 6020,
+          tx_kbps: 3800,
+          public_wan_ip: publicWanIp,
+          interfaces: [
+            {
+              name: "starlink",
+              rx_kbps: 6000,
+              tx_kbps: 3800
+            },
+            {
+              name: "ether1",
+              rx_kbps: 20,
+              tx_kbps: 0
+            }
+          ]
         },
         duplicateMsgId
       )
@@ -131,4 +148,3 @@ run().catch((error) => {
   console.error("[phase2 publish] failed:", error.message);
   process.exit(1);
 });
-

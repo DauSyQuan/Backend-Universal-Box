@@ -1,4 +1,60 @@
+import { EventEmitter } from "node:events";
+import { isIP } from "node:net";
 import { pool } from "./db.js";
+
+const sseEmitter = new EventEmitter();
+let sharedListenerClient = null;
+
+async function ensureNotificationListener() {
+  if (sharedListenerClient || !pool) return;
+  sharedListenerClient = await pool.connect();
+  await sharedListenerClient.query("LISTEN mcu_telemetry_stream");
+  sharedListenerClient.on("notification", async (msg) => {
+    if (msg.channel === "mcu_telemetry_stream") {
+      try {
+        const payload = JSON.parse(msg.payload);
+        const telemetryResult = await pool.query(
+          `
+            select
+              t.id,
+              t.edge_box_id,
+              t.active_uplink as active_interface,
+              t.rx_kbps,
+              t.tx_kbps,
+              t.throughput_kbps,
+              t.observed_at,
+              (
+                select json_agg(json_build_object(
+                  'name', ti.interface_name,
+                  'rx_kbps', ti.rx_kbps,
+                  'tx_kbps', ti.tx_kbps,
+                  'throughput_kbps', ti.throughput_kbps,
+                  'total_gb', ti.total_gb
+                ))
+                from telemetry_interfaces ti
+                where ti.telemetry_id = t.id
+              ) as interfaces
+            from telemetry t
+            where t.id = $1
+          `,
+          [payload.telemetry_id]
+        );
+        if (telemetryResult.rowCount > 0) {
+          const t = telemetryResult.rows[0];
+          sseEmitter.emit(`edge:${t.edge_box_id}`, t);
+        }
+      } catch (err) {
+        console.error("Failed to process notification", err);
+      }
+    }
+  });
+  sharedListenerClient.on("error", (err) => {
+    console.error("Shared listener client error", err);
+    sharedListenerClient.release(true);
+    sharedListenerClient = null;
+    setTimeout(ensureNotificationListener, 2000);
+  });
+}
 
 function ensurePool() {
   if (!pool) {
@@ -14,11 +70,28 @@ function toInt(value, fallback) {
   return parsed;
 }
 
-function isOnline(heartbeatAt, onlineSeconds) {
-  if (!heartbeatAt) {
+function latestObservedAt(...values) {
+  let latest = null;
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+    const timestamp = new Date(value).getTime();
+    if (Number.isNaN(timestamp)) {
+      continue;
+    }
+    if (latest === null || timestamp > latest) {
+      latest = timestamp;
+    }
+  }
+  return latest === null ? null : new Date(latest).toISOString();
+}
+
+function isOnline(activityAt, onlineSeconds) {
+  if (!activityAt) {
     return false;
   }
-  const last = new Date(heartbeatAt).getTime();
+  const last = new Date(activityAt).getTime();
   if (Number.isNaN(last)) {
     return false;
   }
@@ -43,6 +116,41 @@ function firstPresent(payload, keys) {
     }
   }
   return undefined;
+}
+
+function normalizeWanIp(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const [first] = String(value).split(",");
+  const trimmed = first?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.startsWith("::ffff:") ? trimmed.slice(7) : trimmed;
+  return isIP(normalized) ? normalized : null;
+}
+
+function parseWanIpInput(value, { required = false } = {}) {
+  if (value === null || value === undefined || value === "") {
+    if (required) {
+      const error = new Error("wan_ip is required");
+      error.code = "bad_request";
+      throw error;
+    }
+    return null;
+  }
+
+  const normalized = normalizeWanIp(value);
+  if (!normalized) {
+    const error = new Error("wan_ip must be a valid IPv4 or IPv6 address");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  return normalized;
 }
 
 function normalizeTrafficSample(row) {
@@ -90,11 +198,40 @@ function avg(values) {
   return sum / values.length;
 }
 
-export async function listMcuEdges({ tenantCode = null, vesselCode = null, limit = 50, onlineSeconds = 120 }) {
+async function findEdgeByWanIp(publicWanIp) {
+  const normalizedWanIp = parseWanIpInput(publicWanIp, { required: true });
+  const result = await pool.query(
+    `
+      select
+        t.code as tenant_code,
+        v.code as vessel_code,
+        e.edge_code,
+        host(e.public_wan_ip) as public_wan_ip
+      from edge_boxes e
+      join vessels v on v.id = e.vessel_id
+      join tenants t on t.id = v.tenant_id
+      where e.public_wan_ip = $1::inet
+      order by coalesce(e.last_seen_at, e.created_at) desc
+      limit 1
+    `,
+    [normalizedWanIp]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function listMcuEdges({
+  tenantCode = null,
+  vesselCode = null,
+  wanIp = null,
+  limit = 50,
+  onlineSeconds = 120
+}) {
   ensurePool();
 
   const safeLimit = Math.max(1, Math.min(500, toInt(limit, 50)));
   const safeOnlineSeconds = Math.max(10, Math.min(3600, toInt(onlineSeconds, 120)));
+  const normalizedWanIp = parseWanIpInput(wanIp);
 
   const result = await pool.query(
     `
@@ -105,6 +242,7 @@ export async function listMcuEdges({ tenantCode = null, vesselCode = null, limit
         v.name as vessel_name,
         e.id as edge_id,
         e.edge_code,
+        host(e.public_wan_ip) as public_wan_ip,
         e.firmware_version as edge_firmware_version,
         e.last_seen_at,
         hb.observed_at as heartbeat_at,
@@ -160,10 +298,11 @@ export async function listMcuEdges({ tenantCode = null, vesselCode = null, limit
       ) err on true
       where ($1::text is null or t.code = $1)
         and ($2::text is null or v.code = $2)
+        and ($3::inet is null or e.public_wan_ip = $3::inet)
       order by coalesce(hb.observed_at, e.last_seen_at, e.created_at) desc
-      limit $3
+      limit $4
     `,
-    [tenantCode, vesselCode, safeLimit]
+    [tenantCode, vesselCode, normalizedWanIp, safeLimit]
   );
 
   return {
@@ -171,7 +310,7 @@ export async function listMcuEdges({ tenantCode = null, vesselCode = null, limit
     online_seconds: safeOnlineSeconds,
     items: result.rows.map((row) => ({
       ...row,
-      online: isOnline(row.heartbeat_at, safeOnlineSeconds)
+      online: isOnline(latestObservedAt(row.heartbeat_at, row.telemetry_at, row.last_seen_at), safeOnlineSeconds)
     }))
   };
 }
@@ -191,6 +330,7 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
         v.name as vessel_name,
         e.id as edge_id,
         e.edge_code,
+        host(e.public_wan_ip) as public_wan_ip,
         e.firmware_version as edge_firmware_version,
         e.last_seen_at
       from edge_boxes e
@@ -221,7 +361,7 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
     ),
     pool.query(
       `
-        select observed_at, active_uplink, latency_ms, loss_pct, jitter_ms, throughput_kbps
+        select observed_at, active_uplink, latency_ms, loss_pct, jitter_ms, throughput_kbps, rx_kbps, tx_kbps, interfaces
         from telemetry
         where edge_box_id = $1
         order by observed_at desc
@@ -282,7 +422,7 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
       `
         select created_at, reason, detail, topic
         from ingest_errors
-        where topic like concat('mcu/', $1, '/', $2, '/', $3, '/%')
+        where topic like ('mcu/' || $1::text || '/' || $2::text || '/' || $3::text || '/%')
         order by created_at desc
         limit 20
       `,
@@ -305,15 +445,35 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
 
   const heartbeatRow = heartbeat.rows[0] ?? null;
 
+  let telemetryRow = telemetry.rows[0] ?? null;
+  if (!telemetryRow && summary.edge_id) {
+    const fallbackTelemetry = await pool.query(
+      `
+        select observed_at, active_uplink, latency_ms, loss_pct, jitter_ms, throughput_kbps, rx_kbps, tx_kbps, interfaces
+        from telemetry
+        where edge_box_id is null 
+          and tenant_id = $1 
+          and vessel_id = $2
+        order by observed_at desc
+        limit 1
+      `,
+      [summary.tenant_id, summary.vessel_id]
+    );
+    telemetryRow = fallbackTelemetry.rows[0] ?? null;
+  }
+
   return {
     summary: {
       ...summary,
       online_seconds: safeOnlineSeconds,
-      online: isOnline(heartbeatRow?.observed_at, safeOnlineSeconds)
+      online: isOnline(
+        latestObservedAt(heartbeatRow?.observed_at, telemetryRow?.observed_at, summary.last_seen_at),
+        safeOnlineSeconds
+      )
     },
     latest: {
       heartbeat: heartbeatRow,
-      telemetry: telemetry.rows[0] ?? null,
+      telemetry: telemetryRow,
       vms: vms.rows[0] ?? null
     },
     usage_24h: usageStats.rows[0] ?? { upload_mb_24h: 0, download_mb_24h: 0, samples_24h: 0 },
@@ -324,11 +484,29 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
   };
 }
 
+export async function getMcuEdgeDetailByWanIp({ publicWanIp, onlineSeconds = 120 }) {
+  ensurePool();
+
+  const edge = await findEdgeByWanIp(publicWanIp);
+  if (!edge) {
+    return null;
+  }
+
+  return getMcuEdgeDetail({
+    tenantCode: edge.tenant_code,
+    vesselCode: edge.vessel_code,
+    edgeCode: edge.edge_code,
+    onlineSeconds
+  });
+}
+
 export async function registerMcuEdge(input) {
   ensurePool();
   const tenantCode = String(input.tenant_code || "").trim();
   const vesselCode = String(input.vessel_code || "").trim();
   const edgeCode = String(input.edge_code || "").trim();
+  const explicitWanIpInput = firstPresent(input, ["public_wan_ip", "wan_ip", "public_ip", "wan_ipv4", "ip_wan"]);
+  const detectedWanIpInput = firstPresent(input, ["detected_public_wan_ip", "request_ip"]);
 
   if (!tenantCode || !vesselCode || !edgeCode) {
     const error = new Error("tenant_code, vessel_code, edge_code are required");
@@ -340,6 +518,8 @@ export async function registerMcuEdge(input) {
   const vesselName = String(input.vessel_name || vesselCode).trim();
   const firmwareVersion = input.firmware_version ? String(input.firmware_version).trim() : null;
   const observedAt = input.observed_at ? new Date(input.observed_at).toISOString() : null;
+  const publicWanIp =
+    explicitWanIpInput !== undefined ? parseWanIpInput(explicitWanIpInput) : parseWanIpInput(detectedWanIpInput);
 
   const client = await pool.connect();
   try {
@@ -371,15 +551,16 @@ export async function registerMcuEdge(input) {
 
     const edgeResult = await client.query(
       `
-        insert into edge_boxes (vessel_id, edge_code, firmware_version, last_seen_at)
-        values ($1, $2, $3, $4)
+        insert into edge_boxes (vessel_id, edge_code, firmware_version, last_seen_at, public_wan_ip)
+        values ($1, $2, $3, $4, $5::inet)
         on conflict (vessel_id, edge_code)
         do update
           set firmware_version = coalesce(excluded.firmware_version, edge_boxes.firmware_version),
-              last_seen_at = coalesce(excluded.last_seen_at, edge_boxes.last_seen_at)
-        returning id, edge_code, firmware_version, last_seen_at
+              last_seen_at = coalesce(excluded.last_seen_at, edge_boxes.last_seen_at),
+              public_wan_ip = coalesce(excluded.public_wan_ip, edge_boxes.public_wan_ip)
+        returning id, edge_code, host(public_wan_ip) as public_wan_ip, firmware_version, last_seen_at
       `,
-      [vessel.id, edgeCode, firmwareVersion, observedAt]
+      [vessel.id, edgeCode, firmwareVersion, observedAt, publicWanIp]
     );
     const edge = edgeResult.rows[0];
 
@@ -402,6 +583,7 @@ export async function getMcuEdgeTraffic({
   tenantCode,
   vesselCode,
   edgeCode,
+  interfaceName,
   windowMinutes = 60,
   limit = 300
 }) {
@@ -410,7 +592,7 @@ export async function getMcuEdgeTraffic({
   const safeWindowMinutes = Math.max(1, Math.min(1440, toInt(windowMinutes, 60)));
   const safeLimit = Math.max(1, Math.min(2000, toInt(limit, 300)));
 
-  const edge = await pool.query(
+  const edgeQuery = await pool.query(
     `
       select
         t.id as tenant_id,
@@ -418,7 +600,8 @@ export async function getMcuEdgeTraffic({
         v.id as vessel_id,
         v.code as vessel_code,
         e.id as edge_id,
-        e.edge_code
+        e.edge_code,
+        host(e.public_wan_ip) as public_wan_ip
       from edge_boxes e
       join vessels v on v.id = e.vessel_id
       join tenants t on t.id = v.tenant_id
@@ -428,28 +611,65 @@ export async function getMcuEdgeTraffic({
     [tenantCode, vesselCode, edgeCode]
   );
 
-  if (edge.rowCount === 0) {
+  if (edgeQuery.rowCount === 0) {
     return null;
   }
+  
+  const edgeRow = edgeQuery.rows[0];
 
-  const samplesResult = await pool.query(
-    `
-      select
-        coalesce((im.payload->>'timestamp')::timestamptz, im.received_at) as observed_at,
-        im.payload
-      from ingest_messages im
-      where im.channel = 'telemetry'
-        and im.tenant_code = $1
-        and im.vessel_code = $2
-        and im.edge_code = $3
-        and im.received_at >= now() - make_interval(mins => $4::int)
-      order by observed_at desc
-      limit $5
-    `,
-    [tenantCode, vesselCode, edgeCode, safeWindowMinutes, safeLimit]
-  );
+  let samplesResult;
+  if (interfaceName) {
+    samplesResult = await pool.query(
+      `
+        select
+          t.active_uplink as active_interface,
+          ti.rx_kbps,
+          ti.tx_kbps,
+          ti.throughput_kbps,
+          t.interfaces,
+          t.observed_at
+        from telemetry t
+        join telemetry_interfaces ti on ti.telemetry_id = t.id
+        where t.edge_box_id = $1
+          and ti.interface_name = $4
+          and t.observed_at >= now() - make_interval(mins => $2::int)
+        order by t.observed_at desc
+        limit $3
+      `,
+      [edgeRow.edge_id, safeWindowMinutes, safeLimit, interfaceName]
+    );
+  } else {
+    samplesResult = await pool.query(
+      `
+        select
+          active_uplink as active_interface,
+          rx_kbps,
+          tx_kbps,
+          throughput_kbps,
+          interfaces,
+          observed_at
+        from telemetry
+        where edge_box_id = $1
+          and observed_at >= now() - make_interval(mins => $2::int)
+        order by observed_at desc
+        limit $3
+      `,
+      [edgeRow.edge_id, safeWindowMinutes, safeLimit]
+    );
+  }
 
-  const samples = samplesResult.rows.map(normalizeTrafficSample).sort((a, b) => {
+  const samples = samplesResult.rows.map(row => ({
+    observed_at: row.observed_at,
+    active_interface: String(row.active_interface ?? ""),
+    rx_kbps: row.rx_kbps ? Number(row.rx_kbps) : null,
+    tx_kbps: row.tx_kbps ? Number(row.tx_kbps) : null,
+    throughput_kbps: row.throughput_kbps ? Number(row.throughput_kbps) : null,
+    interfaces: row.interfaces ?? [],
+    source: "unknown",
+    mk_status: "unknown",
+    total_gb: null,
+    raw: {}
+  })).sort((a, b) => {
     const ta = new Date(a.observed_at).getTime();
     const tb = new Date(b.observed_at).getTime();
     return ta - tb;
@@ -473,8 +693,9 @@ export async function getMcuEdgeTraffic({
   ).sort();
 
   return {
-    edge: edge.rows[0],
+    edge: edgeRow,
     window_minutes: safeWindowMinutes,
+    interface_filter: interfaceName || null,
     sample_count: samples.length,
     latest,
     summary: {
@@ -488,4 +709,66 @@ export async function getMcuEdgeTraffic({
     },
     samples
   };
+}
+
+export async function getMcuEdgeTrafficByWanIp({ publicWanIp, interfaceName, windowMinutes = 60, limit = 300 }) {
+  ensurePool();
+
+  const edge = await findEdgeByWanIp(publicWanIp);
+  if (!edge) {
+    return null;
+  }
+
+  return getMcuEdgeTraffic({
+    tenantCode: edge.tenant_code,
+    vesselCode: edge.vessel_code,
+    edgeCode: edge.edge_code,
+    interfaceName,
+    windowMinutes,
+    limit
+  });
+}
+
+export async function streamMcuTelemetry(req, res, { tenantCode, vesselCode, edgeCode }) {
+  ensurePool();
+  
+  const edgeQuery = await pool.query(
+    `
+      select e.id as edge_id
+      from edge_boxes e
+      join vessels v on v.id = e.vessel_id
+      join tenants t on t.id = v.tenant_id
+      where t.code = $1 and v.code = $2 and e.edge_code = $3
+      limit 1
+    `,
+    [tenantCode, vesselCode, edgeCode]
+  );
+
+  if (edgeQuery.rowCount === 0) {
+    res.status?.(404).json?.({ error: "not_found" });
+    res.end();
+    return;
+  }
+  const edgeId = edgeQuery.rows[0].edge_id;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  // Send initial connected message
+  res.write('data: {"type":"connected"}\n\n');
+
+  await ensureNotificationListener();
+
+  const handleUpdate = (data) => {
+    res.write(`data: ${JSON.stringify({ type: "telemetry", data })}\n\n`);
+  };
+
+  const topicStr = `edge:${edgeId}`;
+  sseEmitter.on(topicStr, handleUpdate);
+
+  req.on("close", () => {
+    sseEmitter.off(topicStr, handleUpdate);
+  });
 }

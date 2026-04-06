@@ -1,0 +1,16 @@
+[Unit]
+Description=MCU Backend Worker
+After=network-online.target postgresql.service mcu-mqtt-broker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__BACKEND_DIR__/services/worker
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

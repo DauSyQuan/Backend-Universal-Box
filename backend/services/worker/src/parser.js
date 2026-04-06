@@ -1,3 +1,6 @@
+import { isIP } from "node:net";
+import { randomUUID } from "node:crypto";
+
 const VALID_CHANNELS = new Set(["heartbeat", "telemetry", "usage", "event", "vms", "ack", "result"]);
 
 function asNumber(value) {
@@ -15,6 +18,10 @@ function asNumber(value) {
 
 function pushNumberError(errors, field) {
   errors.push(`${field} must be a number`);
+}
+
+function pushIpError(errors, field) {
+  errors.push(`${field} must be a valid IPv4 or IPv6 address`);
 }
 
 function firstPresentValue(payload, aliases) {
@@ -37,6 +44,21 @@ function firstPresentString(payload, aliases) {
   return String(value);
 }
 
+function normalizeIpAddress(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const [first] = String(value).split(",");
+  const trimmed = first?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.startsWith("::ffff:") ? trimmed.slice(7) : trimmed;
+  return isIP(normalized) ? normalized : null;
+}
+
 export function parseTopic(topic) {
   const parts = topic.split("/");
   if (parts.length !== 5 || parts[0] !== "mcu") {
@@ -54,12 +76,19 @@ export function parseTopic(topic) {
 export function parseEnvelope(rawBuffer) {
   const content = rawBuffer.toString("utf8");
   const parsed = JSON.parse(content);
-  const payload = parsed.payload && typeof parsed.payload === "object" ? parsed.payload : {};
+  const hasPayloadField = parsed.payload && typeof parsed.payload === "object";
+  const payload = hasPayloadField ? parsed.payload : { ...parsed };
+
+  if (!hasPayloadField) {
+    delete payload.msg_id;
+    delete payload.schema_version;
+    delete payload.timestamp;
+  }
 
   return {
     raw: parsed,
-    msgId: parsed.msg_id ?? null,
-    timestamp: parsed.timestamp ?? null,
+    msgId: parsed.msg_id ?? randomUUID(),
+    timestamp: parsed.timestamp ?? new Date().toISOString(),
     schemaVersion: parsed.schema_version ?? "v1",
     payload
   };
@@ -100,11 +129,19 @@ export function validateAndNormalizePayload(channel, payload) {
     ]);
     const fwRaw = firstPresentString(payload, ["firmware_version", "routeros_version", "ros_version", "version"]);
     const statusRaw = firstPresentString(payload, ["status", "router_status", "state"]);
+    const publicWanIpRaw = firstPresentValue(payload, [
+      "public_wan_ip",
+      "wan_ip",
+      "public_ip",
+      "wan_ipv4",
+      "ip_wan"
+    ]);
 
     normalized.cpu_usage_pct = asNumber(cpuRaw);
     normalized.ram_usage_pct = asNumber(ramRaw);
     normalized.firmware_version = fwRaw ?? payload.firmware_version ?? null;
     normalized.status = statusRaw ?? payload.status ?? "online";
+    normalized.public_wan_ip = normalizeIpAddress(publicWanIpRaw);
 
     if (cpuRaw !== undefined && normalized.cpu_usage_pct === null) {
       pushNumberError(errors, "cpu_usage_pct");
@@ -112,15 +149,26 @@ export function validateAndNormalizePayload(channel, payload) {
     if (ramRaw !== undefined && normalized.ram_usage_pct === null) {
       pushNumberError(errors, "ram_usage_pct");
     }
+    if (publicWanIpRaw !== undefined && normalized.public_wan_ip === null) {
+      pushIpError(errors, "public_wan_ip");
+    }
   }
 
   if (channel === "telemetry") {
-    const latencyRaw = firstPresentValue(payload, ["latency_ms", "rtt_ms", "ping_latency_ms", "avg_rtt_ms"]);
-    const lossRaw = firstPresentValue(payload, ["loss_pct", "packet_loss_pct", "ping_loss_pct"]);
-    const jitterRaw = firstPresentValue(payload, ["jitter_ms", "ping_jitter_ms"]);
-    const throughputRaw = firstPresentValue(payload, ["throughput_kbps", "total_kbps", "bandwidth_kbps"]);
-    const rxRaw = firstPresentValue(payload, ["rx_kbps", "download_kbps", "rx_rate_kbps"]);
-    const txRaw = firstPresentValue(payload, ["tx_kbps", "upload_kbps", "tx_rate_kbps"]);
+    const latencyRaw = firstPresentValue(payload, ["latency_ms", "rtt_ms", "ping_latency_ms", "avg_rtt_ms", "latency"]);
+    const lossRaw = firstPresentValue(payload, ["loss_pct", "packet_loss_pct", "ping_loss_pct", "packet_loss", "loss"]);
+    const jitterRaw = firstPresentValue(payload, ["jitter_ms", "ping_jitter_ms", "jitter"]);
+    const throughputRaw = firstPresentValue(payload, ["throughput_kbps", "total_kbps", "bandwidth_kbps", "throughput"]);
+    const rxRaw = firstPresentValue(payload, ["rx_kbps", "download_kbps", "rx_rate_kbps", "in"]);
+    const txRaw = firstPresentValue(payload, ["tx_kbps", "upload_kbps", "tx_rate_kbps", "out"]);
+    const totalGbRaw = firstPresentValue(payload, ["total_gb", "total_traffic_gb", "cum_gb", "total"]);
+    const publicWanIpRaw = firstPresentValue(payload, [
+      "public_wan_ip",
+      "wan_ip",
+      "public_ip",
+      "wan_ipv4",
+      "ip_wan"
+    ]);
 
     const rxKbps = asNumber(rxRaw);
     const txKbps = asNumber(txRaw);
@@ -133,6 +181,68 @@ export function validateAndNormalizePayload(channel, payload) {
     normalized.loss_pct = asNumber(lossRaw);
     normalized.jitter_ms = asNumber(jitterRaw);
     normalized.throughput_kbps = asNumber(throughputRaw);
+    normalized.rx_kbps = rxKbps;
+    normalized.tx_kbps = txKbps;
+    normalized.total_gb = asNumber(totalGbRaw);
+    normalized.public_wan_ip = normalizeIpAddress(publicWanIpRaw);
+
+    const interfacesRaw = Array.isArray(payload.interfaces) ? payload.interfaces : [];
+    const dataRaw = Array.isArray(payload.data) ? payload.data : [];
+
+    const interfacesSource = interfacesRaw.length > 0 ? interfacesRaw : dataRaw;
+
+    normalized.interfaces = interfacesSource
+      .map((iface) => {
+        const name = String(firstPresentValue(iface ?? {}, ["name", "interface", "if", "p"]) ?? "").trim();
+        const status = String(firstPresentValue(iface ?? {}, ["status", "s"]) ?? "").trim();
+        const rx = asNumber(firstPresentValue(iface ?? {}, ["rx_kbps", "download_kbps", "rx_rate_kbps", "in"]));
+        const tx = asNumber(firstPresentValue(iface ?? {}, ["tx_kbps", "upload_kbps", "tx_rate_kbps", "out"]));
+        const throughputAlias = asNumber(firstPresentValue(iface ?? {}, ["throughput_kbps", "total_kbps", "bandwidth_kbps", "throughput"]));
+        const tMb = asNumber(firstPresentValue(iface ?? {}, ["t"]));
+        const totalGbAlias = asNumber(firstPresentValue(iface ?? {}, ["total_gb", "total_traffic_gb", "cum_gb", "total"]));
+
+        const throughput_kbps =
+          throughputAlias ??
+          ((rx !== null || tx !== null) ? (rx ?? 0) + (tx ?? 0) : null);
+        const total_gb =
+          totalGbAlias ??
+          (tMb !== null ? tMb / 1024 : null);
+
+        return {
+          name,
+          status,
+          rx_kbps: rx,
+          tx_kbps: tx,
+          throughput_kbps,
+          total_gb
+        };
+      })
+      .filter((iface) => iface.name);
+
+    if (normalized.active_uplink === null && normalized.interfaces.length > 0) {
+      const activeIface = normalized.interfaces.find((iface) => iface.status?.toLowerCase() === "up");
+      normalized.active_uplink = activeIface?.name ?? normalized.interfaces[0].name;
+    }
+
+    if (normalized.rx_kbps === null) {
+      const sumRx = normalized.interfaces.reduce((sum, iface) => sum + (iface.rx_kbps ?? 0), 0);
+      normalized.rx_kbps = sumRx > 0 ? sumRx : null;
+    }
+
+    if (normalized.tx_kbps === null) {
+      const sumTx = normalized.interfaces.reduce((sum, iface) => sum + (iface.tx_kbps ?? 0), 0);
+      normalized.tx_kbps = sumTx > 0 ? sumTx : null;
+    }
+
+    if (normalized.throughput_kbps === null) {
+      const sumThroughput = normalized.interfaces.reduce((sum, iface) => sum + (iface.throughput_kbps ?? 0), 0);
+      normalized.throughput_kbps = sumThroughput > 0 ? sumThroughput : null;
+    }
+
+    if (normalized.total_gb === null) {
+      const sumTotalGb = normalized.interfaces.reduce((sum, iface) => sum + (iface.total_gb ?? 0), 0);
+      normalized.total_gb = sumTotalGb > 0 ? sumTotalGb : null;
+    }
 
     if (normalized.throughput_kbps === null && (rxKbps !== null || txKbps !== null)) {
       normalized.throughput_kbps = (rxKbps ?? 0) + (txKbps ?? 0);
@@ -155,6 +265,9 @@ export function validateAndNormalizePayload(channel, payload) {
     }
     if (txRaw !== undefined && txKbps === null) {
       pushNumberError(errors, "tx_kbps");
+    }
+    if (publicWanIpRaw !== undefined && normalized.public_wan_ip === null) {
+      pushIpError(errors, "public_wan_ip");
     }
   }
 

@@ -4,3 +4,10 @@ node_modules/
 .DS_Store
 npm-debug.log*
 services/api/.env.txt
+__pycache__/
+*.pyc
+*.log
+mcu-client/*-bundle.tar.gz
+ops/ngrok
+ops/bore
+ops/*.tar.gz

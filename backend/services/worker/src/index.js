@@ -14,7 +14,9 @@ import {
   pool,
   resolveEdgeContext,
   resolveTenantVesselContext,
-  resolveUserId
+  resolveUserId,
+  updateEdgePublicWanIp,
+  ensureEdgeExists
 } from "./db.js";
 import {
   parseEnvelope,
@@ -144,6 +146,12 @@ client.on("message", async (topic, payloadBuffer) => {
 
   try {
     if (parsedTopic.channel === "heartbeat") {
+      const context = await ensureEdgeExists({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        edgeCode: parsedTopic.edgeCode
+      });
+
       await insertHeartbeat({
         tenantCode: parsedTopic.tenantCode,
         vesselCode: parsedTopic.vesselCode,
@@ -155,16 +163,15 @@ client.on("message", async (topic, payloadBuffer) => {
         observedAt
       });
 
-      const context = await resolveEdgeContext({
-        tenantCode: parsedTopic.tenantCode,
-        vesselCode: parsedTopic.vesselCode,
-        edgeCode: parsedTopic.edgeCode
-      });
       if (context?.edge_box_id) {
         await markEdgeLastSeen({
           vesselId: context.vessel_id,
           edgeCode: parsedTopic.edgeCode,
           observedAt
+        });
+        await updateEdgePublicWanIp({
+          edgeBoxId: context.edge_box_id,
+          publicWanIp: payload.public_wan_ip
         });
       }
       console.log(`[worker] heartbeat stored topic=${topic} msg_id=${envelope.msgId}`);
@@ -172,7 +179,7 @@ client.on("message", async (topic, payloadBuffer) => {
     }
 
     if (parsedTopic.channel === "telemetry") {
-      const context = await resolveEdgeContext({
+      const context = await ensureEdgeExists({
         tenantCode: parsedTopic.tenantCode,
         vesselCode: parsedTopic.vesselCode,
         edgeCode: parsedTopic.edgeCode
@@ -190,6 +197,15 @@ client.on("message", async (topic, payloadBuffer) => {
       }
 
       await insertTelemetry({ context, payload, observedAt });
+      await markEdgeLastSeen({
+        vesselId: context.vessel_id,
+        edgeCode: parsedTopic.edgeCode,
+        observedAt
+      });
+      await updateEdgePublicWanIp({
+        edgeBoxId: context.edge_box_id,
+        publicWanIp: payload.public_wan_ip
+      });
       console.log(`[worker] telemetry stored topic=${topic} msg_id=${envelope.msgId}`);
       return;
     }

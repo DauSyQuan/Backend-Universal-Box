@@ -95,6 +95,41 @@ curl "http://localhost:3000/api/mcu/edges?tenant=tnr13&vessel=vsl-001"
 curl "http://localhost:3000/api/mcu/edges/tnr13/vsl-001/edge-001"
 ```
 
+5. Open monitoring dashboard:
+```bash
+xdg-open http://localhost:3000/dashboard
+```
+
+## Realtime runtime
+
+To keep broker, worker, and API alive after terminal close or reboot:
+
+```bash
+sudo bash backend/ops/install-runtime-services.sh
+```
+
+This installs 3 systemd services:
+
+- `mcu-mqtt-broker.service`
+- `mcu-worker.service`
+- `mcu-api.service`
+
+Check them with:
+
+```bash
+systemctl status mcu-mqtt-broker.service
+systemctl status mcu-worker.service
+systemctl status mcu-api.service
+```
+
+Follow logs:
+
+```bash
+journalctl -u mcu-mqtt-broker.service -f
+journalctl -u mcu-worker.service -f
+journalctl -u mcu-api.service -f
+```
+
 ## Expected smoke output
 
 - `/api/health` returns status `ok`.
@@ -108,5 +143,6 @@ curl "http://localhost:3000/api/mcu/edges/tnr13/vsl-001/edge-001"
 - `usage`, `event`, `vms` inserts are enabled in Phase 2.
 - Validation and processing failures are persisted to `ingest_errors`.
 - MCU visibility endpoints are available under `/api/mcu/*`.
+- Monitoring dashboard is available at `/dashboard`.
 - Pi4 onboarding guide: `docs/phase2/pi4_mcu_onboarding.md`.
 - RouterOS onboarding guide: `docs/phase2/routeros_mqtt_onboarding.md`.

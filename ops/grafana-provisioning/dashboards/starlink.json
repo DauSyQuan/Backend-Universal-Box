@@ -1,0 +1,33 @@
+{
+  "title": "Starlink Live Traffic",
+  "uid": "starlink-demo",
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Starlink Throughput (RX / TX)",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "datasource": "MCU Backend Postgres",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": "MCU Backend Postgres",
+          "format": "time_series",
+          "rawSql": "SELECT\n  observed_at AS \"time\",\n  rx_kbps AS \"RX Kbps\",\n  tx_kbps AS \"TX Kbps\"\nFROM telemetry\nWHERE active_uplink = 'starlink' \n  AND observed_at BETWEEN $__timeFrom() AND $__timeTo()\nORDER BY observed_at ASC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "bps"
+        }
+      }
+    }
+  ]
+}

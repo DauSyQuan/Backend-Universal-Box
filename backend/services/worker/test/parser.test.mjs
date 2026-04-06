@@ -97,3 +97,46 @@ test("validateAndNormalizePayload computes throughput from rx+tx aliases", () =>
   assert.equal(result.payload.jitter_ms, 1.5);
   assert.equal(result.payload.throughput_kbps, 1500);
 });
+
+test("validateAndNormalizePayload keeps public WAN IP aliases", () => {
+  const result = validateAndNormalizePayload("telemetry", {
+    public_ip: "::ffff:65.181.17.76",
+    rx_kbps: 1200,
+    tx_kbps: 300
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.payload.public_wan_ip, "65.181.17.76");
+});
+
+test("validateAndNormalizePayload parses MCU telemetry data array and computes totals", () => {
+  const result = validateAndNormalizePayload("telemetry", {
+    data: [
+      { p: "P1-STARLINK", s: "UP", in: 1000, out: 200, t: 1200 },
+      { p: "P2-VSAT", s: "DOWN", in: 0, out: 0, t: 0 }
+    ],
+    latency: 15,
+    packet_loss_pct: 0.01,
+    ping_jitter_ms: 2.5
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.payload.active_uplink, "P1-STARLINK");
+  assert.equal(result.payload.latency_ms, 15);
+  assert.equal(result.payload.loss_pct, 0.01);
+  assert.equal(result.payload.jitter_ms, 2.5);
+  assert.equal(result.payload.rx_kbps, 1000);
+  assert.equal(result.payload.tx_kbps, 200);
+  assert.equal(result.payload.throughput_kbps, 1200);
+  assert.equal(result.payload.total_gb, 1200 / 1024);
+  assert.equal(result.payload.interfaces.length, 2);
+});
+
+test("validateAndNormalizePayload rejects invalid public WAN IP", () => {
+  const result = validateAndNormalizePayload("heartbeat", {
+    wan_ip: "not-an-ip"
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /public_wan_ip/i);
+});

@@ -32,13 +32,26 @@ create table if not exists edge_boxes (
   id uuid primary key default gen_random_uuid(),
   vessel_id uuid not null references vessels(id) on delete cascade,
   edge_code text not null,
+  public_wan_ip inet,
   firmware_version text,
   last_seen_at timestamptz,
   created_at timestamptz not null default now(),
   unique (vessel_id, edge_code)
 );
 
-create type user_role as enum ('admin', 'noc', 'captain', 'customer');
+alter table edge_boxes
+  add column if not exists public_wan_ip inet;
+
+create index if not exists idx_edge_boxes_public_wan_ip
+  on edge_boxes(public_wan_ip);
+
+do $$
+begin
+  create type user_role as enum ('admin', 'noc', 'captain', 'customer');
+exception
+  when duplicate_object then null;
+end
+$$;
 
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
@@ -83,12 +96,58 @@ create table if not exists telemetry (
   loss_pct numeric(6,3),
   jitter_ms numeric(10,2),
   throughput_kbps numeric(12,2),
+  rx_kbps numeric(12,2),
+  tx_kbps numeric(12,2),
+  interfaces jsonb not null default '[]'::jsonb,
   observed_at timestamptz not null,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_telemetry_vessel_observed
   on telemetry(vessel_id, observed_at desc);
+
+create index if not exists idx_telemetry_edge_observed
+  on telemetry(edge_box_id, observed_at desc);
+
+create table if not exists telemetry_interfaces (
+  id uuid primary key default gen_random_uuid(),
+  telemetry_id uuid not null references telemetry(id) on delete cascade,
+  interface_name text not null,
+  rx_kbps numeric(12,2),
+  tx_kbps numeric(12,2),
+  throughput_kbps numeric(12,2),
+  total_gb numeric(14,3),
+  observed_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_telemetry_interfaces_lookup
+  on telemetry_interfaces(telemetry_id);
+
+create index if not exists idx_telemetry_interfaces_name_observed
+  on telemetry_interfaces(interface_name, observed_at desc);
+
+create or replace function fn_notify_telemetry()
+returns trigger as $$
+begin
+  perform pg_notify(
+    'mcu_telemetry_stream',
+    json_build_object(
+      'tenant_id', new.tenant_id,
+      'vessel_id', new.vessel_id,
+      'edge_box_id', new.edge_box_id,
+      'telemetry_id', new.id
+    )::text
+  );
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_notify_telemetry on telemetry;
+create trigger trg_notify_telemetry
+  after insert on telemetry
+  for each row
+  execute function fn_notify_telemetry();
 
 create table if not exists ingest_messages (
   id uuid primary key default gen_random_uuid(),
@@ -107,6 +166,9 @@ create table if not exists ingest_messages (
 create index if not exists idx_ingest_messages_received
   on ingest_messages(received_at desc);
 
+create index if not exists idx_ingest_messages_context
+  on ingest_messages(tenant_code, vessel_code, edge_code, channel, received_at desc);
+
 create unique index if not exists idx_ingest_messages_msg_id_unique
   on ingest_messages(msg_id)
   where msg_id is not null;
@@ -124,6 +186,9 @@ create table if not exists ingest_errors (
 
 create index if not exists idx_ingest_errors_created
   on ingest_errors(created_at desc);
+
+create index if not exists idx_ingest_errors_topic
+  on ingest_errors(topic text_pattern_ops);
 
 create table if not exists edge_heartbeats (
   id uuid primary key default gen_random_uuid(),

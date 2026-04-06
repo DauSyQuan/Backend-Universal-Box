@@ -16,6 +16,25 @@ export const pool = new Pool({
   connectionString: databaseUrl
 });
 
+const contextCache = new Map();
+
+function getCachedContext(key) {
+  const cached = contextCache.get(key);
+  // Cache for 5 minutes
+  if (cached && Date.now() - cached.time < 5 * 60 * 1000) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedContext(key, data) {
+  contextCache.set(key, { data, time: Date.now() });
+  if (contextCache.size > 5000) {
+    const oldestKey = contextCache.keys().next().value;
+    contextCache.delete(oldestKey);
+  }
+}
+
 export async function insertIngestMessage(message) {
   const result = await pool.query(
     `
@@ -64,6 +83,10 @@ export async function insertIngestError(errorData) {
 }
 
 export async function resolveTenantVesselContext({ tenantCode, vesselCode }) {
+  const cacheKey = `tv:${tenantCode}:${vesselCode}`;
+  const cached = getCachedContext(cacheKey);
+  if (cached !== null) return cached;
+
   const result = await pool.query(
     `
       select t.id as tenant_id, v.id as vessel_id
@@ -75,10 +98,16 @@ export async function resolveTenantVesselContext({ tenantCode, vesselCode }) {
     [tenantCode, vesselCode]
   );
 
-  return result.rows[0] ?? null;
+  const data = result.rows[0] ?? null;
+  setCachedContext(cacheKey, data);
+  return data;
 }
 
 export async function resolveEdgeContext({ tenantCode, vesselCode, edgeCode }) {
+  const cacheKey = `edge:${tenantCode}:${vesselCode}:${edgeCode}`;
+  const cached = getCachedContext(cacheKey);
+  if (cached !== null) return cached;
+
   const result = await pool.query(
     `
       select t.id as tenant_id, v.id as vessel_id, e.id as edge_box_id
@@ -91,7 +120,76 @@ export async function resolveEdgeContext({ tenantCode, vesselCode, edgeCode }) {
     [tenantCode, vesselCode, edgeCode]
   );
 
-  return result.rows[0] ?? null;
+  const data = result.rows[0] ?? null;
+  setCachedContext(cacheKey, data);
+  return data;
+}
+
+export async function ensureEdgeExists({ tenantCode, vesselCode, edgeCode }) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    // Find or create tenant
+    let tenantResult = await client.query(
+      "select id from tenants where code = $1",
+      [tenantCode]
+    );
+    let tenantId = tenantResult.rows[0]?.id;
+
+    if (!tenantId) {
+      const createTenant = await client.query(
+        "insert into tenants (code, name) values ($1, $2) returning id",
+        [tenantCode, tenantCode]
+      );
+      tenantId = createTenant.rows[0].id;
+    }
+
+    // Find or create vessel
+    let vesselResult = await client.query(
+      "select id from vessels where tenant_id = $1 and code = $2",
+      [tenantId, vesselCode]
+    );
+    let vesselId = vesselResult.rows[0]?.id;
+
+    if (!vesselId) {
+      const createVessel = await client.query(
+        "insert into vessels (tenant_id, code, name) values ($1, $2, $3) returning id",
+        [tenantId, vesselCode, vesselCode]
+      );
+      vesselId = createVessel.rows[0].id;
+    }
+
+    // Find or create edge_box
+    let edgeResult = await client.query(
+      "select id from edge_boxes where vessel_id = $1 and edge_code = $2",
+      [vesselId, edgeCode]
+    );
+    let edgeBoxId = edgeResult.rows[0]?.id;
+
+    if (!edgeBoxId) {
+      const createEdge = await client.query(
+        "insert into edge_boxes (vessel_id, edge_code) values ($1, $2) returning id",
+        [vesselId, edgeCode]
+      );
+      edgeBoxId = createEdge.rows[0].id;
+    }
+
+    await client.query("commit");
+
+    const context = { tenant_id: tenantId, vessel_id: vesselId, edge_box_id: edgeBoxId };
+
+    // Update cache
+    const cacheKey = `edge:${tenantCode}:${vesselCode}:${edgeCode}`;
+    setCachedContext(cacheKey, context);
+
+    return context;
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function resolveUserId({ tenantId, userId, username }) {
@@ -139,6 +237,22 @@ export async function markEdgeLastSeen({ vesselId, edgeCode, observedAt }) {
   );
 }
 
+export async function updateEdgePublicWanIp({ edgeBoxId, publicWanIp }) {
+  if (!edgeBoxId || !publicWanIp) {
+    return;
+  }
+
+  await pool.query(
+    `
+      update edge_boxes
+      set public_wan_ip = $2::inet
+      where id = $1
+        and public_wan_ip is distinct from $2::inet
+    `,
+    [edgeBoxId, publicWanIp]
+  );
+}
+
 export async function insertHeartbeat(heartbeat) {
   await pool.query(
     `
@@ -161,25 +275,72 @@ export async function insertHeartbeat(heartbeat) {
 }
 
 export async function insertTelemetry({ context, payload, observedAt }) {
-  await pool.query(
-    `
-      insert into telemetry
-        (tenant_id, vessel_id, edge_box_id, active_uplink, latency_ms, loss_pct, jitter_ms, throughput_kbps, observed_at)
-      values
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `,
-    [
-      context.tenant_id,
-      context.vessel_id,
-      context.edge_box_id ?? null,
-      payload.active_uplink ?? null,
-      payload.latency_ms ?? null,
-      payload.loss_pct ?? null,
-      payload.jitter_ms ?? null,
-      payload.throughput_kbps ?? null,
-      observedAt
-    ]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    const result = await client.query(
+      `
+        insert into telemetry
+          (tenant_id, vessel_id, edge_box_id, active_uplink, latency_ms, loss_pct, jitter_ms, throughput_kbps, rx_kbps, tx_kbps, interfaces, observed_at)
+        values
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
+        returning id
+      `,
+      [
+        context.tenant_id,
+        context.vessel_id,
+        context.edge_box_id ?? null,
+        payload.active_uplink ?? null,
+        payload.latency_ms ?? null,
+        payload.loss_pct ?? null,
+        payload.jitter_ms ?? null,
+        payload.throughput_kbps ?? null,
+        payload.rx_kbps ?? null,
+        payload.tx_kbps ?? null,
+        JSON.stringify(payload.interfaces ?? []),
+        observedAt
+      ]
+    );
+
+    const telemetryId = result.rows[0].id;
+
+    if (payload.interfaces && Array.isArray(payload.interfaces) && payload.interfaces.length > 0) {
+      const values = [];
+      const flatParams = [];
+      let i = 1;
+
+      for (const iface of payload.interfaces) {
+        flatParams.push(
+          telemetryId,
+          iface.name,
+          iface.rx_kbps ?? null,
+          iface.tx_kbps ?? null,
+          iface.throughput_kbps ?? null,
+          iface.total_gb ?? null,
+          observedAt
+        );
+        values.push(`($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
+      }
+
+      await client.query(
+        `
+          insert into telemetry_interfaces
+            (telemetry_id, interface_name, rx_kbps, tx_kbps, throughput_kbps, total_gb, observed_at)
+          values
+            ${values.join(", ")}
+        `,
+        flatParams
+      );
+    }
+
+    await client.query("commit");
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function insertUsage({ context, userId, payload, observedAt }) {
@@ -241,4 +402,3 @@ export async function insertVms({ context, payload, observedAt }) {
     ]
   );
 }
-

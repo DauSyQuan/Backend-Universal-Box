@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MCU Fleet Monitor</title>
+    <link rel="stylesheet" href="/dashboard/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">MCU Ops Console</p>
+          <h1>Fleet traffic, uplink, and edge visibility in one screen.</h1>
+          <p class="hero-text">
+            Theo doi MCU Pi4, uplink va traffic theo thoi gian thuc tu backend hien tai.
+          </p>
+        </div>
+        <div class="hero-status">
+          <div class="status-card">
+            <span class="status-label">API</span>
+            <strong id="health-pill" class="status-pill status-loading">Checking</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Database</span>
+            <strong id="ready-pill" class="status-pill status-loading">Checking</strong>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Live stream</span>
+            <strong id="stream-pill" class="status-pill status-muted">Idle</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard-grid">
+        <section class="panel command-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Filters</p>
+              <h2>Ops control</h2>
+            </div>
+            <button id="refresh-button" class="button button-primary" type="button">Refresh now</button>
+          </div>
+
+          <form id="filters-form" class="filters-form">
+            <label>
+              <span>Tenant</span>
+              <input id="tenant-input" name="tenant" type="text" placeholder="tnr13">
+            </label>
+            <label>
+              <span>Vessel</span>
+              <input id="vessel-input" name="vessel" type="text" placeholder="vsl-001">
+            </label>
+            <label>
+              <span>Auto refresh</span>
+              <select id="refresh-interval-select" name="refresh_interval">
+                <option value="0">Off</option>
+                <option value="10">10s</option>
+                <option value="15" selected>15s</option>
+                <option value="30">30s</option>
+                <option value="60">60s</option>
+              </select>
+            </label>
+            <div class="filters-actions">
+              <button class="button button-primary" type="submit">Apply filters</button>
+              <button id="clear-filters-button" class="button button-secondary" type="button">Clear</button>
+            </div>
+          </form>
+
+          <div id="summary-cards" class="summary-grid"></div>
+
+          <div class="endpoint-block">
+            <div class="panel-heading endpoint-heading">
+              <div>
+                <p class="panel-kicker">API access</p>
+                <h2>Domain & quick links</h2>
+              </div>
+            </div>
+            <div id="endpoint-list" class="endpoint-list"></div>
+          </div>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Edge boxes</p>
+              <h2>Fleet overview</h2>
+            </div>
+            <span id="edge-count" class="muted-meta">0 devices</span>
+          </div>
+
+          <div id="edge-list" class="edge-list"></div>
+        </section>
+
+        <section class="panel detail-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Selected edge</p>
+              <h2 id="detail-title">Choose a device</h2>
+            </div>
+            <span id="detail-meta" class="muted-meta">No selection</span>
+          </div>
+
+          <div id="detail-shell" class="detail-shell">
+            <div class="empty-state">
+              <h3>Chua co edge nao duoc chon</h3>
+              <p>Chon mot edge o cot ben trai de xem traffic, telemetry, su kien va ingest errors.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/dashboard/app.js" defer></script>
+  </body>
+</html>
