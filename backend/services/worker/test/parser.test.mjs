@@ -4,7 +4,8 @@ import {
   parseEnvelope,
   parseTopic,
   validateAndNormalizePayload,
-  validateEnvelope
+  validateEnvelope,
+  detectLinkDownEvent
 } from "../src/parser.js";
 
 test("parseTopic parses valid topic", () => {
@@ -17,9 +18,36 @@ test("parseTopic parses valid topic", () => {
   });
 });
 
+test("parseEnvelope preserves missing msg_id without generating a random one", () => {
+  const raw = Buffer.from(
+    JSON.stringify({
+      timestamp: "2026-04-01T03:00:00Z",
+      schema_version: "v1",
+      payload: { latency_ms: 10 }
+    }),
+    "utf8"
+  );
+
+  const envelope = parseEnvelope(raw);
+  assert.equal(envelope.msgId, null);
+  assert.equal(envelope.timestamp, "2026-04-01T03:00:00Z");
+  assert.equal(envelope.schemaVersion, "v1");
+  assert.equal(envelope.payload.latency_ms, 10);
+});
+
 test("validateEnvelope rejects missing msg_id", () => {
   const result = validateEnvelope({
     msgId: null,
+    timestamp: "2026-04-01T03:00:00Z",
+    schemaVersion: "v1"
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join(" "), /msg_id/i);
+});
+
+test("validateEnvelope rejects blank msg_id", () => {
+  const result = validateEnvelope({
+    msgId: "",
     timestamp: "2026-04-01T03:00:00Z",
     schemaVersion: "v1"
   });
@@ -63,6 +91,20 @@ test("parseEnvelope parses payload object", () => {
   const envelope = parseEnvelope(raw);
   assert.equal(envelope.msgId, "abc");
   assert.equal(envelope.payload.latency_ms, 10);
+});
+
+test("detectLinkDownEvent returns a warning for a starlink interface down", () => {
+  const result = detectLinkDownEvent({
+    active_uplink: "starlink",
+    interfaces: [
+      { name: "starlink", status: "DOWN", rx_kbps: 0, tx_kbps: 0 }
+    ]
+  });
+
+  assert.deepEqual(result, {
+    link: "starlink",
+    reason: "interface_down"
+  });
 });
 
 test("validateAndNormalizePayload maps RouterOS heartbeat aliases", () => {

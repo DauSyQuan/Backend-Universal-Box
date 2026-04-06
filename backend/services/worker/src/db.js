@@ -82,6 +82,23 @@ export async function insertIngestError(errorData) {
   );
 }
 
+export async function hasRecentEvent({ vesselId, edgeBoxId, eventType, withinSeconds = 300 }) {
+  const result = await pool.query(
+    `
+      select 1
+      from events
+      where vessel_id = $1
+        and edge_box_id is not distinct from $2
+        and event_type = $3
+        and observed_at >= now() - ($4::int || ' seconds')::interval
+      limit 1
+    `,
+    [vesselId, edgeBoxId, eventType, withinSeconds]
+  );
+
+  return result.rowCount > 0;
+}
+
 export async function resolveTenantVesselContext({ tenantCode, vesselCode }) {
   const cacheKey = `tv:${tenantCode}:${vesselCode}`;
   const cached = getCachedContext(cacheKey);

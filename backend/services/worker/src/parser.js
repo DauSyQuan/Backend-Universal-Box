@@ -73,6 +73,15 @@ export function parseTopic(topic) {
   return { tenantCode, vesselCode, edgeCode, channel };
 }
 
+function normalizeMsgId(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const stringValue = String(value).trim();
+  return stringValue === "" ? null : stringValue;
+}
+
 export function parseEnvelope(rawBuffer) {
   const content = rawBuffer.toString("utf8");
   const parsed = JSON.parse(content);
@@ -87,7 +96,7 @@ export function parseEnvelope(rawBuffer) {
 
   return {
     raw: parsed,
-    msgId: parsed.msg_id ?? randomUUID(),
+    msgId: normalizeMsgId(parsed.msg_id),
     timestamp: parsed.timestamp ?? new Date().toISOString(),
     schemaVersion: parsed.schema_version ?? "v1",
     payload
@@ -321,6 +330,48 @@ export function validateAndNormalizePayload(channel, payload) {
     errors,
     payload: normalized
   };
+}
+
+function normalizeString(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isUpStatus(value) {
+  const status = normalizeString(value);
+  return status === "up" || status === "online" || status === "active" || status === "connected";
+}
+
+function isStarlinkName(value) {
+  const name = normalizeString(value);
+  return name === "starlink" || name.includes("starlink");
+}
+
+export function detectLinkDownEvent(payload) {
+  if (!payload || !Array.isArray(payload.interfaces)) {
+    return null;
+  }
+
+  const activeUplink = normalizeString(payload.active_uplink);
+  const starlinkIface = payload.interfaces.find((iface) => isStarlinkName(iface?.name));
+  if (!starlinkIface) {
+    return null;
+  }
+
+  const ifaceStatus = normalizeString(starlinkIface.status);
+  const rx = typeof starlinkIface.rx_kbps === "number" ? starlinkIface.rx_kbps : null;
+  const tx = typeof starlinkIface.tx_kbps === "number" ? starlinkIface.tx_kbps : null;
+  const throughput = typeof starlinkIface.throughput_kbps === "number" ? starlinkIface.throughput_kbps : null;
+  const hasTraffic = (throughput !== null && throughput > 0) || (rx !== null && rx > 0) || (tx !== null && tx > 0);
+
+  if (activeUplink && !isStarlinkName(activeUplink) && !isUpStatus(ifaceStatus)) {
+    return { link: "starlink", reason: "active_uplink_changed" };
+  }
+
+  if (!isUpStatus(ifaceStatus) || (activeUplink && isStarlinkName(activeUplink) && !hasTraffic)) {
+    return { link: "starlink", reason: "interface_down" };
+  }
+
+  return null;
 }
 
 export function toObservedAt(value, options = {}) {

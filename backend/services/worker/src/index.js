@@ -16,14 +16,16 @@ import {
   resolveTenantVesselContext,
   resolveUserId,
   updateEdgePublicWanIp,
-  ensureEdgeExists
+  ensureEdgeExists,
+  hasRecentEvent
 } from "./db.js";
 import {
   parseEnvelope,
   parseTopic,
   toObservedAt,
   validateAndNormalizePayload,
-  validateEnvelope
+  validateEnvelope,
+  detectLinkDownEvent
 } from "./parser.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/.env") });
@@ -200,6 +202,33 @@ client.on("message", async (topic, payloadBuffer) => {
       }
 
       await insertTelemetry({ context, payload, observedAt });
+
+      const linkDown = detectLinkDownEvent(payload);
+      if (linkDown) {
+        const hasRecent = await hasRecentEvent({
+          vesselId: context.vessel_id,
+          edgeBoxId: context.edge_box_id,
+          eventType: "link_down",
+          withinSeconds: 600
+        });
+
+        if (!hasRecent) {
+          await insertEvent({
+            context,
+            payload: {
+              event_type: "link_down",
+              severity: "warning",
+              details: {
+                link: linkDown.link,
+                reason: linkDown.reason
+              }
+            },
+            observedAt
+          });
+          console.log(`[worker] link_down event created topic=${topic} msg_id=${envelope.msgId}`);
+        }
+      }
+
       await markEdgeLastSeen({
         vesselId: context.vessel_id,
         edgeCode: parsedTopic.edgeCode,
