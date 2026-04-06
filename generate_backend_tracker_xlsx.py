@@ -8,7 +8,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 
-BASE = Path(r"C:\Users\OSB\OneDrive - OSB Holding JSC\Documents\Playground")
+BASE = Path(__file__).parent
 WEEKLY_CSV = BASE / "backend_weekly_tracker_solo.csv"
 PHASE_CSV = BASE / "backend_phase_summary_solo.csv"
 OUTPUT_XLSX = BASE / "backend_tracker_solo_professional.xlsx"

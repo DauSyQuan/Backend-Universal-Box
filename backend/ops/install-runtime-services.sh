@@ -11,6 +11,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUN_USER="${SUDO_USER:-${USER:-tofu}}"
 SYSTEMD_DIR="/etc/systemd/system"
+INSTALL_LOCAL_BROKER=0
+
+if [[ "${1:-}" == "--with-local-broker" ]]; then
+  INSTALL_LOCAL_BROKER=1
+fi
 
 if ! id "${RUN_USER}" >/dev/null 2>&1; then
   echo "Run user '${RUN_USER}' does not exist."
@@ -28,23 +33,36 @@ install_unit() {
     "${SCRIPT_DIR}/systemd/${src_name}" > "${SYSTEMD_DIR}/${dest_name}"
 }
 
-install_unit "mcu-mqtt-broker.service" "mcu-mqtt-broker.service"
 install_unit "mcu-worker.service" "mcu-worker.service"
 install_unit "mcu-api.service" "mcu-api.service"
 
+if [[ "${INSTALL_LOCAL_BROKER}" -eq 1 ]]; then
+  install_unit "mcu-mqtt-broker.service" "mcu-mqtt-broker.service"
+fi
+
 systemctl daemon-reload
-systemctl enable --now mcu-mqtt-broker.service
 systemctl enable --now mcu-worker.service
 systemctl enable --now mcu-api.service
+
+if [[ "${INSTALL_LOCAL_BROKER}" -eq 1 ]]; then
+  systemctl enable --now mcu-mqtt-broker.service
+fi
 
 echo
 echo "Realtime backend services installed."
 echo "Check status with:"
-echo "  systemctl status mcu-mqtt-broker.service"
 echo "  systemctl status mcu-worker.service"
 echo "  systemctl status mcu-api.service"
+if [[ "${INSTALL_LOCAL_BROKER}" -eq 1 ]]; then
+  echo "  systemctl status mcu-mqtt-broker.service"
+else
+  echo "MQTT broker:"
+  echo "  using system mosquitto.service"
+fi
 echo
 echo "Follow logs with:"
-echo "  journalctl -u mcu-mqtt-broker.service -f"
 echo "  journalctl -u mcu-worker.service -f"
 echo "  journalctl -u mcu-api.service -f"
+if [[ "${INSTALL_LOCAL_BROKER}" -eq 1 ]]; then
+  echo "  journalctl -u mcu-mqtt-broker.service -f"
+fi
