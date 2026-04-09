@@ -350,6 +350,8 @@ const server = createServer(async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-server.listen(port, () => {
-  console.log(`[api] listening on http://localhost:${port}`);
+const host = process.env.HOST || "0.0.0.0";
+
+server.listen(port, host, () => {
+  console.log(`[api] listening on http://${host}:${port}`);
 });

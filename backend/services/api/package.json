@@ -10,8 +10,8 @@
   "scripts": {
     "dev": "node src/server.js",
     "start": "node src/server.js",
-    "build": "echo \"api build placeholder\"",
-    "lint": "echo \"api lint placeholder\"",
-    "typecheck": "echo \"api typecheck placeholder\""
+    "build": "node ../../scripts/check-source.mjs src",
+    "lint": "node ../../scripts/check-source.mjs src",
+    "typecheck": "node ../../scripts/check-source.mjs src"
   }
 }

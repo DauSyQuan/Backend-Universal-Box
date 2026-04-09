@@ -22,6 +22,7 @@
     "dev:worker": "npm run dev -w services/worker",
     "start:api": "npm run start -w services/api",
     "start:worker": "npm run start -w services/worker",
+    "test": "npm test -w services/worker",
     "db:migrate": "node ./scripts/db-migrate.mjs",
     "db:reset-local": "node ./scripts/db-reset-local.mjs",
     "db:seed:phase2": "node ./scripts/db-seed-phase2.mjs",
@@ -29,6 +30,7 @@
     "mqtt:broker": "node ./scripts/mqtt-broker.mjs",
     "phase2:report": "node ./scripts/phase2-report.mjs",
     "test:smoke": "node ./scripts/smoke-test.mjs",
+    "verify": "node ./scripts/check-source.mjs services/api/src services/worker/src services/worker/test scripts && npm test",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"

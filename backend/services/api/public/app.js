@@ -181,6 +181,63 @@ function extractTelemetryInterfaces(telemetry, traffic) {
   return trafficInterfaces;
 }
 
+function normalizeNameKey(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function classifyUplinkName(value) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.includes("starlink")) {
+    return "starlink";
+  }
+  if (normalized.includes("vsat")) {
+    return "vsat";
+  }
+  return null;
+}
+
+function findInterfaceByLabel(interfaces, label) {
+  if (!Array.isArray(interfaces) || !label) {
+    return null;
+  }
+
+  const requestedKey = normalizeNameKey(label);
+  const requestedClass = classifyUplinkName(label);
+
+  const exactMatch = interfaces.find((iface) => normalizeNameKey(iface?.name) === requestedKey);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  if (requestedClass) {
+    const classMatch = interfaces.find((iface) => classifyUplinkName(iface?.name) === requestedClass);
+    if (classMatch) {
+      return classMatch;
+    }
+  }
+
+  return (
+    interfaces.find((iface) => {
+      const interfaceKey = normalizeNameKey(iface?.name);
+      return interfaceKey.includes(requestedKey) || requestedKey.includes(interfaceKey);
+    }) || null
+  );
+}
+
+function resolveUplinkDisplay(reportedLabel, interfaces) {
+  const reported = String(reportedLabel ?? "").trim();
+  const matched = findInterfaceByLabel(interfaces, reported);
+  const matchedName = matched?.name ? String(matched.name).trim() : "";
+
+  return {
+    displayName: matchedName || reported || "No data",
+    matchedName: matchedName || null,
+    rawLabel: reported || null
+  };
+}
+
 function findInterfaceTotalGb(interfaces, interfaceName) {
   if (!Array.isArray(interfaces) || !interfaceName) {
     return null;
@@ -195,7 +252,7 @@ function findInterfaceTotalGb(interfaces, interfaceName) {
   return Number.isFinite(total) ? total : null;
 }
 
-function renderInterfaceUsage(interfaces, activeUplink) {
+function renderInterfaceUsage(interfaces, activeInterfaceName) {
   if (!Array.isArray(interfaces) || interfaces.length === 0) {
     return `
       <div class="empty-state compact-empty-state">
@@ -209,7 +266,7 @@ function renderInterfaceUsage(interfaces, activeUplink) {
     .sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || "")))
     .map((iface) => {
       const name = String(iface?.name || "unknown");
-      const isActive = activeUplink && name === activeUplink;
+      const isActive = activeInterfaceName && name === activeInterfaceName;
       return `
         <tr>
           <td>
@@ -549,6 +606,142 @@ function linePath(values, width, height, topPadding, bottomPadding, maxValue) {
     .join(" ");
 }
 
+function linePathSparse(values, width, height, topPadding, bottomPadding, maxValue) {
+  if (!values.length) {
+    return "";
+  }
+
+  const innerHeight = height - topPadding - bottomPadding;
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  const segments = [];
+  let segmentOpen = false;
+
+  values.forEach((value, index) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      segmentOpen = false;
+      return;
+    }
+
+    const x = index * step;
+    const y = topPadding + innerHeight - (numeric / maxValue) * innerHeight;
+    segments.push(`${segmentOpen ? "L" : "M"} ${x.toFixed(2)} ${y.toFixed(2)}`);
+    segmentOpen = true;
+  });
+
+  return segments.join(" ");
+}
+
+function getLatestNonNullValue(values) {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    const numeric = Number(values[index]);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return null;
+}
+
+function buildUplinkSeries(samples, keyword) {
+  const values = [];
+  let latestName = null;
+
+  samples.forEach((sample) => {
+    const interfaces = Array.isArray(sample?.interfaces) ? sample.interfaces : [];
+    const matched = interfaces.find((iface) => classifyUplinkName(iface?.name) === keyword) || null;
+    const throughput = Number(matched?.throughput_kbps);
+
+    values.push(Number.isFinite(throughput) ? throughput : null);
+    if (matched?.name) {
+      latestName = String(matched.name).trim();
+    }
+  });
+
+  return {
+    label: latestName || (keyword === "starlink" ? "Starlink" : "VSAT"),
+    values,
+    latest: getLatestNonNullValue(values)
+  };
+}
+
+function renderUplinkComparisonChart(samples) {
+  if (!Array.isArray(samples) || samples.length === 0) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>Chua co mau so sanh</h3>
+        <p>Can co telemetry cho Starlink va VSAT de ve bieu do doi chieu.</p>
+      </div>
+    `;
+  }
+
+  const starlink = buildUplinkSeries(samples, "starlink");
+  const vsat = buildUplinkSeries(samples, "vsat");
+  const hasStarlink = starlink.values.some((value) => value !== null && value !== undefined);
+  const hasVsat = vsat.values.some((value) => value !== null && value !== undefined);
+
+  if (!hasStarlink && !hasVsat) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>Chua co mau so sanh</h3>
+        <p>Edge nay chua co interface Starlink hoac VSAT trong mau telemetry hien tai.</p>
+      </div>
+    `;
+  }
+
+  const width = 640;
+  const height = 220;
+  const topPadding = 18;
+  const bottomPadding = 24;
+  const maxValue = Math.max(
+    1,
+    ...starlink.values.map((value) => Number(value) || 0),
+    ...vsat.values.map((value) => Number(value) || 0)
+  );
+
+  const gridLines = [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const y = topPadding + (height - topPadding - bottomPadding) * ratio;
+    return `<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="4 8"></line>`;
+  });
+
+  const labels = samples
+    .filter((_, index) => index === 0 || index === samples.length - 1 || index === Math.floor(samples.length / 2))
+    .map((sample, index, items) => {
+      const sourceIndex = samples.findIndex((item) => item.observed_at === sample.observed_at);
+      const x = items.length === 1 ? width / 2 : (sourceIndex / (samples.length - 1 || 1)) * width;
+      return `<text x="${x}" y="${height}" fill="rgba(169,189,216,0.86)" text-anchor="${index === 0 ? "start" : index === items.length - 1 ? "end" : "middle"}" font-size="11">${escapeHtml(new Date(sample.observed_at).toLocaleTimeString())}</text>`;
+    });
+
+  const starlinkLatest = getLatestNonNullValue(starlink.values);
+  const vsatLatest = getLatestNonNullValue(vsat.values);
+  const difference = starlinkLatest !== null && vsatLatest !== null ? starlinkLatest - vsatLatest : null;
+
+  return `
+    <svg class="chart-svg comparison-chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Starlink and VSAT comparison chart">
+      ${gridLines.join("")}
+      <path d="${linePathSparse(starlink.values, width, height, topPadding, bottomPadding, maxValue)}" fill="none" stroke="#68e1fd" stroke-width="3"></path>
+      <path d="${linePathSparse(vsat.values, width, height, topPadding, bottomPadding, maxValue)}" fill="none" stroke="#ff9d5c" stroke-width="3"></path>
+      ${labels.join("")}
+    </svg>
+    <div class="comparison-metrics">
+      <article class="comparison-metric">
+        <span>Starlink now</span>
+        <strong>${escapeHtml(formatKbps(starlinkLatest))}</strong>
+        <div class="tiny-note">${escapeHtml(starlink.label)}</div>
+      </article>
+      <article class="comparison-metric">
+        <span>VSAT now</span>
+        <strong>${escapeHtml(formatKbps(vsatLatest))}</strong>
+        <div class="tiny-note">${escapeHtml(vsat.label)}</div>
+      </article>
+      <article class="comparison-metric">
+        <span>Gap</span>
+        <strong>${escapeHtml(difference !== null ? formatKbps(Math.abs(difference)) : "No data")}</strong>
+        <div class="tiny-note">${difference === null ? "Chua co ca hai du lieu" : difference >= 0 ? "Starlink dang cao hon" : "VSAT dang cao hon"}</div>
+      </article>
+    </div>
+  `;
+}
+
 function renderTrafficChart(samples) {
   if (!samples.length) {
     return `
@@ -741,10 +934,14 @@ function renderDetail() {
   const trafficSummary = traffic?.summary || {};
   const trafficSamples = Array.isArray(traffic?.samples) ? traffic.samples : [];
   const usage24h = detail.usage_24h || {};
+  const usageOverview = detail.usage_overview || {};
   const totalUsageMb24h = Number(usage24h.upload_mb_24h || 0) + Number(usage24h.download_mb_24h || 0);
   const cumulativeTelemetryGb = extractTelemetryTotalGb(latestTelemetry, traffic);
   const interfaceUsage = extractTelemetryInterfaces(latestTelemetry, traffic);
-  const activeInterfaceTotalGb = findInterfaceTotalGb(interfaceUsage, latestTelemetry.active_uplink);
+  const uplinkResolution = resolveUplinkDisplay(latestTelemetry.active_uplink, interfaceUsage);
+  const activeInterfaceName = uplinkResolution.matchedName || uplinkResolution.displayName || latestTelemetry.active_uplink;
+  const activeInterfaceTotalGb = findInterfaceTotalGb(interfaceUsage, activeInterfaceName);
+  const latestUsageAt = usageOverview.latest_usage_at || null;
 
   setTextContent(elements.detailTitle, summary.edge_code || "Edge detail");
   setTextContent(elements.detailMeta, `${summary.tenant_code || "-"} / ${summary.vessel_code || "-"} / direct Ethernet`);
@@ -762,7 +959,8 @@ function renderDetail() {
       <div class="detail-hero-meta">
         <span class="meta-chip"><strong>Firmware</strong> ${escapeHtml(summary.edge_firmware_version || latestHeartbeat.firmware_version || "Unknown")}</span>
         <span class="meta-chip"><strong>Last seen</strong> ${escapeHtml(formatDate(latestTelemetry.observed_at || summary.last_seen_at || latestHeartbeat.observed_at))}</span>
-        <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(latestTelemetry.active_uplink || "No data")}</span>
+        <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(uplinkResolution.displayName)}</span>
+        ${uplinkResolution.rawLabel && uplinkResolution.rawLabel !== uplinkResolution.displayName ? `<span class="meta-chip"><strong>Reported</strong> ${escapeHtml(uplinkResolution.rawLabel)}</span>` : ""}
       </div>
     </section>
 
@@ -779,7 +977,8 @@ function renderDetail() {
           <h3>Active uplink</h3>
           <span class="tiny-note">Direct link</span>
         </div>
-        <div class="live-value">${escapeHtml(latestTelemetry.active_uplink || "Unknown")}</div>
+        <div class="live-value uplink-display">${escapeHtml(uplinkResolution.displayName)}</div>
+        <div class="live-subvalue">${escapeHtml(uplinkResolution.rawLabel && uplinkResolution.rawLabel !== uplinkResolution.displayName ? `Reported as ${uplinkResolution.rawLabel}` : activeInterfaceName ? `Matched interface ${activeInterfaceName}` : "No additional uplink data")}</div>
       </article>
     </section>
 
@@ -852,7 +1051,21 @@ function renderDetail() {
           <p class="chart-note">Dung luong va bang thong duoc tach rieng theo tung cong MCU/MikroTik.</p>
         </div>
       </div>
-      ${renderInterfaceUsage(interfaceUsage, latestTelemetry.active_uplink)}
+      ${renderInterfaceUsage(interfaceUsage, activeInterfaceName)}
+    </section>
+
+    <section class="chart-card comparison-card">
+      <div class="chart-header">
+        <div>
+          <h3>Starlink vs VSAT</h3>
+          <p class="chart-note">So sanh throughput theo ten interface thuc te tren cung edge.</p>
+        </div>
+        <div class="legend">
+          <span style="color:#68e1fd">Starlink</span>
+          <span style="color:#ff9d5c">VSAT</span>
+        </div>
+      </div>
+      ${renderUplinkComparisonChart(trafficSamples)}
     </section>
 
     <section class="chart-card">
@@ -862,7 +1075,7 @@ function renderDetail() {
           <p class="chart-note">Mini-chart rieng cho tung port de xem cong nao dang an bang thong va dung luong nhieu nhat.</p>
         </div>
       </div>
-      ${renderPortCharts(trafficSamples, latestTelemetry.active_uplink)}
+      ${renderPortCharts(trafficSamples, activeInterfaceName)}
     </section>
 
     <section class="history-grid">
@@ -908,6 +1121,7 @@ function renderDetail() {
           <h3>Top users 24h</h3>
           <span class="tiny-note">${escapeHtml(String(detail.top_users_24h?.length || 0))} users</span>
         </div>
+        ${latestUsageAt ? `<p class="chart-note">Khong co usage trong 24h qua. Ban ghi gan nhat: ${escapeHtml(formatDate(latestUsageAt))}.</p>` : ""}
         ${renderListItems(
           detail.top_users_24h || [],
           (item) => `
@@ -917,8 +1131,10 @@ function renderDetail() {
               <div>${escapeHtml(formatDate(item.last_seen))}</div>
             </li>
           `,
-          "No usage data",
-          "Chua co luu luong user trong 24h qua."
+          "No usage data in 24h",
+          latestUsageAt
+            ? "He thong co usage lich su, nhung khong co sample trong 24h gan nhat."
+            : "Chua co luu luong user trong 24h qua."
         )}
       </article>
     </section>

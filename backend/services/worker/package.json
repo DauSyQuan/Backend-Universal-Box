@@ -12,8 +12,8 @@
     "dev": "node src/index.js",
     "start": "node src/index.js",
     "test": "node --test test/parser.test.mjs",
-    "build": "echo \"worker build placeholder\"",
-    "lint": "echo \"worker lint placeholder\"",
-    "typecheck": "echo \"worker typecheck placeholder\""
+    "build": "node ../../scripts/check-source.mjs src test",
+    "lint": "node ../../scripts/check-source.mjs src test",
+    "typecheck": "node ../../scripts/check-source.mjs src test"
   }
 }
