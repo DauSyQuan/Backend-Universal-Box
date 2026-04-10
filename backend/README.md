@@ -100,6 +100,25 @@ curl "http://localhost:3000/api/mcu/edges/tnr13/vsl-001/edge-001"
 xdg-open http://localhost:3000/dashboard
 ```
 
+## Remote access via ngrok
+
+If you already have ngrok set up on the backend host, you can expose the same dashboard to another laptop without any code changes:
+
+```bash
+bash backend/ops/start_tunnels.sh
+```
+
+When the tunnel is ready, the script prints:
+
+- `HTTP API WAN`
+- `Dashboard URL`
+
+Open the `Dashboard URL` on the other laptop. It will look like:
+
+- `https://<your-ngrok-subdomain>.ngrok-free.app/dashboard`
+
+Because the dashboard is served from the same origin as the API, the page and its `/api/*` calls keep working through ngrok.
+
 ## Realtime runtime
 
 To keep broker, worker, and API alive after terminal close or reboot:

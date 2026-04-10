@@ -21,3 +21,4 @@ Operational files for running the backend outside development.
 - Keep `.env` local only.
 - Use `install-runtime-services.sh` for stable runtime.
 - Use `start_tunnels.sh` only when public tunnels are needed.
+- The public dashboard is available at `${API_PUBLIC_URL}/dashboard` when `start_tunnels.sh` is running.
