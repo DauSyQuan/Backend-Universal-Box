@@ -6,7 +6,9 @@ Client-side scripts for pushing MCU or RouterOS traffic into the backend.
 
 - `read_traffic.py`: RouterOS-to-backend bridge for the current MCU flow
 - `pi4_uplink.py`: generic Pi4 uplink client
+- `routeros_policy.py`: RouterOS policy-routing helper for VSAT work and Starlink entertainment
 - `pi4_uplink.env.example`: sample environment for the Pi4 client
+- `routeros_policy.env.example`: sample environment for the policy helper
 - `pi4_uplink.service`: sample systemd unit for the Pi4 client
 
 ## Current choice
@@ -23,6 +25,25 @@ It sends:
 to backend MQTT topics in the form:
 
 - `mcu/{tenant}/{vessel}/{edge}/{channel}`
+
+## Policy routing helper
+
+Use `routeros_policy.py` when you want RouterOS to keep:
+
+- `work` traffic on `VSAT`
+- `entertainment` traffic on `Starlink`
+
+The helper supports two modes:
+
+- `--print`: emit RouterOS CLI commands
+- `--apply`: apply the policy over the RouterOS API
+
+Example env values:
+
+- `WORK_SOURCE_ADDRESSES=192.168.88.10,192.168.88.11`
+- `ENTERTAINMENT_SOURCE_ADDRESSES=192.168.88.20,192.168.88.21`
+- `VSAT_GATEWAY=10.10.10.1`
+- `STARLINK_GATEWAY=100.64.0.1`
 
 ## Runtime notes
 

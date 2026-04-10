@@ -238,6 +238,54 @@ function resolveUplinkDisplay(reportedLabel, interfaces) {
   };
 }
 
+function resolveUplinkPolicy(interfaces, activeUplink, serverPolicy = null) {
+  const starlink = findInterfaceByLabel(interfaces, "Starlink") || findInterfaceByClass(interfaces, "starlink");
+  const vsat = findInterfaceByLabel(interfaces, "VSAT") || findInterfaceByClass(interfaces, "vsat");
+  const activeRole = serverPolicy?.active_role || classifyUplinkName(activeUplink) || null;
+
+  const workInterface = serverPolicy?.work?.interface_name
+    ? findInterfaceByLabel(interfaces, serverPolicy.work.interface_name) || vsat || starlink
+    : vsat || starlink;
+  const entertainmentInterface = serverPolicy?.entertainment?.interface_name
+    ? findInterfaceByLabel(interfaces, serverPolicy.entertainment.interface_name) || starlink || vsat
+    : starlink || vsat;
+
+  const buildPolicyEntry = (label, preferred, interfaceRow, fallbackRow) => {
+    const detected = Boolean(interfaceRow);
+    const fallback = !detected && Boolean(fallbackRow);
+    const status = detected ? "ready" : fallback ? "fallback" : "missing";
+
+    return {
+      label,
+      preferred,
+      interfaceName: interfaceRow?.name ?? null,
+      detected,
+      fallback,
+      status,
+      note: detected
+        ? `Detected ${interfaceRow.name}`
+        : fallbackRow
+          ? `Falling back to ${fallbackRow.name}`
+          : `No ${label.toLowerCase()} uplink telemetry yet`
+    };
+  };
+
+  return {
+    activeRole,
+    activeInterface: activeUplink || null,
+    work: buildPolicyEntry("Work", "VSAT", workInterface, starlink),
+    entertainment: buildPolicyEntry("Entertainment", "Starlink", entertainmentInterface, vsat)
+  };
+}
+
+function findInterfaceByClass(interfaces, className) {
+  if (!Array.isArray(interfaces) || !className) {
+    return null;
+  }
+
+  return interfaces.find((iface) => classifyUplinkName(iface?.name) === className) || null;
+}
+
 function findInterfaceTotalGb(interfaces, interfaceName) {
   if (!Array.isArray(interfaces) || !interfaceName) {
     return null;
@@ -432,35 +480,50 @@ function renderSummaryCards() {
 
   const cards = [
     {
-      label: "Observed edges",
+      label: "Fleet in scope",
       value: total,
-      meta: "Tong so edge dang nam trong bo loc hien tai"
+      meta: "Devices matching current tenant and vessel filters",
+      icon: "bi bi-diagram-3-fill",
+      color: "info"
     },
     {
-      label: "Online now",
+      label: "Online rate",
       value: online,
-      meta: "Tinh theo heartbeat trong 120 giay"
+      meta: "Last heartbeat within 120 seconds",
+      icon: "bi bi-broadcast",
+      color: "success"
     },
     {
-      label: "Traffic active",
+      label: "Active throughput",
       value: state.edges.filter((item) => Number(item.throughput_kbps || 0) > 0).length,
-      meta: "So edge dang co luu luong duoc ghi nhan"
+      meta: "Edges reporting live throughput",
+      icon: "bi bi-lightning-charge-fill",
+      color: "warning"
     },
     {
-      label: "Average traffic",
+      label: "Average throughput",
       value: formatKbps(avgThroughput),
-      meta: "Trung binh throughput hien tai"
+      meta: "Mean throughput across the filtered fleet",
+      icon: "bi bi-graph-up-arrow",
+      color: "primary"
     }
   ];
 
   elements.summaryCards.innerHTML = cards
     .map(
       (card) => `
-        <article class="summary-card">
-          <span>${escapeHtml(card.label)}</span>
-          <strong>${escapeHtml(card.value)}</strong>
-          <span>${escapeHtml(card.meta)}</span>
-        </article>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="small-box bg-${escapeHtml(card.color)}">
+            <div class="inner">
+              <h3>${escapeHtml(card.value)}</h3>
+              <p>${escapeHtml(card.label)}</p>
+            </div>
+            <div class="icon">
+              <i class="${escapeHtml(card.icon)}"></i>
+            </div>
+            <div class="small-box-footer">${escapeHtml(card.meta)}</div>
+          </div>
+        </div>
       `
     )
     .join("");
@@ -531,35 +594,39 @@ function renderEdgeList() {
 
   if (!state.edges.length) {
     elements.edgeList.innerHTML = `
-      <div class="empty-state">
-        <h3>Khong tim thay edge nao</h3>
-        <p>Thu bo rong bo loc tenant hoac vessel de xem them du lieu.</p>
+      <div class="p-3">
+        <div class="callout callout-info mb-0">
+          <h5>No assets found</h5>
+          <p>Broaden the tenant or vessel filters to reveal more fleet data.</p>
+        </div>
       </div>
     `;
     return;
   }
 
-  elements.edgeList.innerHTML = state.edges
+  elements.edgeList.innerHTML = `
+    <div class="list-group list-group-flush">
+      ${state.edges
     .map((edge) => {
       const selected = edgeKey(edge) === state.selectedEdgeKey;
       return `
-        <article class="edge-item ${selected ? "is-selected" : ""}" data-edge-key="${escapeHtml(edgeKey(edge))}">
-          <div class="edge-item-header">
-            <div>
-              <h3>${escapeHtml(edge.edge_code)}</h3>
-              <p>${escapeHtml(edge.tenant_code)} / ${escapeHtml(edge.vessel_code)}</p>
+        <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start ${selected ? "active" : ""}" data-edge-key="${escapeHtml(edgeKey(edge))}">
+          <div class="me-3 text-start">
+            <div class="fw-bold">${escapeHtml(edge.edge_code)}</div>
+            <small class="${selected ? "text-white-50" : "text-muted"}">${escapeHtml(edge.tenant_code)} / ${escapeHtml(edge.vessel_code)}</small>
+            <div class="mt-2 d-flex flex-wrap" style="gap: 6px;">
+              <span class="badge text-bg-${edge.online ? "success" : "danger"}">${edge.online ? "Online" : "Offline"}</span>
+              <span class="badge text-bg-secondary">Seen ${escapeHtml(formatDate(edge.telemetry_at || edge.heartbeat_at || edge.last_seen_at))}</span>
+              <span class="badge text-bg-secondary">Uplink ${escapeHtml(edge.active_uplink || "No data")}</span>
+              <span class="badge text-bg-secondary">Traffic ${escapeHtml(formatKbps(edge.throughput_kbps))}</span>
             </div>
-            ${statusMarkup(edge.online)}
           </div>
-          <div class="edge-meta">
-            <span class="meta-chip"><strong>Seen</strong> ${escapeHtml(formatDate(edge.telemetry_at || edge.heartbeat_at || edge.last_seen_at))}</span>
-            <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(edge.active_uplink || "No data")}</span>
-            <span class="meta-chip"><strong>Traffic</strong> ${escapeHtml(formatKbps(edge.throughput_kbps))}</span>
-          </div>
-        </article>
+        </button>
       `;
     })
-    .join("");
+    .join("")}
+    </div>
+  `;
 
   elements.edgeList.querySelectorAll("[data-edge-key]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -900,6 +967,46 @@ function renderPortCharts(samples, activeUplink) {
   `;
 }
 
+function renderUplinkPolicyCard(policy) {
+  if (!policy) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>Chua co policy uplink</h3>
+        <p>Telemetry hien tai chua du de xac lap VSAT va Starlink.</p>
+      </div>
+    `;
+  }
+
+  const activeRoleLabel =
+    policy.activeRole === "vsat" ? "Work" : policy.activeRole === "starlink" ? "Entertainment" : "Unknown";
+
+  const renderPolicyItem = (entry, accentClass) => `
+    <article class="policy-item ${accentClass}">
+      <div class="policy-item-header">
+        <span class="policy-kicker">${escapeHtml(entry.label)}</span>
+        <span class="policy-status policy-status-${entry.status}">${escapeHtml(entry.status)}</span>
+      </div>
+      <strong>${escapeHtml(entry.preferred)}</strong>
+      <div class="policy-interface">${escapeHtml(entry.interfaceName || "No data")}</div>
+      <p>${escapeHtml(entry.note)}</p>
+    </article>
+  `;
+
+  return `
+    <div class="policy-grid">
+      ${renderPolicyItem(policy.work, "policy-work")}
+      ${renderPolicyItem(policy.entertainment, "policy-entertainment")}
+    </div>
+    <div class="policy-summary">
+      <span class="tiny-note">Current active uplink role</span>
+      <strong>${escapeHtml(activeRoleLabel)}</strong>
+      <span class="tiny-note">
+        ${escapeHtml(policy.activeInterface ? `Active interface: ${policy.activeInterface}` : "No active interface detected")}
+      </span>
+    </div>
+  `;
+}
+
 function renderListItems(items, renderItem, emptyTitle, emptyText) {
   if (!items.length) {
     return `
@@ -910,7 +1017,24 @@ function renderListItems(items, renderItem, emptyTitle, emptyText) {
     `;
   }
 
-  return `<ul>${items.map(renderItem).join("")}</ul>`;
+  return `<ul class="list-unstyled mb-0">${items.map(renderItem).join("")}</ul>`;
+}
+
+function renderInfoBox(label, value, icon, color, note = "") {
+  return `
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="info-box bg-${escapeHtml(color)}">
+        <span class="info-box-icon">
+          <i class="${escapeHtml(icon)}"></i>
+        </span>
+        <div class="info-box-content">
+          <span class="info-box-text">${escapeHtml(label)}</span>
+          <span class="info-box-number">${escapeHtml(value)}</span>
+          ${note ? `<small class="text-white-50">${escapeHtml(note)}</small>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderDetail() {
@@ -930,8 +1054,6 @@ function renderDetail() {
   const summary = detail.summary || {};
   const latestHeartbeat = detail.latest?.heartbeat || {};
   const latestTelemetry = detail.latest?.telemetry || {};
-  const latestVms = detail.latest?.vms || {};
-  const trafficSummary = traffic?.summary || {};
   const trafficSamples = Array.isArray(traffic?.samples) ? traffic.samples : [];
   const usage24h = detail.usage_24h || {};
   const usageOverview = detail.usage_overview || {};
@@ -942,202 +1064,167 @@ function renderDetail() {
   const activeInterfaceName = uplinkResolution.matchedName || uplinkResolution.displayName || latestTelemetry.active_uplink;
   const activeInterfaceTotalGb = findInterfaceTotalGb(interfaceUsage, activeInterfaceName);
   const latestUsageAt = usageOverview.latest_usage_at || null;
+  const uplinkPolicy = resolveUplinkPolicy(interfaceUsage, latestTelemetry.active_uplink, detail.uplink_policy);
 
   setTextContent(elements.detailTitle, summary.edge_code || "Edge detail");
   setTextContent(elements.detailMeta, `${summary.tenant_code || "-"} / ${summary.vessel_code || "-"} / direct Ethernet`);
   renderEndpointList();
 
   elements.detailShell.innerHTML = `
-    <section class="detail-summary">
-      <div class="detail-summary-header">
+    <div class="card card-outline card-primary">
+      <div class="card-header">
         <div>
           <h3>${escapeHtml(summary.edge_code || "Unknown edge")}</h3>
           <p>${escapeHtml(summary.tenant_name || summary.tenant_code || "Unknown tenant")} / ${escapeHtml(summary.vessel_name || summary.vessel_code || "Unknown vessel")}</p>
         </div>
         ${statusMarkup(summary.online)}
       </div>
-      <div class="detail-hero-meta">
+      <div class="card-body">
+        <div class="detail-hero-meta">
         <span class="meta-chip"><strong>Firmware</strong> ${escapeHtml(summary.edge_firmware_version || latestHeartbeat.firmware_version || "Unknown")}</span>
         <span class="meta-chip"><strong>Last seen</strong> ${escapeHtml(formatDate(latestTelemetry.observed_at || summary.last_seen_at || latestHeartbeat.observed_at))}</span>
         <span class="meta-chip"><strong>Uplink</strong> ${escapeHtml(uplinkResolution.displayName)}</span>
         ${uplinkResolution.rawLabel && uplinkResolution.rawLabel !== uplinkResolution.displayName ? `<span class="meta-chip"><strong>Reported</strong> ${escapeHtml(uplinkResolution.rawLabel)}</span>` : ""}
+        </div>
       </div>
-    </section>
+    </div>
 
-    <section class="live-grid">
-      <article class="live-card">
-        <div class="live-card-header">
-          <h3>Throughput now</h3>
-          <span class="tiny-note">${escapeHtml(formatDate(latestTelemetry.observed_at))}</span>
-        </div>
-        <div class="live-value">${escapeHtml(formatKbps(latestTelemetry.throughput_kbps))}</div>
-      </article>
-      <article class="live-card">
-        <div class="live-card-header">
-          <h3>Active uplink</h3>
-          <span class="tiny-note">Direct link</span>
-        </div>
-        <div class="live-value uplink-display">${escapeHtml(uplinkResolution.displayName)}</div>
-        <div class="live-subvalue">${escapeHtml(uplinkResolution.rawLabel && uplinkResolution.rawLabel !== uplinkResolution.displayName ? `Reported as ${uplinkResolution.rawLabel}` : activeInterfaceName ? `Matched interface ${activeInterfaceName}` : "No additional uplink data")}</div>
-      </article>
-    </section>
+    <div class="row g-3">
+      ${renderInfoBox("Current throughput", formatKbps(latestTelemetry.throughput_kbps), "bi bi-speedometer2", "info", formatDate(latestTelemetry.observed_at))}
+      ${renderInfoBox("Active uplink", uplinkResolution.displayName, "bi bi-diagram-3-fill", "primary", uplinkResolution.rawLabel && uplinkResolution.rawLabel !== uplinkResolution.displayName ? `Reported as ${uplinkResolution.rawLabel}` : activeInterfaceName ? `Matched interface ${activeInterfaceName}` : "No additional uplink data")}
+      ${renderInfoBox("Active port total", activeInterfaceTotalGb != null ? formatDataVolumeGb(activeInterfaceTotalGb) : cumulativeTelemetryGb != null ? formatDataVolumeGb(cumulativeTelemetryGb) : formatDataVolumeMb(totalUsageMb24h), "bi bi-hdd-stack-fill", "success", "From telemetry and usage history")}
+      ${renderInfoBox("Packet loss", formatPercent(latestTelemetry.loss_pct), "bi bi-exclamation-triangle-fill", "warning", "Current sample window")}
+    </div>
 
-    <section class="metric-grid">
-      <article class="metric-card">
-        <span>RX now</span>
-        <strong>${escapeHtml(formatKbps(latestTelemetry.rx_kbps))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>TX now</span>
-        <strong>${escapeHtml(formatKbps(latestTelemetry.tx_kbps))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Active port total</span>
-        <strong>${escapeHtml(activeInterfaceTotalGb != null ? formatDataVolumeGb(activeInterfaceTotalGb) : cumulativeTelemetryGb != null ? formatDataVolumeGb(cumulativeTelemetryGb) : formatDataVolumeMb(totalUsageMb24h))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Latency</span>
-        <strong>${escapeHtml(latestTelemetry.latency_ms != null ? `${formatNumber(latestTelemetry.latency_ms)} ms` : "No data")}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Packet loss</span>
-        <strong>${escapeHtml(formatPercent(latestTelemetry.loss_pct))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>CPU</span>
-        <strong>${escapeHtml(formatPercent(latestHeartbeat.cpu_usage_pct))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>RAM</span>
-        <strong>${escapeHtml(formatPercent(latestHeartbeat.ram_usage_pct))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Traffic average</span>
-        <strong>${escapeHtml(formatKbps(trafficSummary.avg_throughput_kbps))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Traffic peak</span>
-        <strong>${escapeHtml(formatKbps(trafficSummary.peak_throughput_kbps))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Latitude</span>
-        <strong>${escapeHtml(formatCoordinate(latestVms.latitude))}</strong>
-      </article>
-      <article class="metric-card">
-        <span>Longitude</span>
-        <strong>${escapeHtml(formatCoordinate(latestVms.longitude))}</strong>
-      </article>
-    </section>
-
-    <section class="chart-card">
-      <div class="chart-header">
-        <div>
-          <h3>Traffic timeline</h3>
-          <p class="chart-note">Window 120 phut, tu dong cap nhat va tron them telemetry song.</p>
-        </div>
+    <div class="card card-outline card-info mt-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Traffic timeline</h3>
         <div class="legend">
           <span style="color:#68e1fd">Throughput</span>
           <span style="color:#53e2a1">RX</span>
           <span style="color:#ff9d5c">TX</span>
         </div>
       </div>
-      ${renderTrafficChart(trafficSamples)}
-    </section>
+      <div class="card-body">
+        ${renderTrafficChart(trafficSamples)}
+      </div>
+    </div>
 
-    <section class="chart-card">
-      <div class="chart-header">
-        <div>
-          <h3>Port usage breakdown</h3>
-          <p class="chart-note">Dung luong va bang thong duoc tach rieng theo tung cong MCU/MikroTik.</p>
+    <div class="card card-outline card-warning">
+      <div class="card-header">
+        <h3 class="card-title mb-0">Uplink priority</h3>
+      </div>
+      <div class="card-body">
+        ${renderUplinkPolicyCard(uplinkPolicy)}
+      </div>
+    </div>
+
+    <div class="card card-outline card-secondary collapsed-card">
+      <div class="card-header">
+        <h3 class="card-title mb-0">Supporting detail</h3>
+        <div class="card-tools">
+          <button type="button" class="btn btn-tool" data-lte-toggle="card-widget">
+            <i class="bi bi-plus-lg"></i>
+          </button>
         </div>
       </div>
-      ${renderInterfaceUsage(interfaceUsage, activeInterfaceName)}
-    </section>
-
-    <section class="chart-card comparison-card">
-      <div class="chart-header">
-        <div>
-          <h3>Starlink vs VSAT</h3>
-          <p class="chart-note">So sanh throughput theo ten interface thuc te tren cung edge.</p>
+      <div class="card-body">
+        <div class="card card-outline card-info">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">Starlink vs VSAT</h3>
+            <div class="legend">
+              <span style="color:#68e1fd">Starlink</span>
+              <span style="color:#ff9d5c">VSAT</span>
+            </div>
+          </div>
+          <div class="card-body">
+            ${renderUplinkComparisonChart(trafficSamples)}
+          </div>
         </div>
-        <div class="legend">
-          <span style="color:#68e1fd">Starlink</span>
-          <span style="color:#ff9d5c">VSAT</span>
+
+        <div class="card card-outline card-secondary mt-3">
+          <div class="card-header">
+            <h3 class="card-title mb-0">Port usage breakdown</h3>
+          </div>
+          <div class="card-body">
+            ${renderInterfaceUsage(interfaceUsage, activeInterfaceName)}
+          </div>
+        </div>
+
+        <div class="row g-3 mt-3">
+          <div class="col-lg-4">
+            <div class="card card-outline card-secondary h-100">
+              <div class="card-header">
+                <h3 class="card-title mb-0">Recent events</h3>
+                <span class="badge text-bg-secondary float-end">${escapeHtml(String(detail.recent_events?.length || 0))}</span>
+              </div>
+              <div class="card-body">
+                ${renderListItems(
+                  detail.recent_events || [],
+                  (item) => `
+                    <li>
+                      <strong>${escapeHtml(item.event_type || "event")}</strong>
+                      <div>${escapeHtml(item.severity || "unknown")} · ${escapeHtml(formatDate(item.observed_at))}</div>
+                    </li>
+                  `,
+                  "No events",
+                  "This edge has not emitted recent events."
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card card-outline card-secondary h-100">
+              <div class="card-header">
+                <h3 class="card-title mb-0">Ingest errors</h3>
+                <span class="badge text-bg-secondary float-end">${escapeHtml(String(detail.ingest_errors?.length || 0))}</span>
+              </div>
+              <div class="card-body">
+                ${renderListItems(
+                  detail.ingest_errors || [],
+                  (item) => `
+                    <li>
+                      <strong>${escapeHtml(item.reason || "error")}</strong>
+                      <div>${escapeHtml(item.detail || "No detail")}</div>
+                      <div>${escapeHtml(formatDate(item.created_at))}</div>
+                    </li>
+                  `,
+                  "No ingest errors",
+                  "The pipeline is currently receiving clean records."
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card card-outline card-secondary h-100">
+              <div class="card-header">
+                <h3 class="card-title mb-0">Top users 24h</h3>
+                <span class="badge text-bg-secondary float-end">${escapeHtml(String(detail.top_users_24h?.length || 0))}</span>
+              </div>
+              <div class="card-body">
+                ${latestUsageAt ? `<p class="chart-note">No usage in the last 24h. Latest record: ${escapeHtml(formatDate(latestUsageAt))}.</p>` : ""}
+                ${renderListItems(
+                  detail.top_users_24h || [],
+                  (item) => `
+                    <li>
+                      <strong>${escapeHtml(item.username || "unknown")}</strong>
+                      <div>DL ${escapeHtml(formatNumber(item.download_mb, 2))} MB · UL ${escapeHtml(formatNumber(item.upload_mb, 2))} MB</div>
+                      <div>${escapeHtml(formatDate(item.last_seen))}</div>
+                    </li>
+                  `,
+                  "No usage data in 24h",
+                  latestUsageAt
+                    ? "Historical usage exists, but nothing landed in the last 24 hours."
+                    : "No user traffic recorded in the last 24 hours."
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      ${renderUplinkComparisonChart(trafficSamples)}
-    </section>
-
-    <section class="chart-card">
-      <div class="chart-header">
-        <div>
-          <h3>Port traffic over time</h3>
-          <p class="chart-note">Mini-chart rieng cho tung port de xem cong nao dang an bang thong va dung luong nhieu nhat.</p>
-        </div>
-      </div>
-      ${renderPortCharts(trafficSamples, activeInterfaceName)}
-    </section>
-
-    <section class="history-grid">
-      <article class="stack-card">
-        <div class="stack-card-header">
-          <h3>Recent events</h3>
-          <span class="tiny-note">${escapeHtml(String(detail.recent_events?.length || 0))} items</span>
-        </div>
-        ${renderListItems(
-          detail.recent_events || [],
-          (item) => `
-            <li>
-              <strong>${escapeHtml(item.event_type || "event")}</strong>
-              <div>${escapeHtml(item.severity || "unknown")} · ${escapeHtml(formatDate(item.observed_at))}</div>
-            </li>
-          `,
-          "No events",
-          "Edge nay chua phat sinh su kien nao."
-        )}
-      </article>
-
-      <article class="stack-card">
-        <div class="stack-card-header">
-          <h3>Ingest errors</h3>
-          <span class="tiny-note">${escapeHtml(String(detail.ingest_errors?.length || 0))} items</span>
-        </div>
-        ${renderListItems(
-          detail.ingest_errors || [],
-          (item) => `
-            <li>
-              <strong>${escapeHtml(item.reason || "error")}</strong>
-              <div>${escapeHtml(item.detail || "No detail")}</div>
-              <div>${escapeHtml(formatDate(item.created_at))}</div>
-            </li>
-          `,
-          "No ingest errors",
-          "Worker dang nhan va xu ly du lieu sach."
-        )}
-      </article>
-
-      <article class="stack-card">
-        <div class="stack-card-header">
-          <h3>Top users 24h</h3>
-          <span class="tiny-note">${escapeHtml(String(detail.top_users_24h?.length || 0))} users</span>
-        </div>
-        ${latestUsageAt ? `<p class="chart-note">Khong co usage trong 24h qua. Ban ghi gan nhat: ${escapeHtml(formatDate(latestUsageAt))}.</p>` : ""}
-        ${renderListItems(
-          detail.top_users_24h || [],
-          (item) => `
-            <li>
-              <strong>${escapeHtml(item.username || "unknown")}</strong>
-              <div>DL ${escapeHtml(formatNumber(item.download_mb, 2))} MB · UL ${escapeHtml(formatNumber(item.upload_mb, 2))} MB</div>
-              <div>${escapeHtml(formatDate(item.last_seen))}</div>
-            </li>
-          `,
-          "No usage data in 24h",
-          latestUsageAt
-            ? "He thong co usage lich su, nhung khong co sample trong 24h gan nhat."
-            : "Chua co luu luong user trong 24h qua."
-        )}
-      </article>
-    </section>
+    </div>
   `;
 }
 

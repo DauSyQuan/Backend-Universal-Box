@@ -198,6 +198,59 @@ function avg(values) {
   return sum / values.length;
 }
 
+function classifyUplinkName(value) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.includes("starlink")) {
+    return "starlink";
+  }
+  if (normalized.includes("vsat")) {
+    return "vsat";
+  }
+  return null;
+}
+
+function findInterfaceByClass(interfaces, className) {
+  if (!Array.isArray(interfaces) || !className) {
+    return null;
+  }
+
+  return interfaces.find((iface) => classifyUplinkName(iface?.name) === className) ?? null;
+}
+
+function resolveUplinkPolicy(interfaces, activeUplink) {
+  const starlink = findInterfaceByClass(interfaces, "starlink");
+  const vsat = findInterfaceByClass(interfaces, "vsat");
+  const activeRole = classifyUplinkName(activeUplink);
+
+  const workInterface = vsat || starlink;
+  const entertainmentInterface = starlink || vsat;
+
+  const buildEntry = (label, preferredClass, interfaceRow, fallbackRow) => {
+    const detected = Boolean(interfaceRow);
+    const fallback = !detected && Boolean(fallbackRow);
+    return {
+      label,
+      preferred: preferredClass === "vsat" ? "VSAT" : "Starlink",
+      interface_name: interfaceRow?.name ?? null,
+      detected,
+      fallback,
+      status: detected ? "ready" : fallback ? "fallback" : "missing",
+      note: detected
+        ? `Detected ${interfaceRow.name}`
+        : fallbackRow
+          ? `Falling back to ${fallbackRow.name}`
+          : `No ${label.toLowerCase()} uplink telemetry yet`
+    };
+  };
+
+  return {
+    active_role: activeRole,
+    active_interface: activeUplink ?? null,
+    work: buildEntry("Work", "vsat", workInterface, starlink),
+    entertainment: buildEntry("Entertainment", "starlink", entertainmentInterface, vsat)
+  };
+}
+
 async function findEdgeByWanIp(publicWanIp) {
   const normalizedWanIp = parseWanIpInput(publicWanIp, { required: true });
   const result = await pool.query(
@@ -472,6 +525,8 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
     telemetryRow = fallbackTelemetry.rows[0] ?? null;
   }
 
+  const uplinkPolicy = resolveUplinkPolicy(telemetryRow?.interfaces ?? [], telemetryRow?.active_uplink ?? null);
+
   return {
     summary: {
       ...summary,
@@ -489,6 +544,7 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
     usage_24h: usageStats.rows[0] ?? { upload_mb_24h: 0, download_mb_24h: 0, samples_24h: 0 },
     top_users_24h: usageRecent.rows,
     usage_overview: usageOverview.rows[0] ?? { latest_usage_at: null, total_samples: 0 },
+    uplink_policy: uplinkPolicy,
     recent_events: events.rows,
     ingest_errors: ingestErrors.rows,
     ingest_activity_24h: channelActivity.rows
