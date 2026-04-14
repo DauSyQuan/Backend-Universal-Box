@@ -98,6 +98,11 @@ NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-$(read_env_value "$ENV_FILE" "NGROK_AUTHTOKE
 NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-$(read_yaml_scalar "$DEFAULT_NGROK_CONFIG_1" "authtoken")}"
 NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-$(read_yaml_scalar "$DEFAULT_NGROK_CONFIG_2" "authtoken")}"
 NGROK_AUTHTOKEN="$(strip_wrapping_quotes "$NGROK_AUTHTOKEN")"
+NGROK_API_DOMAIN="${NGROK_API_DOMAIN:-$(read_env_value "$ENV_FILE" "NGROK_API_DOMAIN")}"
+NGROK_API_DOMAIN="$(strip_wrapping_quotes "$NGROK_API_DOMAIN")"
+NGROK_API_DOMAIN="${NGROK_API_DOMAIN#http://}"
+NGROK_API_DOMAIN="${NGROK_API_DOMAIN#https://}"
+NGROK_API_DOMAIN="${NGROK_API_DOMAIN%%/*}"
 
 NGROK_API_URL="http://${NGROK_WEB_ADDR}/api/tunnels"
 NGROK_LOG_FILE="/tmp/ngrok_backend.log"
@@ -126,6 +131,11 @@ if [ -z "$NGROK_AUTHTOKEN" ]; then
   exit 1
 fi
 
+API_TUNNEL_DOMAIN_BLOCK=""
+if [ -n "$NGROK_API_DOMAIN" ]; then
+  API_TUNNEL_DOMAIN_BLOCK="    domain: ${NGROK_API_DOMAIN}"
+fi
+
 cat > "$TMP_CONFIG_FILE" <<EOF
 version: 2
 authtoken: ${NGROK_AUTHTOKEN}
@@ -134,6 +144,7 @@ tunnels:
   api:
     proto: http
     addr: ${API_PORT}
+${API_TUNNEL_DOMAIN_BLOCK}
   mqtt:
     proto: tcp
     addr: ${MQTT_LOCAL_PORT}
@@ -180,6 +191,9 @@ echo "======================================"
 echo ">> MQTT Broker WAN:  ${MQTT_BROKER_URL}"
 echo ">> HTTP API WAN   :  ${API_PUBLIC_URL}"
 echo ">> Dashboard URL  :  ${API_PUBLIC_URL}/dashboard"
+if [ -n "$NGROK_API_DOMAIN" ]; then
+  echo ">> Custom domain  :  ${NGROK_API_DOMAIN}"
+fi
 echo ""
 echo "Please update your MCU at 65.181.17.76 to connect to the above addresses."
 echo "Keep this window open to keep the tunnels alive."

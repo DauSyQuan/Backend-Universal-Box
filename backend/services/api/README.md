@@ -8,3 +8,6 @@ Current endpoints:
 4. `GET /api/mcu/edges/{tenant}/{vessel}/{edge}`
 5. `POST /api/mcu/register`
 6. `GET /api/mcu/edges/{tenant}/{vessel}/{edge}/traffic?window_minutes=60&limit=300`
+7. `POST /api/commands`
+8. `GET /api/commands`
+9. `GET /api/commands/{id}`

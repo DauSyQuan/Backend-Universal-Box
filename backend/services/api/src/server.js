@@ -5,11 +5,15 @@ import mqtt from "mqtt";
 import { getHealth, getReady } from "./health.js";
 import { pingDb } from "./db.js";
 import {
+  createCommandJob,
   getMcuEdgeDetail,
   getMcuEdgeDetailByWanIp,
   getMcuEdgeTraffic,
   getMcuEdgeTrafficByWanIp,
+  getCommandJob,
   listMcuEdges,
+  listCommandJobs,
+  markCommandJobStatus,
   registerMcuEdge,
   streamMcuTelemetry
 } from "./mcu.js";
@@ -133,6 +137,31 @@ const readJsonBody = async (req, maxBytes = 1_000_000) => {
   }
 };
 
+const publishMqtt = (topic, payload, options = {}) =>
+  new Promise((resolve, reject) => {
+    mqttClient.publish(topic, payload, options, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+
+const buildCommandEnvelope = (job) => ({
+  msg_id: job.id,
+  timestamp: new Date().toISOString(),
+  tenant_id: job.tenant_code,
+  vessel_id: job.vessel_code,
+  edge_id: job.edge_code,
+  schema_version: "v1",
+  payload: {
+    command_job_id: job.id,
+    command_type: job.command_type,
+    command_payload: job.command_payload ?? {}
+  }
+});
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
@@ -152,6 +181,108 @@ const server = createServer(async (req, res) => {
       sendJson(res, database ? 200 : 503, ready);
     } catch {
       sendJson(res, 503, getReady({ database: false }));
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/commands" && req.method === "GET") {
+    try {
+      const data = await listCommandJobs({
+        tenantCode: url.searchParams.get("tenant") ?? url.searchParams.get("tenant_code"),
+        vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
+        edgeCode: url.searchParams.get("edge") ?? url.searchParams.get("edge_code"),
+        status: url.searchParams.get("status"),
+        limit: url.searchParams.get("limit")
+      });
+      sendJson(res, 200, data);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/commands] failed:", error);
+      sendJson(res, 500, { error: "command_jobs_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/commands" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const job = await createCommandJob({
+        tenantCode: body.tenant_code ?? body.tenant ?? url.searchParams.get("tenant"),
+        vesselCode: body.vessel_code ?? body.vessel ?? url.searchParams.get("vessel"),
+        edgeCode: body.edge_code ?? body.edge ?? url.searchParams.get("edge"),
+        commandType: body.command_type ?? body.type,
+        commandPayload: body.command_payload ?? body.payload ?? {},
+        createdBy: body.created_by ?? null
+      });
+
+      if (!job) {
+        sendJson(res, 404, { error: "edge_not_found" });
+        return;
+      }
+
+      const mqttTopic = `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`;
+      const envelope = buildCommandEnvelope(job);
+
+      try {
+        await publishMqtt(mqttTopic, JSON.stringify(envelope), { qos: 1, retain: false });
+        const sentJob = await markCommandJobStatus(job.id, { status: "sent" });
+        sendJson(res, 201, {
+          ok: true,
+          mqtt_topic: mqttTopic,
+          command: sentJob ?? job,
+          envelope
+        });
+      } catch (publishError) {
+        await markCommandJobStatus(job.id, {
+          status: "failed",
+          resultAt: new Date().toISOString(),
+          resultPayload: {
+            error: publishError?.message || String(publishError),
+            stage: "publish"
+          }
+        }).catch(() => {});
+        console.error("[api/commands] publish failed:", publishError);
+        sendJson(res, 503, { error: "command_publish_failed", command_id: job.id });
+      }
+    } catch (error) {
+      if (error?.code === "invalid_json") {
+        sendJson(res, 400, { error: "invalid_json" });
+        return;
+      }
+      if (error?.code === "payload_too_large") {
+        sendJson(res, 413, { error: "payload_too_large" });
+        return;
+      }
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/commands] create failed:", error);
+      sendJson(res, 500, { error: "command_create_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/commands/") && req.method === "GET") {
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length !== 3) {
+      sendJson(res, 400, { error: "invalid_path" });
+      return;
+    }
+
+    try {
+      const job = await getCommandJob(parts[2]);
+      if (!job) {
+        sendJson(res, 404, { error: "command_not_found" });
+        return;
+      }
+      sendJson(res, 200, job);
+    } catch (error) {
+      console.error("[api/commands/:id] failed:", error);
+      sendJson(res, 500, { error: "command_job_failed" });
     }
     return;
   }

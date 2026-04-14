@@ -182,3 +182,29 @@ test("validateAndNormalizePayload rejects invalid public WAN IP", () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join(" "), /public_wan_ip/i);
 });
+
+test("validateAndNormalizePayload validates ack payload", () => {
+  const result = validateAndNormalizePayload("ack", {
+    msg_id: "cmd-001",
+    status: "ack",
+    message: "accepted"
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.payload.command_job_id, "cmd-001");
+  assert.equal(result.payload.status, "ack");
+  assert.equal(result.payload.message, "accepted");
+});
+
+test("validateAndNormalizePayload validates result payload", () => {
+  const result = validateAndNormalizePayload("result", {
+    command_job_id: "cmd-001",
+    status: "success",
+    result_payload: { applied: true }
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.payload.command_job_id, "cmd-001");
+  assert.equal(result.payload.status, "success");
+  assert.deepEqual(result.payload.result_payload, { applied: true });
+});

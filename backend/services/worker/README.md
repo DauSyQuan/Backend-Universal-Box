@@ -10,6 +10,7 @@ Current responsibility:
 - persist usage to `user_usage` when user can be resolved
 - persist event to `events`
 - persist vms to `vms_positions`
+- update command jobs on `ack` and `result`
 - persist ingest failures to `ingest_errors`
 - skip duplicate `msg_id` safely
 - reconnect automatically on broker disconnect
@@ -20,3 +21,4 @@ Validation rules:
 1. envelope validation for `msg_id`, `timestamp`, `schema_version`.
 2. channel payload validation for numeric/range/required fields.
 3. mapping validation (tenant/vessel/user resolution).
+4. command payload validation for `ack` / `result`.

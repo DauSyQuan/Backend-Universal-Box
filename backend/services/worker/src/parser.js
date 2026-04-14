@@ -325,6 +325,52 @@ export function validateAndNormalizePayload(channel, payload) {
     }
   }
 
+  if (channel === "ack" || channel === "result") {
+    const jobIdRaw = firstPresentString(payload, [
+      "command_job_id",
+      "job_id",
+      "command_id",
+      "msg_id",
+      "id"
+    ]);
+    const statusRaw = firstPresentString(payload, ["status", "ack_status", "result_status"]);
+    const messageRaw = firstPresentString(payload, ["message", "detail", "reason"]);
+    const resultPayloadRaw = firstPresentValue(payload, ["result_payload", "result", "payload_result", "data"]);
+
+    normalized.command_job_id = jobIdRaw ?? null;
+    normalized.status = statusRaw ?? (channel === "ack" ? "ack" : null);
+    normalized.message = messageRaw ?? null;
+    normalized.result_payload = resultPayloadRaw ?? null;
+
+    if (!normalized.command_job_id) {
+      errors.push("command_job_id is required");
+    }
+
+    if (channel === "result") {
+      if (!normalized.status) {
+        errors.push("status is required");
+      } else if (!["success", "failed"].includes(String(normalized.status))) {
+        errors.push("status must be success or failed");
+      }
+
+      if (
+        resultPayloadRaw !== undefined &&
+        resultPayloadRaw !== null &&
+        (typeof resultPayloadRaw !== "object" || Array.isArray(resultPayloadRaw))
+      ) {
+        errors.push("result_payload must be an object when provided");
+      }
+    }
+
+    if (channel === "ack" && normalized.status && !["ack", "accepted"].includes(String(normalized.status))) {
+      errors.push("status must be ack or accepted");
+    }
+
+    if (messageRaw !== undefined && messageRaw !== null && typeof messageRaw !== "string") {
+      errors.push("message must be a string when provided");
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,

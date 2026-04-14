@@ -14,6 +14,8 @@ const routes = new Map([
   ["/dashboard/styles.css", "styles.css"]
 ]);
 
+const vendorPrefix = "/dashboard/vendor/";
+
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -63,6 +65,12 @@ export async function maybeServeStatic(req, res, url) {
   if (url.pathname === "/favicon.ico") {
     res.writeHead(204);
     res.end();
+    return true;
+  }
+
+  if (url.pathname.startsWith(vendorPrefix)) {
+    const filename = url.pathname.slice("/dashboard/".length);
+    await sendFile(res, filename);
     return true;
   }
 

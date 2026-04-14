@@ -119,6 +119,28 @@ Open the `Dashboard URL` on the other laptop. It will look like:
 
 Because the dashboard is served from the same origin as the API, the page and its `/api/*` calls keep working through ngrok.
 
+If you want a shorter address, set `NGROK_API_DOMAIN` in `backend/ops/.env` to a reserved ngrok domain or your own custom domain. Then the dashboard will be available at:
+
+- `https://<your-short-domain>/dashboard`
+
+Example:
+
+```bash
+NGROK_API_DOMAIN=ops.ngrok.app
+```
+
+If you prefer to use the server IP directly without ngrok, install the Nginx reverse proxy and open the dashboard on port 80:
+
+```bash
+sudo bash backend/ops/install-nginx-reverse-proxy.sh
+```
+
+After that, the dashboard is available at:
+
+- `http://<server-ip>/dashboard`
+
+If you also point your domain DNS A record to the same IP, the same proxy will serve `https://` once you add TLS later.
+
 ## Realtime runtime
 
 To keep broker, worker, and API alive after terminal close or reboot:

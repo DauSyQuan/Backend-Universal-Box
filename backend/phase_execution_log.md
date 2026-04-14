@@ -41,3 +41,11 @@
   - command orchestration (`command`, `ack`, `result`) state machine
   - alert engine and policy sync jobs
   - captain-facing usage summary endpoints
+
+## 2026-04-10
+
+- Implemented command orchestration MVP:
+  - `POST /api/commands` creates a command job and publishes MQTT command envelope
+  - `GET /api/commands` and `GET /api/commands/{id}` expose command history
+  - worker updates command jobs on MQTT `ack` and `result`
+  - MQTT contract updated with command / ack / result payload examples

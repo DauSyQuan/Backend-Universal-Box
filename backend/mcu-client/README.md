@@ -26,6 +26,25 @@ to backend MQTT topics in the form:
 
 - `mcu/{tenant}/{vessel}/{edge}/{channel}`
 
+It also listens for backend commands on:
+
+- `mcu/{tenant}/{vessel}/{edge}/command`
+
+and publishes `ack` / `result` replies back to the backend.
+
+By default:
+
+- `policy_sync` runs the bundled `routeros_policy.py --apply`
+- `failback_vsat`, `failover_starlink`, and `restore_automatic` use `COMMAND_HOOK` if configured
+
+Optional env values for command execution:
+
+- `COMMAND_HOOK=/usr/local/bin/apply-edge-command.sh`
+- `WORK_SOURCE_ADDRESSES=192.168.88.10,192.168.88.11`
+- `ENTERTAINMENT_SOURCE_ADDRESSES=192.168.88.20,192.168.88.21`
+- `VSAT_GATEWAY=10.10.10.1`
+- `STARLINK_GATEWAY=100.64.0.1`
+
 ## Policy routing helper
 
 Use `routeros_policy.py` when you want RouterOS to keep:

@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -261,9 +262,11 @@ class BackendCompatibleMcu:
         self.ping_timeout_seconds = env_int("PING_TIMEOUT_SECONDS", 2)
         self.watch_ports = env_json("WATCH_PORTS_JSON", DEFAULT_WATCH_PORTS)
         self.wan_priority = env_csv("WAN_PRIORITY", DEFAULT_WAN_PRIORITY)
+        self.command_hook = env_text("COMMAND_HOOK", "")
 
         self.register_url = f"{self.backend_api_url}/api/mcu/register"
         self.base_topic = f"mcu/{self.tenant_code}/{self.vessel_code}/{self.edge_code}"
+        self.command_topic = f"{self.base_topic}/command"
         self.api_pool = None
         self.tracker: Optional[RouterOsTrafficTracker] = None
 
@@ -274,6 +277,34 @@ class BackendCompatibleMcu:
         )
         if self.mqtt_username:
             self.mqtt_client.username_pw_set(self.mqtt_username, self.mqtt_password or None)
+        self.mqtt_client.on_connect = self._on_connect
+        self.mqtt_client.on_message = self._on_message
+
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        reason = getattr(reason_code, "value", reason_code)
+        try:
+            reason_int = int(reason)
+        except (TypeError, ValueError):
+            reason_int = 1 if str(reason).lower() not in {"success", "0"} else 0
+
+        if reason_int == 0:
+            log(f"Connected to MQTT {self.mqtt_host}:{self.mqtt_port}")
+            client.subscribe(self.command_topic, qos=1)
+            log(f"Subscribed command topic {self.command_topic}")
+        else:
+            log(f"MQTT connect failed rc={reason}")
+
+    def _on_message(self, client, userdata, message):
+        if message.topic != self.command_topic:
+            return
+
+        try:
+            envelope = json.loads(message.payload.decode("utf-8"))
+        except Exception as exc:
+            log(f"command parse failed topic={message.topic}: {exc}")
+            return
+
+        self.handle_command(envelope)
 
     def connect(self) -> None:
         self.mqtt_client.connect(self.mqtt_host, self.mqtt_port, keepalive=60)
@@ -324,6 +355,193 @@ class BackendCompatibleMcu:
             "payload": payload,
         }
         self.mqtt_client.publish(f"{self.base_topic}/{channel}", json.dumps(message), qos=1)
+
+    def publish_command_status(
+        self,
+        channel: str,
+        command_job_id: str,
+        status: str,
+        message_text: Optional[str] = None,
+        result_payload: Optional[dict] = None,
+    ) -> None:
+        payload = {
+            "command_job_id": command_job_id,
+            "status": status,
+        }
+        if message_text:
+            payload["message"] = message_text
+        if result_payload is not None:
+            payload["result_payload"] = result_payload
+        self.publish(channel, payload)
+
+    def extract_command_payload(self, envelope: dict) -> tuple[Optional[str], Optional[str], dict]:
+        raw_payload = envelope.get("payload") if isinstance(envelope, dict) else None
+        payload = raw_payload if isinstance(raw_payload, dict) else (envelope if isinstance(envelope, dict) else {})
+        command_job_id = payload.get("command_job_id") or (envelope.get("msg_id") if isinstance(envelope, dict) else None)
+        command_type = payload.get("command_type") if isinstance(payload, dict) else None
+        command_payload = payload.get("command_payload") if isinstance(payload, dict) else {}
+        if not isinstance(command_payload, dict):
+            command_payload = {}
+        return (
+            str(command_job_id).strip() if command_job_id else None,
+            str(command_type).strip() if command_type else None,
+            command_payload,
+        )
+
+    def run_policy_sync(self) -> dict:
+        script_path = Path(__file__).with_name("routeros_policy.py")
+        completed = subprocess.run(
+            [sys.executable, str(script_path), "--apply"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        if completed.returncode == 0:
+            return {
+                "status": "success",
+                "message": stdout or "RouterOS policy synchronized",
+                "result_payload": {
+                    "applied": True,
+                    "mode": "routeros_policy_apply",
+                    "stdout": stdout or None,
+                },
+            }
+
+        return {
+            "status": "failed",
+            "message": stderr or stdout or f"Policy sync exited with rc={completed.returncode}",
+            "result_payload": {
+                "applied": False,
+                "mode": "routeros_policy_apply",
+                "returncode": completed.returncode,
+                "stderr": stderr or None,
+                "stdout": stdout or None,
+            },
+        }
+
+    def run_command_hook(self, command_job_id: str, command_type: str, command_payload: dict) -> dict:
+        if not self.command_hook:
+            return {
+                "status": "success",
+                "message": "Command received; no COMMAND_HOOK configured",
+                "result_payload": {
+                    "applied": False,
+                    "mode": "noop",
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                },
+            }
+
+        command = shlex.split(self.command_hook)
+        env = os.environ.copy()
+        env.update(
+            {
+                "MCU_COMMAND_JOB_ID": command_job_id,
+                "MCU_COMMAND_TYPE": command_type,
+                "MCU_COMMAND_PAYLOAD": json.dumps(command_payload),
+                "MCU_COMMAND_TOPIC": self.command_topic,
+                "MCU_TENANT_CODE": self.tenant_code,
+                "MCU_VESSEL_CODE": self.vessel_code,
+                "MCU_EDGE_CODE": self.edge_code,
+            }
+        )
+
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+            env=env,
+        )
+
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        if completed.returncode == 0:
+            return {
+                "status": "success",
+                "message": stdout or "Command hook completed successfully",
+                "result_payload": {
+                    "applied": True,
+                    "mode": "hook",
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                    "stdout": stdout or None,
+                },
+            }
+
+        return {
+            "status": "failed",
+            "message": stderr or stdout or f"Command hook exited with rc={completed.returncode}",
+            "result_payload": {
+                "applied": False,
+                "mode": "hook",
+                "returncode": completed.returncode,
+                "command_type": command_type,
+                "command_payload": command_payload,
+                "stderr": stderr or None,
+                "stdout": stdout or None,
+            },
+        }
+
+    def execute_command(self, command_job_id: str, command_type: str, command_payload: dict) -> dict:
+        if command_type == "policy_sync":
+            return self.run_policy_sync()
+
+        if command_type in {"failback_vsat", "failover_starlink", "restore_automatic"}:
+            return self.run_command_hook(command_job_id, command_type, command_payload)
+
+        return {
+            "status": "failed",
+            "message": f"Unsupported command_type: {command_type}",
+            "result_payload": {
+                "applied": False,
+                "command_type": command_type,
+                "command_payload": command_payload,
+            },
+        }
+
+    def handle_command(self, envelope: dict) -> None:
+        command_job_id, command_type, command_payload = self.extract_command_payload(envelope)
+        if not command_job_id or not command_type:
+            log("command ignored: missing command_job_id or command_type")
+            return
+
+        log(f"command received job_id={command_job_id} type={command_type}")
+        try:
+            self.publish_command_status("ack", command_job_id, "ack", "accepted")
+        except Exception as exc:
+            log(f"command ack failed job_id={command_job_id}: {exc}")
+            return
+
+        try:
+            result = self.execute_command(command_job_id, command_type, command_payload)
+        except Exception as exc:
+            result = {
+                "status": "failed",
+                "message": str(exc),
+                "result_payload": {
+                    "applied": False,
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                },
+            }
+
+        try:
+            self.publish_command_status(
+                "result",
+                command_job_id,
+                result.get("status", "failed"),
+                result.get("message"),
+                result.get("result_payload"),
+            )
+            log(f"command result published job_id={command_job_id} status={result.get('status', 'failed')}")
+        except Exception as exc:
+            log(f"command result publish failed job_id={command_job_id}: {exc}")
 
     def choose_active_uplink(self, interfaces: list[TelemetryInterface]) -> Optional[TelemetryInterface]:
         by_name = {iface.name: iface for iface in interfaces}

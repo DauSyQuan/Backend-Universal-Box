@@ -38,8 +38,13 @@
 - `GET /api/commands`
 - `GET /api/commands/{id}`
 
+## Notes
+
+- Command jobs are persisted in `command_jobs`.
+- `POST /api/commands` publishes an MQTT command to the target edge box and marks the job `sent` when delivery is accepted by the broker.
+- MCU `ack` and `result` messages update the stored command job status.
+
 ## Health and ops
 
 - `GET /api/health`
 - `GET /api/ready`
-

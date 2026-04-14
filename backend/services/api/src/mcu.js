@@ -198,6 +198,54 @@ function avg(values) {
   return sum / values.length;
 }
 
+function normalizeCommandJobRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    tenant_code: row.tenant_code,
+    vessel_code: row.vessel_code,
+    edge_code: row.edge_code,
+    edge_box_id: row.edge_box_id,
+    command_type: row.command_type,
+    command_payload: row.command_payload ?? {},
+    status: row.status,
+    ack_at: row.ack_at,
+    result_at: row.result_at,
+    result_payload: row.result_payload ?? null,
+    created_by: row.created_by ?? null,
+    created_at: row.created_at
+  };
+}
+
+async function resolveEdgeCommandContext({ tenantCode, vesselCode, edgeCode }) {
+  ensurePool();
+
+  const result = await pool.query(
+    `
+      select
+        t.id as tenant_id,
+        t.code as tenant_code,
+        v.id as vessel_id,
+        v.code as vessel_code,
+        e.id as edge_box_id,
+        e.edge_code
+      from tenants t
+      join vessels v on v.tenant_id = t.id
+      join edge_boxes e on e.vessel_id = v.id
+      where t.code = $1
+        and v.code = $2
+        and e.edge_code = $3
+      limit 1
+    `,
+    [tenantCode, vesselCode, edgeCode]
+  );
+
+  return result.rows[0] ?? null;
+}
+
 function classifyUplinkName(value) {
   const normalized = String(value ?? "").toLowerCase();
   if (normalized.includes("starlink")) {
@@ -644,6 +692,202 @@ export async function registerMcuEdge(input) {
   } finally {
     client.release();
   }
+}
+
+export async function listCommandJobs({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  status,
+  limit = 50
+}) {
+  ensurePool();
+
+  const safeLimit = Math.max(1, Math.min(200, toInt(limit, 50)));
+  const filters = [];
+  const params = [];
+
+  if (tenantCode) {
+    params.push(String(tenantCode).trim());
+    filters.push(`t.code = $${params.length}`);
+  }
+
+  if (vesselCode) {
+    params.push(String(vesselCode).trim());
+    filters.push(`v.code = $${params.length}`);
+  }
+
+  if (edgeCode) {
+    params.push(String(edgeCode).trim());
+    filters.push(`e.edge_code = $${params.length}`);
+  }
+
+  if (status) {
+    params.push(String(status).trim());
+    filters.push(`cj.status = $${params.length}`);
+  }
+
+  const query = `
+    select
+      cj.id,
+      t.code as tenant_code,
+      v.code as vessel_code,
+      e.edge_code,
+      cj.edge_box_id,
+      cj.command_type,
+      cj.command_payload,
+      cj.status,
+      cj.ack_at,
+      cj.result_at,
+      cj.result_payload,
+      cj.created_by,
+      cj.created_at
+    from command_jobs cj
+    join tenants t on t.id = cj.tenant_id
+    join vessels v on v.id = cj.vessel_id
+    left join edge_boxes e on e.id = cj.edge_box_id
+    ${filters.length ? `where ${filters.join(" and ")}` : ""}
+    order by cj.created_at desc
+    limit $${params.length + 1}
+  `;
+
+  const result = await pool.query(query, [...params, safeLimit]);
+  return {
+    total: result.rowCount,
+    items: result.rows.map(normalizeCommandJobRow)
+  };
+}
+
+export async function getCommandJob(commandJobId) {
+  ensurePool();
+
+  const result = await pool.query(
+    `
+      select
+        cj.id,
+        t.code as tenant_code,
+        v.code as vessel_code,
+        e.edge_code,
+        cj.edge_box_id,
+        cj.command_type,
+        cj.command_payload,
+        cj.status,
+        cj.ack_at,
+        cj.result_at,
+        cj.result_payload,
+        cj.created_by,
+        cj.created_at
+      from command_jobs cj
+      join tenants t on t.id = cj.tenant_id
+      join vessels v on v.id = cj.vessel_id
+      left join edge_boxes e on e.id = cj.edge_box_id
+      where cj.id = $1
+      limit 1
+    `,
+    [commandJobId]
+  );
+
+  return normalizeCommandJobRow(result.rows[0] ?? null);
+}
+
+export async function createCommandJob({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  commandType,
+  commandPayload = {},
+  createdBy = null
+}) {
+  ensurePool();
+
+  const tenant = String(tenantCode ?? "").trim();
+  const vessel = String(vesselCode ?? "").trim();
+  const edge = String(edgeCode ?? "").trim();
+  const type = String(commandType ?? "").trim();
+
+  if (!tenant || !vessel || !edge || !type) {
+    const error = new Error("tenant_code, vessel_code, edge_code, command_type are required");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  if (!commandPayload || typeof commandPayload !== "object" || Array.isArray(commandPayload)) {
+    const error = new Error("command_payload must be an object");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const context = await resolveEdgeCommandContext({
+    tenantCode: tenant,
+    vesselCode: vessel,
+    edgeCode: edge
+  });
+
+  if (!context) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+      insert into command_jobs
+        (tenant_id, vessel_id, edge_box_id, command_type, command_payload, status, created_by)
+      values
+        ($1, $2, $3, $4, $5::jsonb, 'queued', $6)
+      returning id
+    `,
+    [
+      context.tenant_id,
+      context.vessel_id,
+      context.edge_box_id,
+      type,
+      JSON.stringify(commandPayload),
+      createdBy
+    ]
+  );
+
+  return getCommandJob(result.rows[0].id);
+}
+
+export async function markCommandJobStatus(commandJobId, {
+  status,
+  ackAt = null,
+  resultAt = null,
+  resultPayload = null
+} = {}) {
+  ensurePool();
+
+  const normalizedStatus = String(status ?? "").trim();
+  if (!normalizedStatus) {
+    const error = new Error("status is required");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const result = await pool.query(
+    `
+      update command_jobs
+      set
+        status = $2,
+        ack_at = coalesce($3, ack_at),
+        result_at = coalesce($4, result_at),
+        result_payload = coalesce($5::jsonb, result_payload)
+      where id = $1
+      returning id
+    `,
+    [
+      commandJobId,
+      normalizedStatus,
+      ackAt,
+      resultAt,
+      resultPayload !== null && resultPayload !== undefined ? JSON.stringify(resultPayload) : null
+    ]
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  return getCommandJob(commandJobId);
 }
 
 export async function getMcuEdgeTraffic({

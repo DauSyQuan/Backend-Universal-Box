@@ -23,6 +23,54 @@
 - `ack`
 - `result`
 
+## Command envelope
+
+Commands are published by the server to:
+
+`mcu/{tenant_id}/{vessel_id}/{edge_id}/command`
+
+The envelope uses the same `v1` wrapper as inbound messages:
+
+```json
+{
+  "msg_id": "command-job-id",
+  "timestamp": "2026-03-31T07:00:00Z",
+  "tenant_id": "tnr13",
+  "vessel_id": "vsl-001",
+  "edge_id": "edge-001",
+  "schema_version": "v1",
+  "payload": {
+    "command_job_id": "command-job-id",
+    "command_type": "failover_starlink",
+    "command_payload": {}
+  }
+}
+```
+
+## ACK / result payloads
+
+`ack` payload:
+
+```json
+{
+  "command_job_id": "command-job-id",
+  "status": "ack",
+  "message": "accepted"
+}
+```
+
+`result` payload:
+
+```json
+{
+  "command_job_id": "command-job-id",
+  "status": "success",
+  "result_payload": {
+    "applied": true
+  }
+}
+```
+
 ## Common envelope
 
 ```json

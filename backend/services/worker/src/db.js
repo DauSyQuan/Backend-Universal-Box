@@ -419,3 +419,65 @@ export async function insertVms({ context, payload, observedAt }) {
     ]
   );
 }
+
+export async function markCommandJobSent({ jobId, observedAt }) {
+  const result = await pool.query(
+    `
+      update command_jobs
+      set status = 'sent'
+      where id = $1
+        and status = 'queued'
+      returning id
+    `,
+    [jobId]
+  );
+
+  return result.rowCount > 0;
+}
+
+export async function markCommandJobAck({ jobId, payload, observedAt }) {
+  const result = await pool.query(
+    `
+      update command_jobs
+      set
+        status = 'ack',
+        ack_at = coalesce(ack_at, $2),
+        result_payload = coalesce($3::jsonb, result_payload)
+      where id = $1
+        and status not in ('success', 'failed')
+      returning id
+    `,
+    [
+      jobId,
+      observedAt,
+      payload ? JSON.stringify(payload) : null
+    ]
+  );
+
+  return result.rowCount > 0;
+}
+
+export async function markCommandJobResult({ jobId, status, payload, observedAt }) {
+  const normalizedStatus = String(status ?? "").trim();
+  const result = await pool.query(
+    `
+      update command_jobs
+      set
+        status = $2,
+        ack_at = coalesce(ack_at, $3),
+        result_at = $3,
+        result_payload = coalesce($4::jsonb, result_payload)
+      where id = $1
+        and status not in ('success', 'failed')
+      returning id
+    `,
+    [
+      jobId,
+      normalizedStatus || "failed",
+      observedAt,
+      payload ? JSON.stringify(payload) : null
+    ]
+  );
+
+  return result.rowCount > 0;
+}

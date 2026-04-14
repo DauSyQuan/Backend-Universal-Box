@@ -6,6 +6,10 @@ const state = {
     tenant: "",
     vessel: ""
   },
+  commandFeedback: null,
+  commandJobs: [],
+  commandBusyAction: null,
+  commandPollTimer: null,
   health: null,
   ready: null,
   refreshTimer: null,
@@ -575,6 +579,15 @@ function renderEndpointList() {
         { window_minutes: 120 }
       )
     });
+    items.push({
+      label: "Selected edge commands",
+      href: buildAbsoluteUrl("/api/commands", {
+        tenant: selected.tenant_code,
+        vessel: selected.vessel_code,
+        edge: selected.edge_code,
+        limit: 20
+      })
+    });
   }
 
   elements.endpointList.innerHTML = items
@@ -1037,6 +1050,229 @@ function renderInfoBox(label, value, icon, color, note = "") {
   `;
 }
 
+function humanizeCommandType(commandType) {
+  const normalized = String(commandType || "").trim();
+  const lookup = {
+    failover_starlink: "Switch to Starlink",
+    failback_vsat: "Switch to VSAT",
+    restore_automatic: "Restore automatic",
+    policy_sync: "Sync policy"
+  };
+
+  return lookup[normalized] || normalized.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || "Command";
+}
+
+function commandStatusBadgeClass(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "success":
+      return "text-bg-success";
+    case "failed":
+      return "text-bg-danger";
+    case "ack":
+      return "text-bg-info";
+    case "sent":
+      return "text-bg-warning";
+    case "queued":
+    default:
+      return "text-bg-secondary";
+  }
+}
+
+function hasPendingCommandJobs(jobs) {
+  if (!Array.isArray(jobs) || jobs.length === 0) {
+    return false;
+  }
+
+  return jobs.some((job) => {
+    const status = String(job?.status || "").toLowerCase();
+    return status === "queued" || status === "sent" || status === "ack";
+  });
+}
+
+function isCommandableEdge(edge) {
+  return Boolean(edge?.online);
+}
+
+function commandActionDefinition(action) {
+  const actions = {
+    failback_vsat: {
+      label: "Switch to VSAT",
+      description: "Move primary work traffic back to VSAT.",
+      command_type: "failback_vsat",
+      command_payload: {
+        preferred_uplink: "vsat",
+        scope: "critical"
+      },
+      confirm: "Send a command to prefer VSAT for critical traffic?"
+    },
+    failover_starlink: {
+      label: "Switch to Starlink",
+      description: "Move backup or critical traffic to Starlink.",
+      command_type: "failover_starlink",
+      command_payload: {
+        preferred_uplink: "starlink",
+        scope: "critical"
+      },
+      confirm: "Send a command to prefer Starlink for critical traffic?"
+    },
+    policy_sync: {
+      label: "Sync policy",
+      description: "Push the current uplink policy to the edge box.",
+      command_type: "policy_sync",
+      command_payload: {
+        scope: "uplink_policy"
+      },
+      confirm: "Sync the current policy to this edge box?"
+    },
+    restore_automatic: {
+      label: "Restore automatic",
+      description: "Return the edge box to automatic policy handling.",
+      command_type: "restore_automatic",
+      command_payload: {
+        mode: "automatic"
+      },
+      confirm: "Restore automatic handling on this edge box?"
+    }
+  };
+
+  return actions[action] || null;
+}
+
+function renderCommandFeedback() {
+  const feedback = state.commandFeedback;
+  if (!feedback) {
+    return "";
+  }
+
+  const className = feedback.kind === "success" ? "alert-success" : feedback.kind === "danger" ? "alert-danger" : "alert-info";
+  return `
+    <div class="alert ${className} command-feedback mb-3" role="status">
+      ${escapeHtml(feedback.text)}
+    </div>
+  `;
+}
+
+function renderCommandJobsList(jobs) {
+  if (!Array.isArray(jobs) || jobs.length === 0) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <h3>No command jobs yet</h3>
+        <p>Commands issued from this dashboard will show up here as they move through queued, sent, ack, and result states.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="command-job-list">
+      ${jobs
+        .map((job) => {
+          const statusClass = commandStatusBadgeClass(job.status);
+          const statusLabel = String(job.status || "queued").toUpperCase();
+          const payloadSummary = Object.entries(job.command_payload || {})
+            .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+            .join(" · ");
+
+          return `
+            <article class="command-job-item">
+              <div class="command-job-header">
+                <div>
+                  <strong>${escapeHtml(humanizeCommandType(job.command_type))}</strong>
+                  <div class="tiny-note">${escapeHtml(job.command_type || "command")} · ${escapeHtml(job.id.slice(0, 8))}</div>
+                </div>
+                <span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+              </div>
+              <div class="command-job-meta">
+                <span><strong>Created</strong> ${escapeHtml(formatDate(job.created_at))}</span>
+                ${job.ack_at ? `<span><strong>Ack</strong> ${escapeHtml(formatDate(job.ack_at))}</span>` : ""}
+                ${job.result_at ? `<span><strong>Result</strong> ${escapeHtml(formatDate(job.result_at))}</span>` : ""}
+              </div>
+              <div class="tiny-note">${escapeHtml(payloadSummary || "No payload details")}</div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderCommandCenterCard() {
+  const selected = selectedEdge();
+  if (!selected) {
+    return "";
+  }
+
+  const commandable = isCommandableEdge(selected);
+  const jobPollingActive = hasPendingCommandJobs(state.commandJobs);
+
+  const buttons = [
+    "failback_vsat",
+    "failover_starlink",
+    "policy_sync",
+    "restore_automatic"
+  ]
+    .map((action) => {
+      const definition = commandActionDefinition(action);
+      if (!definition) {
+        return "";
+      }
+
+      const isBusy = state.commandBusyAction === action;
+      return `
+        <button
+          type="button"
+          class="btn btn-outline-light command-action-btn"
+          data-command-action="${escapeHtml(action)}"
+          ${isBusy || !commandable ? "disabled" : ""}
+        >
+          <span class="command-action-main">
+            <span class="command-action-title">${escapeHtml(definition.label)}</span>
+            <span class="command-action-desc">${escapeHtml(definition.description)}</span>
+          </span>
+          <i class="bi bi-arrow-right-circle"></i>
+        </button>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="card card-outline card-danger mt-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Command center</h3>
+        <span class="badge text-bg-danger">Live control</span>
+      </div>
+      <div class="card-body">
+        <p class="chart-note mb-3">
+          Commands publish to the selected edge box and are tracked until ack/result comes back.
+        </p>
+        <div class="tiny-note mb-3">
+          ${commandable
+            ? "Edge is online. Commands are enabled and live polling stays active while jobs are pending."
+            : "Edge is offline. Commands are disabled until the next heartbeat arrives."}
+        </div>
+        ${renderCommandFeedback()}
+        <div class="command-center-grid">
+          <section class="command-action-panel">
+            <div class="command-panel-head">
+              <h4>Quick actions</h4>
+              <span class="tiny-note">${escapeHtml(selected.edge_code)} ready</span>
+            </div>
+            <div class="command-action-list">
+              ${buttons}
+            </div>
+          </section>
+          <section class="command-history-panel">
+            <div class="command-panel-head">
+              <h4>Recent jobs</h4>
+              <span class="tiny-note">${escapeHtml(String(state.commandJobs.length))} tracked${jobPollingActive ? " · polling" : ""}</span>
+            </div>
+            ${renderCommandJobsList(state.commandJobs.slice(0, 5))}
+          </section>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderDetail() {
   const detail = state.detail;
   const traffic = state.traffic;
@@ -1118,6 +1354,8 @@ function renderDetail() {
         ${renderUplinkPolicyCard(uplinkPolicy)}
       </div>
     </div>
+
+    ${renderCommandCenterCard()}
 
     <div class="card card-outline card-secondary collapsed-card">
       <div class="card-header">
@@ -1331,6 +1569,9 @@ async function refreshSelectedEdge() {
   if (!edge) {
     state.detail = null;
     state.traffic = null;
+    state.commandJobs = [];
+    state.commandFeedback = null;
+    setCommandPollTimer();
     closeSse();
     renderDetail();
     return;
@@ -1339,11 +1580,100 @@ async function refreshSelectedEdge() {
   const detailPath = `/api/mcu/edges/${encodeURIComponent(edge.tenant_code)}/${encodeURIComponent(edge.vessel_code)}/${encodeURIComponent(edge.edge_code)}`;
   const trafficPath = `${detailPath}/traffic?window_minutes=120&limit=180`;
 
-  const [detail, traffic] = await Promise.all([fetchJson(detailPath), fetchJson(trafficPath)]);
+  const commandPath = `/api/commands?${createQueryString({
+    tenant: edge.tenant_code,
+    vessel: edge.vessel_code,
+    edge: edge.edge_code,
+    limit: 10
+  })}`;
+
+  const [detail, traffic, commandJobs] = await Promise.all([
+    fetchJson(detailPath),
+    fetchJson(trafficPath),
+    fetchJson(commandPath).catch(() => ({ items: [] }))
+  ]);
   state.detail = detail;
   state.traffic = traffic;
+  state.commandJobs = Array.isArray(commandJobs?.items) ? commandJobs.items : [];
+  setCommandPollTimer();
   renderDetail();
   connectSse(edge);
+}
+
+async function sendCommand(action) {
+  const edge = selectedEdge();
+  const definition = commandActionDefinition(action);
+  if (!edge || !definition) {
+    return;
+  }
+
+  if (!window.confirm(definition.confirm)) {
+    return;
+  }
+
+  state.commandBusyAction = action;
+  state.commandFeedback = {
+    kind: "info",
+    text: `Sending ${definition.label} to ${edge.edge_code}...`
+  };
+  renderDetail();
+
+  try {
+    const response = await fetch("/api/commands", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json"
+      },
+      body: JSON.stringify({
+        tenant_code: edge.tenant_code,
+        vessel_code: edge.vessel_code,
+        edge_code: edge.edge_code,
+        command_type: definition.command_type,
+        command_payload: definition.command_payload
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || response.statusText || "command_request_failed");
+    }
+
+    state.commandFeedback = {
+      kind: "success",
+      text: `${definition.label} queued. Command job ${payload.command?.id || "created"} is now ${payload.command?.status || "sent"}.`
+    };
+
+    await refreshSelectedEdge();
+    setCommandPollTimer();
+    window.setTimeout(() => {
+      refreshSelectedEdge().catch(renderErrorState);
+    }, 1200);
+  } catch (error) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: error.message || "Unable to send command"
+    };
+    renderDetail();
+  } finally {
+    state.commandBusyAction = null;
+    renderDetail();
+  }
+}
+
+function setCommandPollTimer() {
+  if (state.commandPollTimer) {
+    window.clearTimeout(state.commandPollTimer);
+    state.commandPollTimer = null;
+  }
+
+  if (!selectedEdge() || !hasPendingCommandJobs(state.commandJobs)) {
+    return;
+  }
+
+  state.commandPollTimer = window.setTimeout(() => {
+    refreshSelectedEdge().catch(renderErrorState);
+  }, 3000);
 }
 
 function renderErrorState(error) {
@@ -1378,6 +1708,17 @@ async function refreshAll() {
 }
 
 function bindEvents() {
+  elements.detailShell.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-command-action]");
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    const action = button.dataset.commandAction;
+    sendCommand(action).catch(renderErrorState);
+  });
+
   elements.filtersForm.addEventListener("submit", (event) => {
     event.preventDefault();
     state.filters.tenant = elements.tenantInput.value.trim();
@@ -1418,6 +1759,9 @@ async function bootstrap() {
 
 window.addEventListener("beforeunload", () => {
   closeSse();
+  if (state.commandPollTimer) {
+    window.clearTimeout(state.commandPollTimer);
+  }
 });
 
 bootstrap().catch(renderErrorState);

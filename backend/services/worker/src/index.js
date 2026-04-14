@@ -10,6 +10,8 @@ import {
   insertTelemetry,
   insertUsage,
   insertVms,
+  markCommandJobAck,
+  markCommandJobResult,
   markEdgeLastSeen,
   pool,
   resolveEdgeContext,
@@ -323,6 +325,55 @@ client.on("message", async (topic, payloadBuffer) => {
 
       await insertVms({ context, payload, observedAt });
       console.log(`[worker] vms stored topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
+    if (parsedTopic.channel === "ack") {
+      const jobId = payload.command_job_id ?? envelope.msgId;
+      const updated = await markCommandJobAck({
+        jobId,
+        payload,
+        observedAt
+      });
+
+      if (!updated) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "command_job_not_found",
+          detail: "ack payload did not match an existing command job",
+          raw: envelope.raw
+        });
+        return;
+      }
+
+      console.log(`[worker] command ack stored topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
+    if (parsedTopic.channel === "result") {
+      const jobId = payload.command_job_id ?? envelope.msgId;
+      const updated = await markCommandJobResult({
+        jobId,
+        status: payload.status,
+        payload,
+        observedAt
+      });
+
+      if (!updated) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "command_job_not_found",
+          detail: "result payload did not match an existing command job",
+          raw: envelope.raw
+        });
+        return;
+      }
+
+      console.log(`[worker] command result stored topic=${topic} msg_id=${envelope.msgId}`);
       return;
     }
 
