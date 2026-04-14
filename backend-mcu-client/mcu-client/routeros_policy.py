@@ -72,42 +72,25 @@ class PolicyGroup:
         return f"mcu-policy:{self.name.lower()}"
 
 
-def build_groups(mode: str = "automatic") -> list[PolicyGroup]:
+def build_groups() -> list[PolicyGroup]:
     work_sources = env_csv("WORK_SOURCE_ADDRESSES")
     entertainment_sources = env_csv("ENTERTAINMENT_SOURCE_ADDRESSES")
-    normalized_mode = normalize_label(mode or "automatic")
-
-    if normalized_mode == "failover_starlink":
-        work_gateway = env_text("STARLINK_GATEWAY", env_text("VSAT_GATEWAY", ""))
-        entertainment_gateway = work_gateway
-        work_preferred = "Starlink"
-        entertainment_preferred = "Starlink"
-    elif normalized_mode == "failback_vsat":
-        work_gateway = env_text("VSAT_GATEWAY", env_text("STARLINK_GATEWAY", ""))
-        entertainment_gateway = work_gateway
-        work_preferred = "VSAT"
-        entertainment_preferred = "VSAT"
-    else:
-        work_gateway = env_text("WORK_GATEWAY", env_text("VSAT_GATEWAY", ""))
-        entertainment_gateway = env_text("ENTERTAINMENT_GATEWAY", env_text("STARLINK_GATEWAY", ""))
-        work_preferred = "VSAT"
-        entertainment_preferred = "Starlink"
 
     return [
         PolicyGroup(
             name="work",
-            preferred_uplink=work_preferred,
+            preferred_uplink="VSAT",
             address_list_name=env_text("WORK_ADDRESS_LIST", "mcu-work"),
             routing_table=env_text("WORK_ROUTING_TABLE", "to-vsat"),
-            gateway=work_gateway,
+            gateway=env_text("WORK_GATEWAY", env_text("VSAT_GATEWAY", "")),
             source_addresses=work_sources,
         ),
         PolicyGroup(
             name="entertainment",
-            preferred_uplink=entertainment_preferred,
+            preferred_uplink="Starlink",
             address_list_name=env_text("ENTERTAINMENT_ADDRESS_LIST", "mcu-entertainment"),
             routing_table=env_text("ENTERTAINMENT_ROUTING_TABLE", "to-starlink"),
-            gateway=entertainment_gateway,
+            gateway=env_text("ENTERTAINMENT_GATEWAY", env_text("STARLINK_GATEWAY", "")),
             source_addresses=entertainment_sources,
         ),
     ]
@@ -183,9 +166,8 @@ def ensure_default_route(resource, group: PolicyGroup) -> bool:
     return True
 
 
-def render_plan(groups: list[PolicyGroup], mode: str = "automatic") -> str:
+def render_plan(groups: list[PolicyGroup]) -> str:
     lines = []
-    lines.append(f"# mode={mode}")
     for group in groups:
         lines.append(f"# {group.name.upper()} -> {group.preferred_uplink}")
         lines.append(f"/routing table add fib=yes name={group.routing_table}")
@@ -242,22 +224,15 @@ def main() -> int:
     )
     parser.add_argument("--apply", action="store_true", help="Apply the policy to the configured RouterOS device.")
     parser.add_argument("--print", dest="emit", action="store_true", help="Print the RouterOS commands that would be applied.")
-    parser.add_argument(
-        "--mode",
-        choices=["automatic", "failback_vsat", "failover_starlink", "restore_automatic"],
-        default="automatic",
-        help="Apply the named uplink policy mode.",
-    )
     args = parser.parse_args()
 
-    mode = "automatic" if args.mode == "restore_automatic" else args.mode
-    groups = build_groups(mode)
+    groups = build_groups()
 
     if not args.apply and not args.emit:
         args.emit = True
 
     if args.emit:
-        print(render_plan(groups, mode))
+        print(render_plan(groups))
 
     if args.apply:
         router_ip = env_text("MK_IP", required=True)

@@ -30,7 +30,6 @@ except ImportError:
 
 
 ENV_FILE = Path(__file__).with_suffix(".env")
-DEVICE_TOKEN_FILE = Path(os.getenv("BACKEND_DEVICE_TOKEN_FILE", str(Path(__file__).with_name(".mcu-device-token"))))
 PING_RTT_RE = re.compile(r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms")
 PING_LOSS_RE = re.compile(r"(\d+(?:\.\d+)?)%\s*packet loss")
 DEFAULT_WATCH_PORTS = {
@@ -87,25 +86,6 @@ def env_csv(name: str, default: list[str]) -> list[str]:
     if not raw:
         return default
     return [item.strip() for item in raw.split(",") if item.strip()]
-
-
-def read_device_token(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        return ""
-    except OSError:
-        return ""
-
-
-def write_device_token(path: Path, token: str) -> None:
-    token = token.strip()
-    if not token:
-        return
-    try:
-        path.write_text(token + "\n", encoding="utf-8")
-    except OSError:
-        pass
 
 
 def now_iso() -> str:
@@ -281,8 +261,6 @@ class BackendCompatibleMcu:
         self.telemetry_interval = env_float("TELEMETRY_INTERVAL_SECONDS", 5.0)
         self.register_interval = env_float("REGISTER_INTERVAL_SECONDS", 300.0)
         self.register_token = env_text("BACKEND_REGISTER_TOKEN", "")
-        self.device_token_file = Path(env_text("BACKEND_DEVICE_TOKEN_FILE", str(DEVICE_TOKEN_FILE)))
-        self.device_token = read_device_token(self.device_token_file)
         self.ping_target = env_text("PING_TARGET", "8.8.8.8")
         self.ping_packets = env_int("PING_PACKETS", 2)
         self.ping_timeout_seconds = env_int("PING_TIMEOUT_SECONDS", 2)
@@ -298,12 +276,11 @@ class BackendCompatibleMcu:
 
         self.mqtt_client = mqtt.Client(
             CallbackAPIVersion.VERSION2,
-            client_id=f"{self.tenant_code}-{self.vessel_code}-{self.edge_code}",
-            clean_session=False,
+            client_id=f"{self.edge_code}-{uuid.uuid4().hex[:8]}",
+            clean_session=True,
         )
         if self.mqtt_username:
             self.mqtt_client.username_pw_set(self.mqtt_username, self.mqtt_password or None)
-        self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_message = self._on_message
 
@@ -360,9 +337,7 @@ class BackendCompatibleMcu:
         self.tracker = None
 
     def register(self) -> None:
-        headers = {"x-mcu-register-token": self.register_token} if self.register_token else {}
-        if self.device_token:
-            headers["x-mcu-device-token"] = self.device_token
+        headers = {"x-mcu-register-token": self.register_token} if self.register_token else None
         response = post_json(
             self.register_url,
             {
@@ -371,12 +346,8 @@ class BackendCompatibleMcu:
                 "edge_code": self.edge_code,
                 "firmware_version": self.firmware_version,
             },
-            headers=headers or None,
+            headers=headers,
         )
-        device_token = response.get("device_token") or response.get("edge", {}).get("device_token")
-        if device_token:
-            self.device_token = str(device_token).strip()
-            write_device_token(self.device_token_file, self.device_token)
         log(f"register ok edge={response.get('edge', {}).get('edge_code', self.edge_code)}")
 
     def publish(self, channel: str, payload: dict) -> None:
@@ -389,10 +360,7 @@ class BackendCompatibleMcu:
             "schema_version": "v1",
             "payload": payload,
         }
-        info = self.mqtt_client.publish(f"{self.base_topic}/{channel}", json.dumps(message), qos=1)
-        info.wait_for_publish(timeout=5.0)
-        if info.rc != mqtt.MQTT_ERR_SUCCESS:
-            raise RuntimeError(f"publish failed rc={info.rc}")
+        self.mqtt_client.publish(f"{self.base_topic}/{channel}", json.dumps(message), qos=1)
 
     def publish_command_status(
         self,
@@ -411,41 +379,6 @@ class BackendCompatibleMcu:
         if result_payload is not None:
             payload["result_payload"] = result_payload
         self.publish(channel, payload)
-
-    def run_routeros_policy(self, mode: str) -> dict:
-        script_path = Path(__file__).with_name("routeros_policy.py")
-        completed = subprocess.run(
-            [sys.executable, str(script_path), "--apply", "--mode", mode],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=120,
-        )
-
-        stdout = (completed.stdout or "").strip()
-        stderr = (completed.stderr or "").strip()
-        if completed.returncode == 0:
-            return {
-                "status": "success",
-                "message": stdout or f"RouterOS policy mode {mode} applied",
-                "result_payload": {
-                    "applied": True,
-                    "mode": mode,
-                    "stdout": stdout or None,
-                },
-            }
-
-        return {
-            "status": "failed",
-            "message": stderr or stdout or f"RouterOS policy mode {mode} failed with rc={completed.returncode}",
-            "result_payload": {
-                "applied": False,
-                "mode": mode,
-                "returncode": completed.returncode,
-                "stderr": stderr or None,
-                "stdout": stdout or None,
-            },
-        }
 
     def extract_command_payload(self, envelope: dict) -> tuple[Optional[str], Optional[str], dict]:
         raw_payload = envelope.get("payload") if isinstance(envelope, dict) else None
@@ -566,7 +499,7 @@ class BackendCompatibleMcu:
             return self.run_policy_sync()
 
         if command_type in {"failback_vsat", "failover_starlink", "restore_automatic"}:
-            return self.run_critical_uplink_command(command_job_id, command_type, command_payload)
+            return self.run_command_hook(command_job_id, command_type, command_payload)
 
         return {
             "status": "failed",
@@ -577,13 +510,6 @@ class BackendCompatibleMcu:
                 "command_payload": command_payload,
             },
         }
-
-    def run_critical_uplink_command(self, command_job_id: str, command_type: str, command_payload: dict) -> dict:
-        if self.command_hook:
-            return self.run_command_hook(command_job_id, command_type, command_payload)
-
-        mode = "automatic" if command_type == "restore_automatic" else command_type
-        return self.run_routeros_policy(mode)
 
     def handle_command(self, envelope: dict) -> None:
         command_job_id, command_type, command_payload = self.extract_command_payload(envelope)
