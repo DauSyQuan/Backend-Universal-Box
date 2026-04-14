@@ -25,7 +25,7 @@ This repository is prepared for immediate Git push and Ubuntu deployment baselin
 
 ## Repository layout
 
-- `docs/phase0`: scope, roles, API surface
+- `../backend-docs/docs/phase0`: scope, roles, API surface
 - `contracts/mqtt`: topic and payload contract
 - `db`: SQL schema
 - `services/api`: API service
@@ -102,7 +102,7 @@ xdg-open http://localhost:3000/dashboard
 
 ## Remote access via ngrok
 
-If you already have ngrok set up on the backend host, you can expose the same dashboard to another laptop without any code changes:
+If you already have ngrok set up on the backend host, you can expose the same dashboard to another laptop without any code changes. The tunnel script now exposes only the dashboard/API by default and keeps MQTT private unless you explicitly enable it:
 
 ```bash
 bash backend/ops/start_tunnels.sh
@@ -112,6 +112,7 @@ When the tunnel is ready, the script prints:
 
 - `HTTP API WAN`
 - `Dashboard URL`
+- `MQTT Broker` only when `NGROK_ENABLE_MQTT_TUNNEL=true`
 
 Open the `Dashboard URL` on the other laptop. It will look like:
 
@@ -140,6 +141,33 @@ After that, the dashboard is available at:
 - `http://<server-ip>/dashboard`
 
 If you also point your domain DNS A record to the same IP, the same proxy will serve `https://` once you add TLS later.
+
+## Go-live hardening
+
+Before exposing the dashboard to another person, set runtime secrets in `backend/ops/.env`:
+
+```bash
+BASIC_AUTH_ENABLED=true
+BASIC_AUTH_USERNAME=demo
+BASIC_AUTH_PASSWORD=<strong password>
+
+MCU_REGISTER_ENABLED=false
+# Enable only when you intentionally onboard new devices
+# MCU_REGISTER_TOKEN=<shared token>
+
+MQTT_ALLOW_ANONYMOUS=false
+MQTT_USERNAME=<broker user>
+MQTT_PASSWORD=<broker password>
+MQTT_AUTO_PROVISION=false
+```
+
+Notes:
+
+- Dashboard and protected API routes now require HTTP Basic Auth. If `BASIC_AUTH_PASSWORD` is left blank, the API prints a one-time password in its startup log.
+- `/api/mcu/register` is disabled by default and must be explicitly enabled with `MCU_REGISTER_ENABLED=true` plus `MCU_REGISTER_TOKEN`.
+- Worker no longer auto-creates unknown edges unless `MQTT_AUTO_PROVISION=true`. Seed or register the edge first for a cleaner demo.
+- The ngrok helper does not publish MQTT unless `NGROK_ENABLE_MQTT_TUNNEL=true`.
+- The bundled Node MQTT broker expects `MQTT_USERNAME` and `MQTT_PASSWORD` when `MQTT_ALLOW_ANONYMOUS=false`. For isolated local development only, you can temporarily set `MQTT_ALLOW_ANONYMOUS=true`.
 
 ## Realtime runtime
 
@@ -185,5 +213,6 @@ journalctl -u mcu-api.service -f
 - Validation and processing failures are persisted to `ingest_errors`.
 - MCU visibility endpoints are available under `/api/mcu/*`.
 - Monitoring dashboard is available at `/dashboard`.
-- Pi4 onboarding guide: `docs/phase2/pi4_mcu_onboarding.md`.
-- RouterOS onboarding guide: `docs/phase2/routeros_mqtt_onboarding.md`.
+- Pi4 / RouterOS client setup guide: `../backend-mcu-client/mcu-client/README.md`.
+- Sample Pi4 environment: `../backend-mcu-client/mcu-client/pi4_uplink.env.example`.
+- Sample RouterOS MCU environment: `../backend-mcu-client/mcu-client/read_traffic.env.example`.
