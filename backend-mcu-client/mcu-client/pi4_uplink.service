@@ -1,0 +1,15 @@
+[Unit]
+Description=Pi4 MCU Uplink
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/pi4-uplink
+ExecStart=/usr/bin/python3 /opt/pi4-uplink/pi4_uplink.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
