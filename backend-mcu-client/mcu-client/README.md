@@ -36,11 +36,18 @@ and publishes `ack` / `result` replies back to the backend.
 By default:
 
 - `policy_sync` runs the bundled `routeros_policy.py --apply`
-- `failback_vsat`, `failover_starlink`, and `restore_automatic` use `COMMAND_HOOK` if configured
+- `failback_vsat`, `failover_starlink`, and `restore_automatic` run the bundled RouterOS policy helper, or `COMMAND_HOOK` if configured
+- MQTT uses a persistent client session so queued commands survive reconnects
 
 Optional registration hardening env value:
 
 - `BACKEND_REGISTER_TOKEN=<shared register token>`
+
+Optional device auth env value:
+
+- `BACKEND_DEVICE_TOKEN_FILE=.mcu-device-token`
+
+The backend returns a `device_token` after the first successful registration. The client stores it in this file and reuses it for future register calls.
 
 Optional env values for command execution:
 

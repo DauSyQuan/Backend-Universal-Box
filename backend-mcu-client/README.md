@@ -9,3 +9,5 @@ Main content:
 - `mcu-client/read_traffic.py`
 - `mcu-client/pi4_uplink.py`
 - `mcu-client/routeros_policy.py`
+
+Both MCU clients now subscribe to the backend command topic and keep a persistent MQTT session so command delivery survives reconnects.
