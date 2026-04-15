@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -22,6 +23,7 @@ except ImportError:
 
 
 ENV_FILE = Path(__file__).with_suffix(".env")
+DEVICE_TOKEN_FILE = Path(os.getenv("BACKEND_DEVICE_TOKEN_FILE", str(Path(__file__).with_name(".mcu-device-token"))))
 PING_RTT_RE = re.compile(r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms")
 PING_LOSS_RE = re.compile(r"(\d+(?:\.\d+)?)%\s*packet loss")
 
@@ -60,6 +62,25 @@ def env_float(name: str, default: float) -> float:
         return float(os.getenv(name, str(default)))
     except ValueError:
         return default
+
+
+def read_device_token(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+    except OSError:
+        return ""
+
+
+def write_device_token(path: Path, token: str) -> None:
+    token = token.strip()
+    if not token:
+        return
+    try:
+        path.write_text(token + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def now_iso() -> str:
@@ -251,33 +272,52 @@ class Pi4McuClient:
         self.telemetry_interval = env_float("TELEMETRY_INTERVAL_SECONDS", 10.0)
         self.register_interval = env_float("REGISTER_INTERVAL_SECONDS", 300.0)
         self.register_token = env_text("BACKEND_REGISTER_TOKEN", "")
+        self.device_token_file = Path(env_text("BACKEND_DEVICE_TOKEN_FILE", str(DEVICE_TOKEN_FILE)))
+        self.device_token = read_device_token(self.device_token_file)
         self.ping_target = env_text("PING_TARGET", "1.1.1.1")
         self.ping_packets = env_int("PING_PACKETS", 2)
         self.ping_timeout_seconds = env_int("PING_TIMEOUT_SECONDS", 2)
+        self.command_hook = env_text("COMMAND_HOOK", "")
         self.connected = False
 
         self.cpu_tracker = CpuUsageTracker()
         self.traffic_tracker = InterfaceTrafficTracker(self.interface_name)
         self.register_url = f"{self.backend_api_url}/api/mcu/register"
         self.base_topic = f"mcu/{self.tenant_code}/{self.vessel_code}/{self.edge_code}"
+        self.command_topic = f"{self.base_topic}/command"
 
-        self.mqtt_client = mqtt.Client(client_id=f"{self.edge_code}-{uuid.uuid4().hex[:8]}", clean_session=True)
+        self.mqtt_client = mqtt.Client(client_id=f"{self.tenant_code}-{self.vessel_code}-{self.edge_code}", clean_session=False)
         if self.mqtt_username:
             self.mqtt_client.username_pw_set(self.mqtt_username, self.mqtt_password or None)
         self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_disconnect = self._on_disconnect
+        self.mqtt_client.on_message = self._on_message
 
     def _on_connect(self, client, userdata, flags, rc):
         self.connected = rc == 0
         if self.connected:
             log(f"Connected to MQTT {self.mqtt_host}:{self.mqtt_port}")
+            client.subscribe(self.command_topic, qos=1)
+            log(f"Subscribed command topic {self.command_topic}")
         else:
             log(f"MQTT connect failed rc={rc}")
 
     def _on_disconnect(self, client, userdata, rc):
         self.connected = False
         log(f"MQTT disconnected rc={rc}")
+
+    def _on_message(self, client, userdata, message):
+        if message.topic != self.command_topic:
+            return
+
+        try:
+            envelope = json.loads(message.payload.decode("utf-8"))
+        except Exception as exc:
+            log(f"command parse failed topic={message.topic}: {exc}")
+            return
+
+        self.handle_command(envelope)
 
     def ensure_public_wan_ip(self) -> Optional[str]:
         if self.public_wan_ip:
@@ -299,12 +339,18 @@ class Pi4McuClient:
             "observed_at": now_iso(),
         }
 
-        headers = {"x-mcu-register-token": self.register_token} if self.register_token else None
+        headers = {"x-mcu-register-token": self.register_token} if self.register_token else {}
+        if self.device_token:
+            headers["x-mcu-device-token"] = self.device_token
 
         try:
-            result = post_json(self.register_url, payload, headers=headers)
+            result = post_json(self.register_url, payload, headers=headers or None)
             edge = result.get("edge", {})
             registered_ip = edge.get("public_wan_ip") or payload["public_wan_ip"] or "unknown"
+            device_token = result.get("device_token") or edge.get("device_token")
+            if device_token:
+                self.device_token = str(device_token).strip()
+                write_device_token(self.device_token_file, self.device_token)
             log(f"Edge registered successfully, WAN IP={registered_ip}")
         except error.HTTPError as exc:
             log(f"Edge register failed HTTP {exc.code}: {exc.read().decode('utf-8', errors='ignore')}")
@@ -329,6 +375,163 @@ class Pi4McuClient:
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             raise RuntimeError(f"publish failed rc={info.rc}")
         log(f"Published {channel} to {topic}")
+
+    def publish_command_status(
+        self,
+        channel: str,
+        command_job_id: str,
+        status: str,
+        message_text: Optional[str] = None,
+        result_payload: Optional[dict] = None,
+    ) -> None:
+        payload = {
+            "command_job_id": command_job_id,
+            "status": status,
+        }
+        if message_text:
+            payload["message"] = message_text
+        if result_payload is not None:
+            payload["result_payload"] = result_payload
+        self.publish(channel, payload)
+
+    def run_command_hook(self, command_job_id: str, command_type: str, command_payload: dict) -> dict:
+        if not self.command_hook:
+            return {
+                "status": "failed",
+                "message": "COMMAND_HOOK is not configured",
+                "result_payload": {
+                    "applied": False,
+                    "mode": "missing_hook",
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                },
+            }
+
+        command = shlex.split(self.command_hook)
+        env = os.environ.copy()
+        env.update(
+            {
+                "MCU_COMMAND_JOB_ID": command_job_id,
+                "MCU_COMMAND_TYPE": command_type,
+                "MCU_COMMAND_PAYLOAD": json.dumps(command_payload),
+                "MCU_COMMAND_TOPIC": self.command_topic,
+                "MCU_TENANT_CODE": self.tenant_code,
+                "MCU_VESSEL_CODE": self.vessel_code,
+                "MCU_EDGE_CODE": self.edge_code,
+            }
+        )
+
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+            env=env,
+        )
+
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        if completed.returncode == 0:
+            return {
+                "status": "success",
+                "message": stdout or "Command hook completed successfully",
+                "result_payload": {
+                    "applied": True,
+                    "mode": "hook",
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                    "stdout": stdout or None,
+                },
+            }
+
+        return {
+            "status": "failed",
+            "message": stderr or stdout or f"Command hook exited with rc={completed.returncode}",
+            "result_payload": {
+                "applied": False,
+                "mode": "hook",
+                "returncode": completed.returncode,
+                "command_type": command_type,
+                "command_payload": command_payload,
+                "stderr": stderr or None,
+                "stdout": stdout or None,
+            },
+        }
+
+    def execute_command(self, command_job_id: str, command_type: str, command_payload: dict) -> dict:
+        if command_type == "policy_sync":
+            return {
+                "status": "success",
+                "message": "Policy sync acknowledged",
+                "result_payload": {
+                    "applied": False,
+                    "mode": "noop",
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                },
+            }
+
+        if command_type in {"failback_vsat", "failover_starlink", "restore_automatic"}:
+            return self.run_command_hook(command_job_id, command_type, command_payload)
+
+        return {
+            "status": "failed",
+            "message": f"Unsupported command_type: {command_type}",
+            "result_payload": {
+                "applied": False,
+                "command_type": command_type,
+                "command_payload": command_payload,
+            },
+        }
+
+    def handle_command(self, envelope: dict) -> None:
+        raw_payload = envelope.get("payload") if isinstance(envelope, dict) else None
+        payload = raw_payload if isinstance(raw_payload, dict) else (envelope if isinstance(envelope, dict) else {})
+        command_job_id = payload.get("command_job_id") or (envelope.get("msg_id") if isinstance(envelope, dict) else None)
+        command_type = payload.get("command_type") if isinstance(payload, dict) else None
+        command_payload = payload.get("command_payload") if isinstance(payload, dict) else {}
+        if not isinstance(command_payload, dict):
+            command_payload = {}
+
+        command_job_id = str(command_job_id).strip() if command_job_id else None
+        command_type = str(command_type).strip() if command_type else None
+
+        if not command_job_id or not command_type:
+            log("command ignored: missing command_job_id or command_type")
+            return
+
+        log(f"command received job_id={command_job_id} type={command_type}")
+        try:
+            self.publish_command_status("ack", command_job_id, "ack", "accepted")
+        except Exception as exc:
+            log(f"command ack failed job_id={command_job_id}: {exc}")
+            return
+
+        try:
+            result = self.execute_command(command_job_id, command_type, command_payload)
+        except Exception as exc:
+            result = {
+                "status": "failed",
+                "message": str(exc),
+                "result_payload": {
+                    "applied": False,
+                    "command_type": command_type,
+                    "command_payload": command_payload,
+                },
+            }
+
+        try:
+            self.publish_command_status(
+                "result",
+                command_job_id,
+                result.get("status", "failed"),
+                result.get("message"),
+                result.get("result_payload"),
+            )
+            log(f"command result published job_id={command_job_id} status={result.get('status', 'failed')}")
+        except Exception as exc:
+            log(f"command result publish failed job_id={command_job_id}: {exc}")
 
     def send_heartbeat(self) -> None:
         payload = {
