@@ -34,6 +34,10 @@ create table if not exists edge_boxes (
   edge_code text not null,
   public_wan_ip inet,
   firmware_version text,
+  device_token_hash text,
+  device_token_issued_at timestamptz,
+  device_last_register_at timestamptz,
+  device_last_register_ip inet,
   last_seen_at timestamptz,
   created_at timestamptz not null default now(),
   unique (vessel_id, edge_code)
@@ -41,6 +45,14 @@ create table if not exists edge_boxes (
 
 alter table edge_boxes
   add column if not exists public_wan_ip inet;
+alter table edge_boxes
+  add column if not exists device_token_hash text;
+alter table edge_boxes
+  add column if not exists device_token_issued_at timestamptz;
+alter table edge_boxes
+  add column if not exists device_last_register_at timestamptz;
+alter table edge_boxes
+  add column if not exists device_last_register_ip inet;
 
 create index if not exists idx_edge_boxes_public_wan_ip
   on edge_boxes(public_wan_ip);

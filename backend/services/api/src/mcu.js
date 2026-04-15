@@ -1,9 +1,53 @@
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { isIP } from "node:net";
 import { pool } from "./db.js";
 
 const sseEmitter = new EventEmitter();
 let sharedListenerClient = null;
+
+const ALLOWED_COMMAND_TYPES = new Set([
+  "policy_sync",
+  "failback_vsat",
+  "failover_starlink",
+  "restore_automatic"
+]);
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left ?? ""), "utf8");
+  const rightBuffer = Buffer.from(String(right ?? ""), "utf8");
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function normalizeToken(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function generateDeviceToken() {
+  return randomBytes(24).toString("base64url");
+}
+
+function hashDeviceToken(token) {
+  return createHash("sha256").update(normalizeToken(token)).digest("hex");
+}
+
+function firstPresentString(input, keys) {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, key)) {
+      const value = input[key];
+      if (value !== null && value !== undefined && value !== "") {
+        return String(value).trim();
+      }
+    }
+  }
+  return "";
+}
 
 async function ensureNotificationListener() {
   if (sharedListenerClient || !pool) return;
@@ -198,6 +242,35 @@ function avg(values) {
   return sum / values.length;
 }
 
+function validateCommandPayload(commandType, commandPayload) {
+  const errors = [];
+  if (!ALLOWED_COMMAND_TYPES.has(commandType)) {
+    errors.push(`unsupported command_type: ${commandType}`);
+  }
+
+  if (!commandPayload || typeof commandPayload !== "object" || Array.isArray(commandPayload)) {
+    errors.push("command_payload must be an object");
+    return errors;
+  }
+
+  const preferredUplink = String(commandPayload.preferred_uplink ?? "").trim().toLowerCase();
+  if (preferredUplink && !["vsat", "starlink", "automatic"].includes(preferredUplink)) {
+    errors.push("preferred_uplink must be vsat, starlink, or automatic when provided");
+  }
+
+  const scope = String(commandPayload.scope ?? "").trim().toLowerCase();
+  if (scope && !["critical", "uplink_policy", "automatic", "manual"].includes(scope)) {
+    errors.push("scope must be critical, uplink_policy, automatic, or manual when provided");
+  }
+
+  const mode = String(commandPayload.mode ?? "").trim().toLowerCase();
+  if (mode && !["automatic", "manual"].includes(mode)) {
+    errors.push("mode must be automatic or manual when provided");
+  }
+
+  return errors;
+}
+
 function normalizeCommandJobRow(row) {
   if (!row) {
     return null;
@@ -304,10 +377,17 @@ async function findEdgeByWanIp(publicWanIp) {
   const result = await pool.query(
     `
       select
+        t.id as tenant_id,
         t.code as tenant_code,
+        v.id as vessel_id,
         v.code as vessel_code,
+        e.id as edge_box_id,
         e.edge_code,
-        host(e.public_wan_ip) as public_wan_ip
+        host(e.public_wan_ip) as public_wan_ip,
+        e.device_token_hash,
+        e.device_token_issued_at,
+        e.device_last_register_at,
+        host(e.device_last_register_ip) as device_last_register_ip
       from edge_boxes e
       join vessels v on v.id = e.vessel_id
       join tenants t on t.id = v.tenant_id
@@ -617,24 +697,55 @@ export async function getMcuEdgeDetailByWanIp({ publicWanIp, onlineSeconds = 120
 
 export async function registerMcuEdge(input) {
   ensurePool();
-  const tenantCode = String(input.tenant_code || "").trim();
-  const vesselCode = String(input.vessel_code || "").trim();
-  const edgeCode = String(input.edge_code || "").trim();
+  const explicitTenantCode = String(input.tenant_code || "").trim();
+  const explicitVesselCode = String(input.vessel_code || "").trim();
+  const explicitEdgeCode = String(input.edge_code || "").trim();
   const explicitWanIpInput = firstPresent(input, ["public_wan_ip", "wan_ip", "public_ip", "wan_ipv4", "ip_wan"]);
   const detectedWanIpInput = firstPresent(input, ["detected_public_wan_ip", "request_ip"]);
+  const deviceTokenCandidate = firstPresentString(input, ["device_token", "mcu_device_token", "register_device_token"]);
+
+  const publicWanIp =
+    explicitWanIpInput !== undefined ? parseWanIpInput(explicitWanIpInput) : parseWanIpInput(detectedWanIpInput);
+  const edgeByIp = publicWanIp ? await findEdgeByWanIp(publicWanIp) : null;
+  const tenantCode = edgeByIp?.tenant_code ?? explicitTenantCode;
+  const vesselCode = edgeByIp?.vessel_code ?? explicitVesselCode;
+  const edgeCode = edgeByIp?.edge_code ?? explicitEdgeCode;
 
   if (!tenantCode || !vesselCode || !edgeCode) {
-    const error = new Error("tenant_code, vessel_code, edge_code are required");
+    const error = new Error("tenant_code, vessel_code, edge_code are required unless public_wan_ip is already mapped");
     error.code = "bad_request";
     throw error;
+  }
+
+  if (edgeByIp) {
+    if (
+      (explicitTenantCode && explicitTenantCode !== edgeByIp.tenant_code) ||
+      (explicitVesselCode && explicitVesselCode !== edgeByIp.vessel_code) ||
+      (explicitEdgeCode && explicitEdgeCode !== edgeByIp.edge_code)
+    ) {
+      const error = new Error(
+        `public_wan_ip is already bound to ${edgeByIp.tenant_code}/${edgeByIp.vessel_code}/${edgeByIp.edge_code}`
+      );
+      error.code = "bad_request";
+      throw error;
+    }
   }
 
   const tenantName = String(input.tenant_name || tenantCode).trim();
   const vesselName = String(input.vessel_name || vesselCode).trim();
   const firmwareVersion = input.firmware_version ? String(input.firmware_version).trim() : null;
-  const observedAt = input.observed_at ? new Date(input.observed_at).toISOString() : null;
-  const publicWanIp =
-    explicitWanIpInput !== undefined ? parseWanIpInput(explicitWanIpInput) : parseWanIpInput(detectedWanIpInput);
+  let observedAt = null;
+  if (input.observed_at) {
+    const observedAtDate = new Date(input.observed_at);
+    if (Number.isNaN(observedAtDate.getTime())) {
+      const error = new Error("observed_at must be valid ISO-8601");
+      error.code = "bad_request";
+      throw error;
+    }
+    observedAt = observedAtDate.toISOString();
+  }
+  const registerAt = observedAt ?? new Date().toISOString();
+  const registerIp = publicWanIp ?? parseWanIpInput(detectedWanIpInput);
 
   const client = await pool.connect();
   try {
@@ -645,7 +756,7 @@ export async function registerMcuEdge(input) {
         insert into tenants (code, name)
         values ($1, $2)
         on conflict (code)
-        do update set name = excluded.name
+        do update set name = tenants.name
         returning id, code, name
       `,
       [tenantCode, tenantName]
@@ -657,7 +768,7 @@ export async function registerMcuEdge(input) {
         insert into vessels (tenant_id, code, name)
         values ($1, $2, $3)
         on conflict (tenant_id, code)
-        do update set name = excluded.name
+        do update set name = vessels.name
         returning id, code, name
       `,
       [tenant.id, vesselCode, vesselName]
@@ -673,18 +784,85 @@ export async function registerMcuEdge(input) {
           set firmware_version = coalesce(excluded.firmware_version, edge_boxes.firmware_version),
               last_seen_at = coalesce(excluded.last_seen_at, edge_boxes.last_seen_at),
               public_wan_ip = coalesce(excluded.public_wan_ip, edge_boxes.public_wan_ip)
-        returning id, edge_code, host(public_wan_ip) as public_wan_ip, firmware_version, last_seen_at
+        returning
+          id,
+          edge_code,
+          host(public_wan_ip) as public_wan_ip,
+          firmware_version,
+          last_seen_at,
+          host(device_last_register_ip) as device_last_register_ip,
+          device_token_hash,
+          device_token_issued_at,
+          device_last_register_at
       `,
-      [vessel.id, edgeCode, firmwareVersion, observedAt, publicWanIp]
+      [vessel.id, edgeCode, firmwareVersion, registerAt, publicWanIp]
     );
     const edge = edgeResult.rows[0];
+
+    const deviceTokenRequired = Boolean(edge?.device_token_hash);
+    let deviceToken = null;
+    let deviceTokenHash = edge?.device_token_hash ?? null;
+    let deviceTokenIssuedAt = edge?.device_token_issued_at ?? null;
+
+    if (deviceTokenRequired) {
+      if (!deviceTokenCandidate) {
+        const error = new Error("device_token_required");
+        error.code = "unauthorized";
+        throw error;
+      }
+
+      if (!safeEqual(hashDeviceToken(deviceTokenCandidate), edge.device_token_hash)) {
+        const error = new Error("invalid_device_token");
+        error.code = "forbidden";
+        throw error;
+      }
+    }
+
+    if (!deviceTokenHash) {
+      deviceToken = deviceTokenCandidate || generateDeviceToken();
+      deviceTokenHash = hashDeviceToken(deviceToken);
+      deviceTokenIssuedAt = registerAt;
+    }
+
+    const deviceTokenIp = registerIp ?? publicWanIp ?? null;
+    await client.query(
+      `
+        update edge_boxes
+        set
+          firmware_version = coalesce($2, firmware_version),
+          last_seen_at = coalesce($3, last_seen_at),
+          public_wan_ip = coalesce($4::inet, public_wan_ip),
+          device_token_hash = coalesce($5, device_token_hash),
+          device_token_issued_at = coalesce($6, device_token_issued_at),
+          device_last_register_at = $7,
+          device_last_register_ip = coalesce($8::inet, device_last_register_ip)
+        where id = $1
+      `,
+      [
+        edge.id,
+        firmwareVersion,
+        registerAt,
+        publicWanIp,
+        deviceTokenHash,
+        deviceTokenIssuedAt,
+        registerAt,
+        deviceTokenIp
+      ]
+    );
 
     await client.query("commit");
 
     return {
       tenant,
       vessel,
-      edge
+      device_token: deviceToken,
+      edge: {
+        ...edge,
+        public_wan_ip: publicWanIp ?? edge.public_wan_ip ?? null,
+        device_last_register_ip: deviceTokenIp ?? edge.device_last_register_ip ?? null,
+        device_token_bound: Boolean(deviceTokenHash),
+        device_token: deviceToken
+      }
     };
   } catch (error) {
     await client.query("rollback");
@@ -813,6 +991,13 @@ export async function createCommandJob({
 
   if (!commandPayload || typeof commandPayload !== "object" || Array.isArray(commandPayload)) {
     const error = new Error("command_payload must be an object");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const commandErrors = validateCommandPayload(type, commandPayload);
+  if (commandErrors.length > 0) {
+    const error = new Error(commandErrors.join("; "));
     error.code = "bad_request";
     throw error;
   }
@@ -1056,8 +1241,8 @@ export async function streamMcuTelemetry(req, res, { tenantCode, vesselCode, edg
   );
 
   if (edgeQuery.rowCount === 0) {
-    res.status?.(404).json?.({ error: "not_found" });
-    res.end();
+    res.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "not_found" }));
     return;
   }
   const edgeId = edgeQuery.rows[0].edge_id;

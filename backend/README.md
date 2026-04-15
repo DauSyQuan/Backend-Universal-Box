@@ -150,6 +150,8 @@ Before exposing the dashboard to another person, set runtime secrets in `backend
 BASIC_AUTH_ENABLED=true
 BASIC_AUTH_USERNAME=demo
 BASIC_AUTH_PASSWORD=<strong password>
+BASIC_AUTH_ROLE=admin
+AUTH_TOKEN_SECRET=<long random secret>
 
 MCU_REGISTER_ENABLED=false
 # Enable only when you intentionally onboard new devices
@@ -164,6 +166,7 @@ MQTT_AUTO_PROVISION=false
 Notes:
 
 - Dashboard and protected API routes now require HTTP Basic Auth. If `BASIC_AUTH_PASSWORD` is left blank, the API prints a one-time password in its startup log.
+- `POST /api/auth/login` issues a bearer token for the same credentials, and `admin` / `noc` are the only roles allowed to create MCU commands.
 - `/api/mcu/register` is disabled by default and must be explicitly enabled with `MCU_REGISTER_ENABLED=true` plus `MCU_REGISTER_TOKEN`.
 - Worker no longer auto-creates unknown edges unless `MQTT_AUTO_PROVISION=true`. Seed or register the edge first for a cleaner demo.
 - The ngrok helper does not publish MQTT unless `NGROK_ENABLE_MQTT_TUNNEL=true`.
