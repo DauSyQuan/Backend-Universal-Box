@@ -80,23 +80,76 @@ create table if not exists users (
 create table if not exists packages (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
+  tenant_code text,
   code text not null,
   name text not null,
+  description text,
   quota_mb bigint not null check (quota_mb >= 0),
+  validity_days integer,
+  price_usd numeric(10,2) not null default 0,
+  is_active boolean not null default true,
   speed_limit_kbps integer,
   duration_days integer,
+  updated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   unique (tenant_id, code)
 );
+
+alter table packages
+  add column if not exists tenant_code text;
+alter table packages
+  add column if not exists description text;
+alter table packages
+  add column if not exists validity_days integer;
+alter table packages
+  add column if not exists price_usd numeric(10,2) not null default 0;
+alter table packages
+  add column if not exists is_active boolean not null default true;
+alter table packages
+  add column if not exists updated_at timestamptz not null default now();
+
+update packages p
+set
+  tenant_code = coalesce(p.tenant_code, t.code),
+  validity_days = coalesce(p.validity_days, p.duration_days),
+  updated_at = now()
+from tenants t
+where t.id = p.tenant_id
+  and p.tenant_code is null;
+
+create index if not exists idx_packages_tenant_code
+  on packages(tenant_code);
 
 create table if not exists package_assignments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
   package_id uuid not null references packages(id) on delete cascade,
+  vessel_code text,
+  remaining_mb bigint,
   assigned_at timestamptz not null default now(),
   expires_at timestamptz,
+  status text not null default 'active',
   is_active boolean not null default true
 );
+
+alter table package_assignments
+  add column if not exists vessel_code text;
+alter table package_assignments
+  add column if not exists remaining_mb bigint;
+alter table package_assignments
+  add column if not exists status text not null default 'active';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'package_assignments_user_vessel_key'
+  ) then
+    alter table package_assignments
+      add constraint package_assignments_user_vessel_key unique (user_id, vessel_code);
+  end if;
+end $$;
 
 create table if not exists telemetry (
   id uuid primary key default gen_random_uuid(),
@@ -223,12 +276,85 @@ create table if not exists user_usage (
   tenant_id uuid not null references tenants(id) on delete cascade,
   vessel_id uuid not null references vessels(id) on delete cascade,
   user_id uuid not null references users(id) on delete cascade,
+  tenant_code text,
+  vessel_code text,
+  username text,
   session_id text,
+  package_assignment_id uuid references package_assignments(id) on delete set null,
   upload_mb numeric(14,3) not null default 0,
   download_mb numeric(14,3) not null default 0,
+  total_mb numeric(14,3) generated always as (upload_mb + download_mb) stored,
   observed_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+
+alter table user_usage
+  add column if not exists tenant_code text;
+alter table user_usage
+  add column if not exists vessel_code text;
+alter table user_usage
+  add column if not exists username text;
+alter table user_usage
+  add column if not exists session_id text;
+alter table user_usage
+  add column if not exists package_assignment_id uuid references package_assignments(id) on delete set null;
+alter table user_usage
+  add column if not exists total_mb numeric(14,3) generated always as (upload_mb + download_mb) stored;
+
+update user_usage uu
+set
+  tenant_code = coalesce(uu.tenant_code, t.code),
+  vessel_code = coalesce(uu.vessel_code, v.code),
+  username = coalesce(uu.username, u.username)
+from tenants t
+join vessels v on v.tenant_id = t.id
+join users u on u.tenant_id = t.id
+where uu.tenant_id = t.id
+  and uu.vessel_id = v.id
+  and uu.user_id = u.id
+  and (uu.tenant_code is null or uu.vessel_code is null or uu.username is null);
+
+create index if not exists idx_user_usage_username_time
+  on user_usage(username, observed_at desc);
+
+create index if not exists idx_user_usage_vessel_code_time
+  on user_usage(vessel_code, observed_at desc);
+
+create table if not exists alerts (
+  id uuid primary key default gen_random_uuid(),
+  tenant_code text,
+  vessel_code text,
+  username text,
+  alert_type text not null check (alert_type in ('quota_80', 'quota_90', 'quota_exhausted')),
+  message text,
+  remaining_mb bigint,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_alerts_username
+  on alerts(username, created_at desc);
+
+create table if not exists package_audit_events (
+  id uuid primary key default gen_random_uuid(),
+  tenant_code text,
+  package_id uuid references packages(id) on delete set null,
+  package_code text,
+  vessel_code text,
+  username text,
+  action_type text not null,
+  actor_user_id uuid,
+  actor_username text,
+  actor_role text,
+  before_payload jsonb,
+  after_payload jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_package_audit_events_created_at
+  on package_audit_events(created_at desc);
+
+create index if not exists idx_package_audit_events_scope
+  on package_audit_events(tenant_code, package_code, vessel_code, username, created_at desc);
 
 create index if not exists idx_user_usage_user_observed
   on user_usage(user_id, observed_at desc);

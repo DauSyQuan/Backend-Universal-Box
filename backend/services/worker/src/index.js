@@ -13,6 +13,7 @@ import {
   markCommandJobAck,
   markCommandJobResult,
   markEdgeLastSeen,
+  recordUsageWithQuota,
   pool,
   resolveEdgeContext,
   resolveTenantVesselContext,
@@ -38,7 +39,36 @@ const mqttUsername = process.env.MQTT_USERNAME || undefined;
 const mqttPassword = process.env.MQTT_PASSWORD || undefined;
 const qos = Number(process.env.MQTT_QOS ?? "1");
 const observedAtMaxSkewSeconds = Number(process.env.OBSERVED_AT_MAX_SKEW_SECONDS ?? "300");
-const topicFilter = "mcu/+/+/+/+";
+const inboundTopicFilters = [
+  "mcu/+/+/+/heartbeat",
+  "mcu/+/+/+/telemetry",
+  "mcu/+/+/+/usage",
+  "mcu/+/+/+/event",
+  "mcu/+/+/+/vms",
+  "mcu/+/+/+/command",
+  "mcu/+/+/+/ack",
+  "mcu/+/+/+/result"
+];
+
+const booleanTrueValues = new Set(["1", "true", "yes", "on"]);
+const booleanFalseValues = new Set(["0", "false", "no", "off"]);
+
+function parseBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (booleanTrueValues.has(normalized)) {
+    return true;
+  }
+  if (booleanFalseValues.has(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
+const mqttAutoProvision = parseBoolean(process.env.MQTT_AUTO_PROVISION, false);
 
 const client = mqtt.connect(mqttUrl, {
   username: mqttUsername,
@@ -55,14 +85,34 @@ async function saveIngestError(errorData) {
   }
 }
 
+function hasResolvedEdgeContext(context) {
+  return Boolean(context?.tenant_id && context?.vessel_id && context?.edge_box_id);
+}
+
+async function resolveRequiredEdgeContext(parsedTopic) {
+  const context = mqttAutoProvision
+    ? await ensureEdgeExists({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        edgeCode: parsedTopic.edgeCode
+      })
+    : await resolveEdgeContext({
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        edgeCode: parsedTopic.edgeCode
+      });
+
+  return hasResolvedEdgeContext(context) ? context : null;
+}
+
 client.on("connect", () => {
   console.log(`[worker] connected to broker ${mqttUrl}`);
-  client.subscribe(topicFilter, { qos }, (error) => {
+  client.subscribe(inboundTopicFilters, { qos }, (error) => {
     if (error) {
       console.error("[worker] subscribe failed:", error.message);
       return;
     }
-    console.log(`[worker] subscribed ${topicFilter} qos=${qos}`);
+    console.log(`[worker] subscribed ${inboundTopicFilters.join(", ")} qos=${qos}`);
   });
 });
 
@@ -153,11 +203,19 @@ client.on("message", async (topic, payloadBuffer) => {
 
   try {
     if (parsedTopic.channel === "heartbeat") {
-      const context = await ensureEdgeExists({
-        tenantCode: parsedTopic.tenantCode,
-        vesselCode: parsedTopic.vesselCode,
-        edgeCode: parsedTopic.edgeCode
-      });
+      const context = await resolveRequiredEdgeContext(parsedTopic);
+      if (!context) {
+        await saveIngestError({
+          topic,
+          channel: parsedTopic.channel,
+          msgId: envelope.msgId,
+          reason: "context_missing",
+          detail: mqttAutoProvision
+            ? "Unable to create or resolve the requested edge"
+            : "Unknown edge; register or seed the edge before accepting inbound data"
+        });
+        return;
+      }
 
       await insertHeartbeat({
         tenantCode: parsedTopic.tenantCode,
@@ -170,35 +228,30 @@ client.on("message", async (topic, payloadBuffer) => {
         observedAt
       });
 
-      if (context?.edge_box_id) {
-        await markEdgeLastSeen({
-          vesselId: context.vessel_id,
-          edgeCode: parsedTopic.edgeCode,
-          observedAt
-        });
-        await updateEdgePublicWanIp({
-          edgeBoxId: context.edge_box_id,
-          publicWanIp: payload.public_wan_ip
-        });
-      }
+      await markEdgeLastSeen({
+        vesselId: context.vessel_id,
+        edgeCode: parsedTopic.edgeCode,
+        observedAt
+      });
+      await updateEdgePublicWanIp({
+        edgeBoxId: context.edge_box_id,
+        publicWanIp: payload.public_wan_ip
+      });
       console.log(`[worker] heartbeat stored topic=${topic} msg_id=${envelope.msgId}`);
       return;
     }
 
     if (parsedTopic.channel === "telemetry") {
-      const context = await ensureEdgeExists({
-        tenantCode: parsedTopic.tenantCode,
-        vesselCode: parsedTopic.vesselCode,
-        edgeCode: parsedTopic.edgeCode
-      });
-
+      const context = await resolveRequiredEdgeContext(parsedTopic);
       if (!context) {
         await saveIngestError({
           topic,
           channel: parsedTopic.channel,
           msgId: envelope.msgId,
           reason: "context_missing",
-          detail: "Unable to resolve tenant/vessel by code"
+          detail: mqttAutoProvision
+            ? "Unable to create or resolve the requested edge"
+            : "Unknown edge; register or seed the edge before accepting inbound data"
         });
         return;
       }
@@ -278,25 +331,32 @@ client.on("message", async (topic, payloadBuffer) => {
         return;
       }
 
-      await insertUsage({ context, userId, payload, observedAt });
-      console.log(`[worker] usage stored topic=${topic} msg_id=${envelope.msgId}`);
+      const usageResult = await recordUsageWithQuota({
+        context,
+        tenantCode: parsedTopic.tenantCode,
+        vesselCode: parsedTopic.vesselCode,
+        username: payload.username ?? null,
+        userId,
+        payload,
+        observedAt
+      });
+      console.log(
+        `[worker] usage stored topic=${topic} msg_id=${envelope.msgId} assignment=${usageResult.package_assignment_id || "none"} remaining_mb=${usageResult.remaining_mb ?? "n/a"}`
+      );
       return;
     }
 
     if (parsedTopic.channel === "event") {
-      const context = await resolveEdgeContext({
-        tenantCode: parsedTopic.tenantCode,
-        vesselCode: parsedTopic.vesselCode,
-        edgeCode: parsedTopic.edgeCode
-      });
-
+      const context = await resolveRequiredEdgeContext(parsedTopic);
       if (!context) {
         await saveIngestError({
           topic,
           channel: parsedTopic.channel,
           msgId: envelope.msgId,
           reason: "context_missing",
-          detail: "Unable to resolve tenant/vessel by code"
+          detail: mqttAutoProvision
+            ? "Unable to create or resolve the requested edge"
+            : "Unknown edge; register or seed the edge before accepting inbound data"
         });
         return;
       }
@@ -377,6 +437,11 @@ client.on("message", async (topic, payloadBuffer) => {
       return;
     }
 
+    if (parsedTopic.channel === "command") {
+      console.log(`[worker] command observed topic=${topic} msg_id=${envelope.msgId}`);
+      return;
+    }
+
     console.log(`[worker] ${parsedTopic.channel} raw stored topic=${topic} msg_id=${envelope.msgId}`);
   } catch (error) {
     const message = error?.message || String(error);
@@ -403,3 +468,4 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 console.log(`[worker] bootstrap started at ${new Date().toISOString()}`);
+console.log(`[worker] edge auto-provision ${mqttAutoProvision ? "enabled" : "disabled"}`);

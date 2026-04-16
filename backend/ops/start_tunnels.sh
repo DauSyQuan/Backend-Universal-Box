@@ -81,6 +81,18 @@ extract_tunnel_url() {
   ' "$tunnel_name"
 }
 
+is_truthy() {
+  local value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    1|true|yes|on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 DEFAULT_NGROK_BIN="ngrok"
 if [ -x "./ngrok" ]; then
   DEFAULT_NGROK_BIN="./ngrok"
@@ -103,6 +115,10 @@ NGROK_API_DOMAIN="$(strip_wrapping_quotes "$NGROK_API_DOMAIN")"
 NGROK_API_DOMAIN="${NGROK_API_DOMAIN#http://}"
 NGROK_API_DOMAIN="${NGROK_API_DOMAIN#https://}"
 NGROK_API_DOMAIN="${NGROK_API_DOMAIN%%/*}"
+NGROK_ENABLE_MQTT_TUNNEL="${NGROK_ENABLE_MQTT_TUNNEL:-$(read_env_value "$ENV_FILE" "NGROK_ENABLE_MQTT_TUNNEL")}"
+NGROK_ENABLE_MQTT_TUNNEL="$(strip_wrapping_quotes "$NGROK_ENABLE_MQTT_TUNNEL")"
+NGROK_DEVICE_HINT="${NGROK_DEVICE_HINT:-$(read_env_value "$ENV_FILE" "NGROK_DEVICE_HINT")}"
+NGROK_DEVICE_HINT="$(strip_wrapping_quotes "$NGROK_DEVICE_HINT")"
 
 NGROK_API_URL="http://${NGROK_WEB_ADDR}/api/tunnels"
 NGROK_LOG_FILE="/tmp/ngrok_backend.log"
@@ -136,7 +152,12 @@ if [ -n "$NGROK_API_DOMAIN" ]; then
   API_TUNNEL_DOMAIN_BLOCK="    domain: ${NGROK_API_DOMAIN}"
 fi
 
-cat > "$TMP_CONFIG_FILE" <<EOF
+ENABLE_MQTT_TUNNEL=0
+if is_truthy "$NGROK_ENABLE_MQTT_TUNNEL"; then
+  ENABLE_MQTT_TUNNEL=1
+fi
+
+cat > "$TMP_CONFIG_FILE" <<EOF2
 version: 2
 authtoken: ${NGROK_AUTHTOKEN}
 web_addr: ${NGROK_WEB_ADDR}
@@ -145,12 +166,22 @@ tunnels:
     proto: http
     addr: ${API_PORT}
 ${API_TUNNEL_DOMAIN_BLOCK}
+EOF2
+
+if [ "$ENABLE_MQTT_TUNNEL" -eq 1 ]; then
+  cat >> "$TMP_CONFIG_FILE" <<EOF2
   mqtt:
     proto: tcp
     addr: ${MQTT_LOCAL_PORT}
-EOF
+EOF2
+fi
 
-echo "Starting Backend MQTT & API Tunnels with ngrok..."
+echo "Starting Backend API Tunnel with ngrok..."
+if [ "$ENABLE_MQTT_TUNNEL" -eq 1 ]; then
+  echo "MQTT tunnel is enabled for this run."
+else
+  echo "MQTT tunnel is disabled by default for safety."
+fi
 "$NGROK_BIN" start --all --config "$TMP_CONFIG_FILE" --log=stdout --log-format=json > "$NGROK_LOG_FILE" 2>&1 &
 NGROK_PID=$!
 
@@ -167,35 +198,55 @@ for _ in $(seq 1 30); do
   TUNNELS_JSON="$(curl -fsS "$NGROK_API_URL" 2>/dev/null || true)"
   if [ -n "$TUNNELS_JSON" ]; then
     API_PUBLIC_URL="$(extract_tunnel_url "$TUNNELS_JSON" "api")"
-    MQTT_PUBLIC_URL="$(extract_tunnel_url "$TUNNELS_JSON" "mqtt")"
-    if [ -n "$API_PUBLIC_URL" ] && [ -n "$MQTT_PUBLIC_URL" ]; then
-      break
+    if [ "$ENABLE_MQTT_TUNNEL" -eq 1 ]; then
+      MQTT_PUBLIC_URL="$(extract_tunnel_url "$TUNNELS_JSON" "mqtt")"
+    fi
+
+    if [ -n "$API_PUBLIC_URL" ]; then
+      if [ "$ENABLE_MQTT_TUNNEL" -eq 0 ] || [ -n "$MQTT_PUBLIC_URL" ]; then
+        break
+      fi
     fi
   fi
 
   sleep 1
 done
 
-if [ -z "$API_PUBLIC_URL" ] || [ -z "$MQTT_PUBLIC_URL" ]; then
-  echo "Unable to fetch ngrok public URLs."
+if [ -z "$API_PUBLIC_URL" ]; then
+  echo "Unable to fetch ngrok public URL for the API."
   echo "Recent log:"
   tail -n 40 "$NGROK_LOG_FILE" 2>/dev/null || true
   exit 1
 fi
 
-MQTT_BROKER_URL="$(printf '%s' "$MQTT_PUBLIC_URL" | sed 's#^tcp://#mqtt://#')"
+if [ "$ENABLE_MQTT_TUNNEL" -eq 1 ] && [ -z "$MQTT_PUBLIC_URL" ]; then
+  echo "Unable to fetch ngrok public URL for MQTT."
+  echo "Recent log:"
+  tail -n 40 "$NGROK_LOG_FILE" 2>/dev/null || true
+  exit 1
+fi
 
 echo "======================================"
-echo "    NGROK TUNNELS STARTED SUCCESSFULLY "
+echo "       NGROK TUNNELS ARE RUNNING       "
 echo "======================================"
-echo ">> MQTT Broker WAN:  ${MQTT_BROKER_URL}"
-echo ">> HTTP API WAN   :  ${API_PUBLIC_URL}"
-echo ">> Dashboard URL  :  ${API_PUBLIC_URL}/dashboard"
+echo ">> HTTP API WAN  :  ${API_PUBLIC_URL}"
+echo ">> Dashboard URL :  ${API_PUBLIC_URL}/dashboard"
 if [ -n "$NGROK_API_DOMAIN" ]; then
-  echo ">> Custom domain  :  ${NGROK_API_DOMAIN}"
+  echo ">> Custom domain :  ${NGROK_API_DOMAIN}"
 fi
+
+if [ "$ENABLE_MQTT_TUNNEL" -eq 1 ]; then
+  MQTT_BROKER_URL="$(printf '%s' "$MQTT_PUBLIC_URL" | sed 's#^tcp://#mqtt://#')"
+  echo ">> MQTT Broker   :  ${MQTT_BROKER_URL}"
+else
+  echo ">> MQTT Broker   :  not exposed (set NGROK_ENABLE_MQTT_TUNNEL=true to enable)"
+fi
+
+if [ -n "$NGROK_DEVICE_HINT" ]; then
+  echo ">> Device hint   :  ${NGROK_DEVICE_HINT}"
+fi
+
 echo ""
-echo "Please update your MCU at 65.181.17.76 to connect to the above addresses."
 echo "Keep this window open to keep the tunnels alive."
 echo "Press Ctrl+C to stop."
 

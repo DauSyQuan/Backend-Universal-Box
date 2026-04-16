@@ -7,14 +7,20 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, "../public");
 
 const routes = new Map([
-  ["/dashboard", "index.html"],
-  ["/dashboard/", "index.html"],
-  ["/dashboard/index.html", "index.html"],
+  ["/dashboard", "dashboard.html"],
+  ["/dashboard/", "dashboard.html"],
+  ["/dashboard/index.html", "dashboard.html"],
   ["/dashboard/app.js", "app.js"],
-  ["/dashboard/styles.css", "styles.css"]
+  ["/dashboard/styles.css", "styles.css"],
+  ["/package-catalog", "index.html"],
+  ["/package-catalog/", "index.html"],
+  ["/package-catalog/index.html", "index.html"],
+  ["/package-catalog/app.js", "app.js"],
+  ["/package-catalog/styles.css", "styles.css"]
 ]);
 
 const vendorPrefix = "/dashboard/vendor/";
+const packageVendorPrefix = "/package-catalog/vendor/";
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -68,8 +74,21 @@ export async function maybeServeStatic(req, res, url) {
     return true;
   }
 
+  if (url.pathname === "/phase3" || url.pathname === "/phase3/" || url.pathname === "/phase3/index.html") {
+    const next = `/package-catalog${url.search || ""}${url.hash || ""}`;
+    res.writeHead(302, { location: next });
+    res.end();
+    return true;
+  }
+
   if (url.pathname.startsWith(vendorPrefix)) {
     const filename = url.pathname.slice("/dashboard/".length);
+    await sendFile(res, filename);
+    return true;
+  }
+
+  if (url.pathname.startsWith(packageVendorPrefix)) {
+    const filename = url.pathname.slice("/package-catalog/".length);
     await sendFile(res, filename);
     return true;
   }

@@ -44,6 +44,11 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
+function toInt(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
 function normalizeSecret(value) {
   if (value === undefined || value === null) {
     return "";
@@ -457,6 +462,135 @@ const getRequestIp = (req) => {
   const remoteCandidate = normalizeIpCandidate(req.socket?.remoteAddress ?? null);
   return isPublicIpCandidate(remoteCandidate) ? remoteCandidate : null;
 };
+
+function parseDateInput(value, { endOfDay = false } = {}) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    parsed.setUTCHours(23, 59, 59, 999);
+  } else {
+    parsed.setUTCHours(0, 0, 0, 0);
+  }
+
+  return parsed.toISOString();
+}
+
+function escapeCsvValue(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  if (/[,"\n\r]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+  return text;
+}
+
+async function insertPackageAuditEvent({
+  tenantCode = null,
+  packageId = null,
+  packageCode = null,
+  vesselCode = null,
+  username = null,
+  actionType,
+  actor = null,
+  beforePayload = null,
+  afterPayload = null
+}) {
+  if (!actionType) {
+    return;
+  }
+
+  await pool.query(
+    `
+      insert into package_audit_events (
+        tenant_code,
+        package_id,
+        package_code,
+        vessel_code,
+        username,
+        action_type,
+        actor_user_id,
+        actor_username,
+        actor_role,
+        before_payload,
+        after_payload
+      )
+      values ($1, $2::uuid, $3, $4, $5, $6, $7::uuid, $8, $9, $10::jsonb, $11::jsonb)
+    `,
+    [
+      tenantCode,
+      packageId,
+      packageCode,
+      vesselCode,
+      username,
+      actionType,
+      actor?.user_id ?? null,
+      actor?.username ?? null,
+      actor?.role ?? null,
+      beforePayload ? JSON.stringify(beforePayload) : null,
+      afterPayload ? JSON.stringify(afterPayload) : null
+    ]
+  );
+}
+
+function buildUsageReportFilterState(url) {
+  const tenantCode = url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? null;
+  const vesselCode = url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? null;
+  const username = url.searchParams.get("username") ?? null;
+  const packageCode = url.searchParams.get("package_code") ?? null;
+  const dateFrom = parseDateInput(url.searchParams.get("date_from"));
+  const dateTo = parseDateInput(url.searchParams.get("date_to"), { endOfDay: true });
+  const windowMinutesRaw = Number(url.searchParams.get("window_minutes") ?? "1440");
+  const windowMinutes = Number.isFinite(windowMinutesRaw) && windowMinutesRaw > 0 ? Math.min(windowMinutesRaw, 10080) : 1440;
+  const bucketRaw = String(url.searchParams.get("bucket") ?? "day").toLowerCase();
+  const bucket = ["hour", "day", "week"].includes(bucketRaw) ? bucketRaw : "day";
+
+  const conditions = [];
+  const params = [];
+  const addCondition = (sql, value) => {
+    params.push(value);
+    conditions.push(sql.replace("$", `$${params.length}`));
+  };
+
+  if (dateFrom || dateTo) {
+    addCondition("uu.observed_at >= $::timestamptz", dateFrom ?? "1970-01-01T00:00:00.000Z");
+    addCondition("uu.observed_at <= $::timestamptz", dateTo ?? new Date().toISOString());
+  } else {
+    addCondition("uu.observed_at >= now() - ($::int || ' minutes')::interval", windowMinutes);
+  }
+
+  if (tenantCode) {
+    addCondition("uu.tenant_code = $", tenantCode);
+  }
+  if (vesselCode) {
+    addCondition("uu.vessel_code = $", vesselCode);
+  }
+  if (username) {
+    addCondition("lower(uu.username) = lower($)", username);
+  }
+  if (packageCode) {
+    addCondition("p.code = $", packageCode);
+  }
+
+  return {
+    tenantCode,
+    vesselCode,
+    username,
+    packageCode,
+    dateFrom,
+    dateTo,
+    windowMinutes,
+    bucket,
+    conditions,
+    params,
+    whereClause: conditions.length ? `where ${conditions.join(" and ")}` : ""
+  };
+}
 
 const readJsonBody = async (req, maxBytes = 1_000_000) => {
   let total = 0;
@@ -1114,33 +1248,895 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+
+  // =============================================
+  // PHASE 3 - PACKAGES ROUTES
+  // =============================================
+  if (url.pathname === "/api/packages" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const tenantCode = url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? null;
+      const includeInactive = parseBoolean(url.searchParams.get("include_inactive"), false);
+      const result = await pool.query(
+        `
+          select
+            p.id,
+            coalesce(p.tenant_code, t.code) as tenant_code,
+            t.name as tenant_name,
+            p.code,
+            p.name,
+            p.description,
+            p.quota_mb,
+            coalesce(p.validity_days, p.duration_days) as validity_days,
+            p.price_usd,
+            p.is_active,
+            p.speed_limit_kbps,
+            p.duration_days,
+            p.updated_at,
+            p.created_at
+          from packages p
+          join tenants t on t.id = p.tenant_id
+          where ($1::text is null or t.code = $1)
+            and ($2::boolean = true or p.is_active = true)
+          order by p.is_active desc, p.created_at desc, p.name asc
+        `,
+        [tenantCode, includeInactive]
+      );
+      sendJson(res, 200, result.rows);
+    } catch (err) {
+      console.error("[api/packages GET] failed:", err);
+      sendJson(res, 500, { error: "packages_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/packages" && req.method === "POST") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const body = await readJsonBody(req);
+      const tenantCode = String(body.tenant_code ?? body.tenant ?? "").trim();
+      const code = String(body.code ?? body.package_code ?? "").trim();
+      const name = String(body.name ?? "").trim();
+      const description = String(body.description ?? "").trim();
+      const quotaMb = Number(body.quota_mb ?? body.quota ?? 0);
+      const speedLimitKbps = body.speed_limit_kbps !== undefined && body.speed_limit_kbps !== null && body.speed_limit_kbps !== ""
+        ? Number(body.speed_limit_kbps)
+        : null;
+      const validityDays = Number(body.validity_days ?? body.duration_days ?? 0);
+      const priceUsd = body.price_usd !== undefined && body.price_usd !== null && body.price_usd !== ""
+        ? Number(body.price_usd)
+        : 0;
+      const isActive = body.is_active === undefined || body.is_active === null || body.is_active === ""
+        ? true
+        : parseBoolean(body.is_active, true);
+
+      if (!tenantCode || !name || !Number.isFinite(quotaMb) || quotaMb <= 0 || !Number.isFinite(validityDays) || validityDays <= 0) {
+        sendJson(res, 400, { error: "tenant_code, name, quota_mb, validity_days are required" });
+        return;
+      }
+
+      const tenantResult = await pool.query(
+        "select id, code, name from tenants where code = $1 limit 1",
+        [tenantCode]
+      );
+      const tenant = tenantResult.rows[0];
+      if (!tenant) {
+        sendJson(res, 404, { error: "tenant_not_found" });
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          insert into packages (
+            tenant_id,
+            tenant_code,
+            code,
+            name,
+            description,
+            quota_mb,
+            validity_days,
+            price_usd,
+            is_active,
+            speed_limit_kbps,
+            duration_days
+          )
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          on conflict (tenant_id, code)
+          do update set
+            tenant_code = excluded.tenant_code,
+            name = excluded.name,
+            description = excluded.description,
+            quota_mb = excluded.quota_mb,
+            validity_days = excluded.validity_days,
+            price_usd = excluded.price_usd,
+            is_active = excluded.is_active,
+            speed_limit_kbps = excluded.speed_limit_kbps,
+            duration_days = excluded.duration_days,
+            updated_at = now()
+          returning id, tenant_code, code, name, description, quota_mb, validity_days, price_usd, is_active, speed_limit_kbps, duration_days, updated_at, created_at
+        `,
+        [
+          tenant.id,
+          tenant.code,
+          code || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "package",
+          name,
+          description || null,
+          quotaMb,
+          validityDays,
+          priceUsd,
+          isActive,
+          speedLimitKbps,
+          validityDays
+        ]
+      );
+      await insertPackageAuditEvent({
+        tenantCode: tenant.code,
+        packageId: result.rows[0]?.id ?? null,
+        packageCode: result.rows[0]?.code ?? code,
+        actionType: "package_create",
+        actor: principal,
+        afterPayload: result.rows[0] ?? null
+      });
+      sendJson(res, 201, result.rows[0]);
+    } catch (err) {
+      console.error("[api/packages POST] failed:", err);
+      sendJson(res, 500, { error: "package_create_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/packages/") && url.pathname.endsWith("/assign") && req.method === "POST") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    const id = url.pathname.split("/")[3];
+    try {
+      const body = await readJsonBody(req);
+      const { user_id } = body;
+      const username = String(body.username ?? body.user_name ?? "").trim();
+      const vesselCode = String(body.vessel_code ?? body.vessel ?? "").trim();
+      if (!vesselCode) {
+        sendJson(res, 400, { error: "vessel_code is required" });
+        return;
+      }
+
+      const packageResult = await pool.query(
+        `
+          select p.id, p.tenant_id, p.quota_mb, coalesce(p.validity_days, p.duration_days) as validity_days
+          from packages p
+          where p.id = $1
+            and p.is_active = true
+          limit 1
+        `,
+        [id]
+      );
+      const packageRow = packageResult.rows[0];
+      if (!packageRow) {
+        sendJson(res, 404, { error: "package_not_found" });
+        return;
+      }
+
+      let resolvedUserId = user_id ? String(user_id).trim() : "";
+      if (!resolvedUserId) {
+        if (!username) {
+          sendJson(res, 400, { error: "user_id or username is required" });
+          return;
+        }
+        const userResult = await pool.query(
+          `
+            select id
+            from users
+            where tenant_id = $1
+              and lower(username) = lower($2)
+            order by created_at asc
+            limit 1
+          `,
+          [packageRow.tenant_id, username]
+        );
+        resolvedUserId = userResult.rows[0]?.id ?? "";
+      }
+
+      if (!resolvedUserId) {
+        sendJson(res, 404, { error: "user_not_found" });
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          insert into package_assignments (user_id, package_id, vessel_code, remaining_mb, expires_at, status)
+          values ($1::uuid, $2::uuid, $3::text, $4::bigint, now() + ($5::text || ' days')::interval, 'active')
+          on conflict (user_id, vessel_code)
+          do update set
+            package_id = excluded.package_id,
+            remaining_mb = excluded.remaining_mb,
+            expires_at = excluded.expires_at,
+            status = 'active',
+            is_active = true
+          returning *
+        `,
+        [resolvedUserId, packageRow.id, vesselCode, packageRow.quota_mb, String(packageRow.validity_days || 30)]
+      );
+      await insertPackageAuditEvent({
+        tenantCode: packageResult.rows[0]?.tenant_code ?? null,
+        packageId: packageRow.id,
+        packageCode: packageResult.rows[0]?.code ?? null,
+        vesselCode,
+        username: username || null,
+        actionType: "package_assign",
+        actor: principal,
+        afterPayload: result.rows[0] ?? null
+      });
+      sendJson(res, 201, result.rows[0]);
+    } catch (err) {
+      console.error("[api/packages/assign POST] failed:", err);
+      sendJson(res, 500, { error: "package_assign_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/packages/") && !url.pathname.endsWith("/assign") && req.method === "PATCH") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    const id = url.pathname.split("/")[3];
+    try {
+      const body = await readJsonBody(req);
+      const existingResult = await pool.query(
+        `
+          select
+            p.id,
+            p.tenant_id,
+            t.code as tenant_code,
+            p.code,
+            p.name,
+            p.description,
+            p.quota_mb,
+            coalesce(p.validity_days, p.duration_days) as validity_days,
+            p.price_usd,
+            p.is_active,
+            p.speed_limit_kbps,
+            p.duration_days
+          from packages p
+          join tenants t on t.id = p.tenant_id
+          where p.id = $1
+          limit 1
+        `,
+        [id]
+      );
+      const existing = existingResult.rows[0];
+      if (!existing) {
+        sendJson(res, 404, { error: "package_not_found" });
+        return;
+      }
+
+      const requestedTenantCode = String(body.tenant_code ?? body.tenant ?? "").trim();
+      if (requestedTenantCode && requestedTenantCode !== existing.tenant_code) {
+        sendJson(res, 400, { error: "package_tenant_immutable" });
+        return;
+      }
+
+      const nextCode = String(body.code ?? body.package_code ?? existing.code ?? "").trim() || existing.code;
+      const nextName = String(body.name ?? existing.name ?? "").trim() || existing.name;
+      const nextDescription = body.description === undefined
+        ? existing.description
+        : String(body.description ?? "").trim() || null;
+
+      const quotaInput = body.quota_mb ?? body.quota;
+      const validityInput = body.validity_days ?? body.duration_days;
+      const priceInput = body.price_usd;
+      const speedInput = body.speed_limit_kbps;
+      const isActiveInput = body.is_active;
+
+      const nextQuotaMb = quotaInput === undefined || quotaInput === null || quotaInput === ""
+        ? Number(existing.quota_mb ?? 0)
+        : Number(quotaInput);
+      const nextValidityDays = validityInput === undefined || validityInput === null || validityInput === ""
+        ? Number(existing.validity_days ?? existing.duration_days ?? 0)
+        : Number(validityInput);
+      const nextPriceUsd = priceInput === undefined || priceInput === null || priceInput === ""
+        ? Number(existing.price_usd ?? 0)
+        : Number(priceInput);
+      const nextSpeedLimit = speedInput === undefined || speedInput === null || speedInput === ""
+        ? (existing.speed_limit_kbps === null || existing.speed_limit_kbps === undefined ? null : Number(existing.speed_limit_kbps))
+        : Number(speedInput);
+      const nextIsActive = isActiveInput === undefined || isActiveInput === null || isActiveInput === ""
+        ? Boolean(existing.is_active)
+        : parseBoolean(isActiveInput, Boolean(existing.is_active));
+
+      if (!nextCode || !nextName || !Number.isFinite(nextQuotaMb) || nextQuotaMb < 0 || !Number.isFinite(nextValidityDays) || nextValidityDays <= 0 || !Number.isFinite(nextPriceUsd) || (nextSpeedLimit !== null && !Number.isFinite(nextSpeedLimit))) {
+        sendJson(res, 400, { error: "invalid_package_payload" });
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          update packages
+          set
+            code = $2,
+            name = $3,
+            description = $4,
+            quota_mb = $5::bigint,
+            validity_days = $6::int,
+            price_usd = $7::numeric(10,2),
+            is_active = $8::boolean,
+            speed_limit_kbps = $9::int,
+            duration_days = $6::int,
+            updated_at = now()
+          where id = $1::uuid
+          returning id, tenant_code, code, name, description, quota_mb, validity_days, price_usd, is_active, speed_limit_kbps, duration_days, updated_at, created_at
+        `,
+        [
+          id,
+          nextCode,
+          nextName,
+          nextDescription,
+          nextQuotaMb,
+          nextValidityDays,
+          nextPriceUsd,
+          nextIsActive,
+          nextSpeedLimit
+        ]
+      );
+
+      await insertPackageAuditEvent({
+        tenantCode: existing.tenant_code,
+        packageId: id,
+        packageCode: result.rows[0]?.code ?? nextCode,
+        actionType: nextIsActive ? "package_update" : "package_archive_toggle",
+        actor: principal,
+        beforePayload: existing,
+        afterPayload: result.rows[0] ?? null
+      });
+
+      if (!nextIsActive) {
+        await pool.query(
+          `
+            update package_assignments
+            set
+              status = 'cancelled',
+              is_active = false
+            where package_id = $1::uuid
+              and is_active = true
+          `,
+          [id]
+        );
+      }
+
+      sendJson(res, 200, result.rows[0]);
+    } catch (err) {
+      if (err?.code === "23505") {
+        sendJson(res, 409, { error: "package_conflict" });
+        return;
+      }
+      console.error("[api/packages PATCH] failed:", err);
+      sendJson(res, 500, { error: "package_update_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/package-assignments" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const tenantCode = url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? null;
+      const vesselCode = url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? null;
+      const username = url.searchParams.get("username") ?? null;
+      const status = url.searchParams.get("status") ?? null;
+      const packageCode = url.searchParams.get("package_code") ?? null;
+      const activeOnly = parseBoolean(url.searchParams.get("active_only"), true);
+
+      const result = await pool.query(
+        `
+          select
+            pa.id,
+            pa.user_id,
+            u.username,
+            t.code as tenant_code,
+            v.code as vessel_code,
+            p.id as package_id,
+            p.code as package_code,
+            p.name as package_name,
+            pa.assigned_at,
+            pa.expires_at,
+            pa.remaining_mb,
+            pa.status,
+            pa.is_active
+          from package_assignments pa
+          join users u on u.id = pa.user_id
+          join packages p on p.id = pa.package_id
+          join tenants t on t.id = p.tenant_id
+          left join vessels v on v.tenant_id = t.id and v.code = pa.vessel_code
+          where ($1::text is null or t.code = $1)
+            and ($2::text is null or pa.vessel_code = $2)
+            and ($3::text is null or lower(u.username) = lower($3))
+            and ($4::text is null or pa.status = $4)
+            and ($5::text is null or p.code = $5)
+            and ($6::boolean = false or pa.is_active = true)
+          order by pa.assigned_at desc
+          limit 200
+        `,
+        [tenantCode, vesselCode, username, status, packageCode, activeOnly]
+      );
+
+      sendJson(res, 200, {
+        items: result.rows,
+        total: result.rowCount
+      });
+    } catch (err) {
+      console.error("[api/package-assignments GET] failed:", err);
+      sendJson(res, 500, { error: "package_assignments_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/package-assignments/") && req.method === "DELETE") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    const assignmentId = url.pathname.split("/")[3];
+    try {
+      const result = await pool.query(
+        `
+          with updated as (
+            update package_assignments
+            set
+              status = 'cancelled',
+              is_active = false
+            where id = $1::uuid
+            returning id, user_id, package_id, vessel_code, remaining_mb, status, is_active, assigned_at, expires_at
+          )
+          select
+            upd.id,
+            upd.user_id,
+            upd.package_id,
+            upd.vessel_code,
+            upd.remaining_mb,
+            upd.status,
+            upd.is_active,
+            upd.assigned_at,
+            upd.expires_at,
+            p.code as package_code,
+            t.code as tenant_code,
+            u.username
+          from updated upd
+          join packages p on p.id = upd.package_id
+          join tenants t on t.id = p.tenant_id
+          join users u on u.id = upd.user_id
+        `,
+        [assignmentId]
+      );
+
+      if (!result.rowCount) {
+        sendJson(res, 404, { error: "assignment_not_found" });
+        return;
+      }
+
+      await insertPackageAuditEvent({
+        tenantCode: result.rows[0]?.tenant_code ?? null,
+        packageId: result.rows[0]?.package_id ?? null,
+        packageCode: result.rows[0]?.package_code ?? null,
+        vesselCode: result.rows[0]?.vessel_code ?? null,
+        username: result.rows[0]?.username ?? null,
+        actionType: "package_unassign",
+        actor: principal,
+        beforePayload: result.rows[0],
+        afterPayload: {
+          ...result.rows[0],
+          status: "cancelled",
+          is_active: false
+        }
+      });
+
+      sendJson(res, 200, result.rows[0]);
+    } catch (err) {
+      console.error("[api/package-assignments DELETE] failed:", err);
+      sendJson(res, 500, { error: "package_unassign_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/package-assignments/") && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    const assignmentId = url.pathname.split("/")[3];
+    try {
+      const assignmentResult = await pool.query(
+        `
+          select
+            pa.id,
+            pa.user_id,
+            u.username,
+            t.code as tenant_code,
+            t.name as tenant_name,
+            pa.vessel_code,
+            p.id as package_id,
+            p.code as package_code,
+            p.name as package_name,
+            p.description,
+            p.quota_mb,
+            p.price_usd,
+            p.is_active as package_active,
+            pa.assigned_at,
+            pa.expires_at,
+            pa.remaining_mb,
+            pa.status,
+            pa.is_active
+          from package_assignments pa
+          join users u on u.id = pa.user_id
+          join packages p on p.id = pa.package_id
+          join tenants t on t.id = p.tenant_id
+          where pa.id = $1::uuid
+          limit 1
+        `,
+        [assignmentId]
+      );
+
+      const assignment = assignmentResult.rows[0];
+      if (!assignment) {
+        sendJson(res, 404, { error: "assignment_not_found" });
+        return;
+      }
+
+      const [usageSummary, recentUsage, auditHistory, alerts] = await Promise.all([
+        pool.query(
+          `
+            select
+              coalesce(sum(upload_mb), 0)::numeric(14,3) as upload_mb,
+              coalesce(sum(download_mb), 0)::numeric(14,3) as download_mb,
+              coalesce(sum(total_mb), 0)::numeric(14,3) as total_mb,
+              count(*)::int as samples,
+              max(observed_at) as latest_usage_at
+            from user_usage
+            where package_assignment_id = $1::uuid
+          `,
+          [assignmentId]
+        ),
+        pool.query(
+          `
+            select
+              observed_at,
+              username,
+              vessel_code,
+              upload_mb,
+              download_mb,
+              total_mb,
+              session_id
+            from user_usage
+            where package_assignment_id = $1::uuid
+            order by observed_at desc
+            limit 20
+          `,
+          [assignmentId]
+        ),
+        pool.query(
+          `
+            select
+              created_at,
+              action_type,
+              actor_username,
+              actor_role,
+              before_payload,
+              after_payload
+            from package_audit_events
+            where package_id = $1::uuid
+              and ($2::text is null or username is null or lower(username) = lower($2))
+              and ($3::text is null or vessel_code is null or vessel_code = $3)
+            order by created_at desc
+            limit 20
+          `,
+          [assignment.package_id, assignment.username, assignment.vessel_code]
+        ),
+        pool.query(
+          `
+            select created_at, alert_type, message, remaining_mb
+            from alerts
+            where username = $1::text
+              and vessel_code = $2::text
+            order by created_at desc
+            limit 20
+          `,
+          [assignment.username, assignment.vessel_code]
+        )
+      ]);
+
+      sendJson(res, 200, {
+        assignment,
+        usage_summary: usageSummary.rows[0] ?? {},
+        recent_usage: recentUsage.rows,
+        audit_history: auditHistory.rows,
+        alerts: alerts.rows
+      });
+    } catch (err) {
+      console.error("[api/package-assignments/:id GET] failed:", err);
+      sendJson(res, 500, { error: "package_assignment_detail_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/package-audit" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const tenantCode = url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? null;
+      const packageCode = url.searchParams.get("package_code") ?? url.searchParams.get("package") ?? null;
+      const vesselCode = url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? null;
+      const username = url.searchParams.get("username") ?? null;
+      const actionType = url.searchParams.get("action_type") ?? url.searchParams.get("action") ?? null;
+      const dateFrom = parseDateInput(url.searchParams.get("date_from"));
+      const dateTo = parseDateInput(url.searchParams.get("date_to"), { endOfDay: true });
+      const limit = Math.max(1, Math.min(200, toInt(url.searchParams.get("limit"), 50)));
+
+      const conditions = [];
+      const params = [];
+      const addCondition = (sql, value) => {
+        params.push(value);
+        conditions.push(sql.replace("$", `$${params.length}`));
+      };
+
+      if (dateFrom || dateTo) {
+        addCondition("created_at >= $::timestamptz", dateFrom ?? "1970-01-01T00:00:00.000Z");
+        addCondition("created_at <= $::timestamptz", dateTo ?? new Date().toISOString());
+      }
+      if (tenantCode) addCondition("tenant_code = $", tenantCode);
+      if (packageCode) addCondition("package_code = $", packageCode);
+      if (vesselCode) addCondition("vessel_code = $", vesselCode);
+      if (username) addCondition("lower(username) = lower($)", username);
+      if (actionType) addCondition("action_type = $", actionType);
+
+      params.push(limit);
+      const query = `
+        select
+          id,
+          tenant_code,
+          package_id,
+          package_code,
+          vessel_code,
+          username,
+          action_type,
+          actor_user_id,
+          actor_username,
+          actor_role,
+          before_payload,
+          after_payload,
+          created_at
+        from package_audit_events
+        ${conditions.length ? `where ${conditions.join(" and ")}` : ""}
+        order by created_at desc
+        limit $${params.length}
+      `;
+      const result = await pool.query(query, params);
+      sendJson(res, 200, {
+        total: result.rowCount,
+        items: result.rows
+      });
+    } catch (err) {
+      console.error("[api/package-audit GET] failed:", err);
+      sendJson(res, 500, { error: "package_audit_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/reports/usage/export" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const scope = buildUsageReportFilterState(url);
+      const result = await pool.query(
+        `
+          select
+            uu.observed_at,
+            uu.tenant_code,
+            uu.vessel_code,
+            uu.username,
+            coalesce(p.code, 'unassigned') as package_code,
+            coalesce(p.name, 'Unassigned') as package_name,
+            uu.session_id,
+            uu.upload_mb,
+            uu.download_mb,
+            uu.total_mb,
+            pa.remaining_mb,
+            pa.status,
+            pa.id as package_assignment_id
+          from user_usage uu
+          left join package_assignments pa on pa.id = uu.package_assignment_id
+          left join packages p on p.id = pa.package_id
+          ${scope.whereClause}
+          order by uu.observed_at desc
+          limit 5000
+        `,
+        scope.params
+      );
+
+      const header = [
+        "observed_at",
+        "tenant_code",
+        "vessel_code",
+        "username",
+        "package_code",
+        "package_name",
+        "session_id",
+        "upload_mb",
+        "download_mb",
+        "total_mb",
+        "remaining_mb",
+        "status",
+        "package_assignment_id"
+      ];
+      const csv = [
+        header.map(escapeCsvValue).join(","),
+        ...result.rows.map((row) => header.map((key) => escapeCsvValue(row[key])).join(","))
+      ].join("\n");
+
+      res.writeHead(200, {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": 'attachment; filename="usage-report.csv"',
+        "cache-control": "no-store"
+      });
+      res.end(csv);
+    } catch (err) {
+      console.error("[api/reports/usage/export GET] failed:", err);
+      sendJson(res, 500, { error: "usage_export_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/reports/usage" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) return;
+    try {
+      const scope = buildUsageReportFilterState(url);
+      const packageJoin = "left join package_assignments pa on pa.id = uu.package_assignment_id left join packages p on p.id = pa.package_id";
+
+      const summaryResult = await pool.query(
+        `
+          select
+            coalesce(sum(uu.upload_mb), 0)::numeric(14,3) as upload_mb,
+            coalesce(sum(uu.download_mb), 0)::numeric(14,3) as download_mb,
+            coalesce(sum(uu.total_mb), 0)::numeric(14,3) as total_mb,
+            count(*)::int as samples,
+            count(distinct uu.username)::int as users,
+            count(distinct uu.vessel_code)::int as vessels,
+            count(distinct uu.package_assignment_id)::int as assignments,
+            count(distinct p.code)::int as packages
+          from user_usage uu
+          ${packageJoin}
+          ${scope.whereClause}
+        `,
+        scope.params
+      );
+
+      const topUsersResult = await pool.query(
+        `
+          select
+            uu.username,
+            uu.vessel_code,
+            coalesce(p.code, 'unassigned') as package_code,
+            coalesce(p.name, 'Unassigned') as package_name,
+            sum(uu.upload_mb)::numeric(14,3) as upload_mb,
+            sum(uu.download_mb)::numeric(14,3) as download_mb,
+            sum(uu.total_mb)::numeric(14,3) as total_mb,
+            max(uu.observed_at) as last_seen
+          from user_usage uu
+          left join package_assignments pa on pa.id = uu.package_assignment_id
+          left join packages p on p.id = pa.package_id
+          ${scope.whereClause}
+          group by uu.username, uu.vessel_code, p.code, p.name
+          order by sum(uu.total_mb) desc, uu.username asc
+          limit 20
+        `,
+        scope.params
+      );
+
+      const topPackagesResult = await pool.query(
+        `
+          select
+            coalesce(p.code, 'unassigned') as package_code,
+            coalesce(p.name, 'Unassigned') as package_name,
+            sum(uu.total_mb)::numeric(14,3) as total_mb,
+            count(distinct uu.username)::int as user_count
+          from user_usage uu
+          left join package_assignments pa on pa.id = uu.package_assignment_id
+          left join packages p on p.id = pa.package_id
+          ${scope.whereClause}
+          group by p.code, p.name
+          order by sum(uu.total_mb) desc, package_name asc
+          limit 20
+        `,
+        scope.params
+      );
+
+      const activeAssignmentsResult = await pool.query(
+        `
+          select
+            pa.id,
+            pa.user_id,
+            u.username,
+            t.code as tenant_code,
+            pa.vessel_code,
+            p.code as package_code,
+            p.name as package_name,
+            pa.remaining_mb,
+            pa.status,
+            pa.expires_at,
+            pa.assigned_at
+          from package_assignments pa
+          join users u on u.id = pa.user_id
+          join packages p on p.id = pa.package_id
+          join tenants t on t.id = p.tenant_id
+          where pa.is_active = true
+            and ($1::text is null or t.code = $1)
+            and ($2::text is null or pa.vessel_code = $2)
+            and ($3::text is null or lower(u.username) = lower($3))
+            and ($4::text is null or p.code = $4)
+          order by pa.assigned_at desc
+          limit 50
+        `,
+        [scope.tenantCode, scope.vesselCode, scope.username, scope.packageCode]
+      );
+
+      const recentAlertsResult = await pool.query(
+        `
+          select
+            created_at,
+            tenant_code,
+            vessel_code,
+            username,
+            alert_type,
+            message,
+            remaining_mb
+          from alerts
+          where created_at >= now() - ($1::int || ' minutes')::interval
+            and ($2::text is null or tenant_code = $2)
+            and ($3::text is null or vessel_code = $3)
+            and ($4::text is null or lower(username) = lower($4))
+          order by created_at desc
+          limit 20
+        `,
+        [scope.windowMinutes, scope.tenantCode, scope.vesselCode, scope.username]
+      );
+
+      const timelineResult = await pool.query(
+        `
+          select
+            date_trunc('${scope.bucket}', uu.observed_at) as bucket_at,
+            coalesce(sum(uu.upload_mb), 0)::numeric(14,3) as upload_mb,
+            coalesce(sum(uu.download_mb), 0)::numeric(14,3) as download_mb,
+            coalesce(sum(uu.total_mb), 0)::numeric(14,3) as total_mb,
+            count(*)::int as samples
+          from user_usage uu
+          left join package_assignments pa on pa.id = uu.package_assignment_id
+          left join packages p on p.id = pa.package_id
+          ${scope.whereClause}
+          group by 1
+          order by 1 asc
+          limit 500
+        `,
+        scope.params
+      );
+
+      sendJson(res, 200, {
+        window_minutes: scope.windowMinutes,
+        date_from: scope.dateFrom,
+        date_to: scope.dateTo,
+        bucket: scope.bucket,
+        summary: summaryResult.rows[0] ?? {},
+        top_users: topUsersResult.rows,
+        top_packages: topPackagesResult.rows,
+        active_assignments: activeAssignmentsResult.rows,
+        recent_alerts: recentAlertsResult.rows,
+        timeline: timelineResult.rows
+      });
+    } catch (err) {
+      console.error("[api/reports/usage GET] failed:", err);
+      sendJson(res, 500, { error: "usage_report_failed" });
+    }
+    return;
+  }
+
   sendJson(res, 404, { error: "not_found" });
 });
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
-
 server.listen(port, host, () => {
   console.log(`[api] listening on http://${host}:${port}`);
-  if (basicAuthEnabled) {
-    if (generatedBasicAuthPassword) {
-      console.warn(
-        `[api] basic auth enabled. Generated one-time credentials ${basicAuthUsername}:${generatedBasicAuthPassword}`
-      );
-    } else {
-      console.log(`[api] basic auth enabled for user ${basicAuthUsername}`);
-    }
-  } else {
-    console.warn("[api] basic auth disabled");
-  }
-
-  if (mcuRegisterEnabled) {
-    console.log("[api] /api/mcu/register enabled with token protection");
-  } else {
-    console.warn("[api] /api/mcu/register disabled until MCU_REGISTER_ENABLED=true");
-  }
-
-  if (trustProxyHeaders) {
-    console.log("[api] trusting X-Forwarded-For / X-Real-IP headers");
-  }
 });

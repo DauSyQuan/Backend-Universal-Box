@@ -11,13 +11,33 @@ const state = {
   commandBusyAction: null,
   commandPollTimer: null,
   health: null,
+  packages: [],
+  packageBusyId: null,
+  packageFormId: "",
+  packageSaving: false,
   ready: null,
+  reportFilters: {
+    bucket: "day",
+    dateFrom: "",
+    dateTo: "",
+    advanced: false
+  },
   refreshTimer: null,
   selectedEdgeKey: "",
+  selectedAssignmentId: "",
   sse: null,
   streamStatus: "idle",
+  packageAudit: [],
+  packageAuditLoading: false,
+  assignmentDetail: null,
+  usageReport: null,
   traffic: null
 };
+
+const appRoute = window.location.pathname.startsWith("/package-catalog")
+  ? "/package-catalog"
+  : "/dashboard";
+const isPackageCatalogWorkspace = appRoute === "/package-catalog";
 
 const elements = {
   clearFiltersButton: document.querySelector("#clear-filters-button"),
@@ -29,9 +49,45 @@ const elements = {
   endpointList: document.querySelector("#endpoint-list"),
   filtersForm: document.querySelector("#filters-form"),
   healthPill: document.querySelector("#health-pill"),
+  packageList: document.querySelector("#package-list"),
+  packageCount: document.querySelector("#package-count"),
+  packageForm: document.querySelector("#package-form"),
+  packageFormActive: document.querySelector("#package-form-active"),
+  packageFormCode: document.querySelector("#package-form-code"),
+  packageFormDescription: document.querySelector("#package-form-description"),
+  packageFormFeedback: document.querySelector("#package-form-feedback"),
+  packageFormId: document.querySelector("#package-form-id"),
+  packageFormName: document.querySelector("#package-form-name"),
+  packageFormPrice: document.querySelector("#package-form-price"),
+  packageFormQuota: document.querySelector("#package-form-quota"),
+  packageFormReset: document.querySelector("#package-form-reset"),
+  packageFormSpeed: document.querySelector("#package-form-speed"),
+  packageFormSubmit: document.querySelector("#package-form-submit"),
+  packageFormTenant: document.querySelector("#package-form-tenant"),
+  packageFormTitle: document.querySelector("#package-form-title"),
+  packageFormValidity: document.querySelector("#package-form-validity"),
+  usageBucketSelect: document.querySelector("#usage-bucket-select"),
+  usageDateFrom: document.querySelector("#usage-date-from"),
+  usageDateTo: document.querySelector("#usage-date-to"),
+  usageExportButton: document.querySelector("#usage-export-button"),
+  usageFilterApply: document.querySelector("#usage-filter-apply"),
+  usageFilterReset: document.querySelector("#usage-filter-reset"),
   readyPill: document.querySelector("#ready-pill"),
   refreshButton: document.querySelector("#refresh-button"),
   refreshIntervalSelect: document.querySelector("#refresh-interval-select"),
+  workspaceAdvancedToggle: document.querySelector("#workspace-advanced-toggle"),
+  assignmentDetailShell: document.querySelector("#assignment-detail-shell"),
+  assignmentDetailPill: document.querySelector("#assignment-detail-pill"),
+  usageAssignmentsTable: document.querySelector("#usage-assignments-table"),
+  usagePackagesTable: document.querySelector("#usage-packages-table"),
+  usageSummaryCards: document.querySelector("#usage-summary-cards"),
+  usageUsersTable: document.querySelector("#usage-users-table"),
+  usageTimelineTable: document.querySelector("#usage-timeline-table"),
+  usageWindowPill: document.querySelector("#usage-window-pill"),
+  usageNavItem: document.querySelector("#usage-nav-item"),
+  packageAuditCount: document.querySelector("#package-audit-count"),
+  packageAuditSection: document.querySelector("#package-audit-section"),
+  packageAuditTable: document.querySelector("#package-audit-table"),
   streamPill: document.querySelector("#stream-pill"),
   summaryCards: document.querySelector("#summary-cards"),
   tenantInput: document.querySelector("#tenant-input"),
@@ -63,6 +119,31 @@ function formatDate(value) {
     return String(value);
   }
   return date.toLocaleString();
+}
+
+function formatCompactValue(value, maxLength = 140) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  let text;
+  if (typeof value === "string") {
+    text = value;
+  } else if (typeof value === "number" || typeof value === "boolean") {
+    text = String(value);
+  } else {
+    try {
+      text = JSON.stringify(value);
+    } catch (error) {
+      text = String(value);
+    }
+  }
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
 function formatNumber(value, digits = 2) {
@@ -131,6 +212,26 @@ function formatDataVolumeMb(value) {
     return formatDataVolumeGb(numeric / 1024);
   }
   return `${formatNumber(numeric, 2)} MB`;
+}
+
+function formatPackageDuration(days) {
+  const numeric = Number(days);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return "No expiry";
+  }
+  return numeric === 1 ? "1 day" : `${numeric} days`;
+}
+
+function formatUsd(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "No price";
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  }).format(numeric);
 }
 
 function estimateTrafficTotalGb(traffic) {
@@ -396,12 +497,42 @@ function buildAbsoluteUrl(path, query = {}) {
   return url.toString();
 }
 
-async function fetchJson(path) {
-  const response = await fetch(path, {
+function currentWorkspacePath() {
+  return appRoute;
+}
+
+function syncWorkspaceLinks() {
+  document.querySelectorAll("[data-app-current-route-link]").forEach((link) => {
+    link.setAttribute("href", currentWorkspacePath());
+  });
+  document.querySelectorAll("[data-app-dashboard-link]").forEach((link) => {
+    link.setAttribute("href", "/dashboard");
+  });
+  document.querySelectorAll("[data-app-package-catalog-link]").forEach((link) => {
+    link.setAttribute("href", "/package-catalog");
+  });
+  document.querySelectorAll('.sidebar-menu a[href="#packages-section"]').forEach((link) => {
+    link.setAttribute("href", "/package-catalog#packages-section");
+  });
+  document.querySelectorAll('.sidebar-menu a[href="/package-catalog#packages-section"]').forEach((link) => {
+    link.setAttribute("href", "/package-catalog#packages-section");
+  });
+}
+
+async function apiFetch(path, options = {}) {
+  return fetch(path, {
+    cache: "no-store",
+    credentials: "same-origin",
+    ...options,
     headers: {
-      accept: "application/json"
+      accept: "application/json",
+      ...(options.headers || {})
     }
   });
+}
+
+async function fetchJson(path) {
+  const response = await apiFetch(path);
 
   if (!response.ok) {
     const payload = await response.text();
@@ -436,7 +567,8 @@ function syncLocationQuery() {
   if (state.filters.vessel) params.set("vessel", state.filters.vessel);
   if (state.autoRefreshSeconds) params.set("refresh", String(state.autoRefreshSeconds));
   const query = params.toString();
-  const nextUrl = query ? `/dashboard?${query}` : "/dashboard";
+  const hash = window.location.hash || "";
+  const nextUrl = query ? `${currentWorkspacePath()}?${query}${hash}` : `${currentWorkspacePath()}${hash}`;
   window.history.replaceState({}, "", nextUrl);
 }
 
@@ -473,6 +605,94 @@ async function loadEdges() {
   renderSummaryCards();
   renderEndpointList();
   renderEdgeList();
+}
+
+async function loadPackages() {
+  if (!isPackageCatalogWorkspace) {
+    state.packages = [];
+    renderPackagesSection();
+    renderPackageForm();
+    return;
+  }
+
+  const query = createQueryString({
+    tenant: state.filters.tenant,
+    include_inactive: 1
+  });
+
+  const data = await fetchJson(`/api/packages${query ? `?${query}` : ""}`).catch((error) => {
+    console.warn("[dashboard] package load failed:", error);
+    return [];
+  });
+
+  state.packages = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  renderPackagesSection();
+  renderPackageForm();
+}
+
+async function loadUsageReport() {
+  if (!isPackageCatalogWorkspace) {
+    state.usageReport = null;
+    renderUsageReportSection();
+    return;
+  }
+
+  const query = createQueryString({
+    tenant: state.filters.tenant,
+    vessel: state.filters.vessel,
+    window_minutes: 1440,
+    bucket: state.reportFilters.bucket,
+    date_from: state.reportFilters.dateFrom || undefined,
+    date_to: state.reportFilters.dateTo || undefined
+  });
+
+  const data = await fetchJson(`/api/reports/usage${query ? `?${query}` : ""}`).catch((error) => {
+    console.warn("[dashboard] usage report load failed:", error);
+    return null;
+  });
+
+  state.usageReport = data;
+  renderUsageReportSection();
+}
+
+async function loadPackageAudit() {
+  if (!isPackageCatalogWorkspace || !state.reportFilters.advanced) {
+    state.packageAudit = [];
+    renderPackageAuditSection();
+    return;
+  }
+
+  const query = createQueryString({
+    tenant: state.filters.tenant,
+    vessel: state.filters.vessel,
+    date_from: state.reportFilters.dateFrom || undefined,
+    date_to: state.reportFilters.dateTo || undefined,
+    limit: 50
+  });
+
+  const data = await fetchJson(`/api/package-audit${query ? `?${query}` : ""}`).catch((error) => {
+    console.warn("[dashboard] package audit load failed:", error);
+    return { items: [] };
+  });
+
+  state.packageAudit = Array.isArray(data?.items) ? data.items : [];
+  renderPackageAuditSection();
+}
+
+async function loadAssignmentDetail() {
+  if (!isPackageCatalogWorkspace || !state.selectedAssignmentId) {
+    state.assignmentDetail = null;
+    renderAssignmentDetailSection();
+    return;
+  }
+
+  const data = await fetchJson(`/api/package-assignments/${encodeURIComponent(state.selectedAssignmentId)}`).catch((error) => {
+    console.warn("[dashboard] assignment detail load failed:", error);
+    return null;
+  });
+
+  state.assignmentDetail = data;
+  renderAssignmentDetailSection();
 }
 
 function renderSummaryCards() {
@@ -533,6 +753,749 @@ function renderSummaryCards() {
     .join("");
 }
 
+function renderPackagesSection() {
+  if (!elements.packageList) {
+    return;
+  }
+
+  if (elements.packageCount) {
+    elements.packageCount.textContent = `${state.packages.length} packages`;
+  }
+
+  if (!state.packages.length) {
+    elements.packageList.innerHTML = `
+      <div class="empty-state compact-empty-state">
+        <h3>No packages found</h3>
+        <p>Run the package seed or broaden the tenant filter to show package catalog entries here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  elements.packageList.innerHTML = `
+    <div class="package-grid">
+      ${state.packages
+        .map((item) => {
+          const quotaMb = Number(item.quota_mb || 0);
+          const selected = selectedEdge();
+          const canAssign = Boolean(selected);
+          const isBusy = state.packageBusyId === item.id;
+          const inactive = !item.is_active;
+          return `
+            <article class="package-card">
+              <div class="package-card-header">
+                <div>
+                  <span class="package-kicker">${escapeHtml(item.tenant_code || "tenant")}</span>
+                  <h3>${escapeHtml(item.name || item.code || "Package")}</h3>
+                  <p class="package-description">${escapeHtml(item.description || "No description")}</p>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-2">
+                  <span class="package-code">${escapeHtml(item.code || "package")}</span>
+                  ${inactive ? '<span class="badge text-bg-secondary">Inactive</span>' : ""}
+                </div>
+              </div>
+              <div class="package-metrics">
+                <span><strong>Quota</strong> ${escapeHtml(formatDataVolumeMb(quotaMb))}</span>
+                <span><strong>Validity</strong> ${escapeHtml(formatPackageDuration(item.validity_days ?? item.duration_days))}</span>
+                <span><strong>Price</strong> ${escapeHtml(formatUsd(item.price_usd))}</span>
+                <span><strong>Status</strong> ${escapeHtml(item.is_active ? "Active" : "Inactive")}</span>
+                <span><strong>Created</strong> ${escapeHtml(formatDate(item.created_at))}</span>
+                <span><strong>Updated</strong> ${escapeHtml(formatDate(item.updated_at))}</span>
+              </div>
+              <div class="package-actions">
+                <div class="package-admin-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-light package-edit-btn"
+                    data-package-edit="${escapeHtml(item.id)}"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger package-delete-btn"
+                    data-package-delete="${escapeHtml(item.id)}"
+                  >
+                    ${item.is_active ? "Archive" : "Restore"}
+                  </button>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary package-assign-btn"
+                    data-package-assign="${escapeHtml(item.id)}"
+                    ${!canAssign || isBusy || !item.is_active ? "disabled" : ""}
+                  >
+                    ${isBusy ? "Assigning..." : "Assign"}
+                  </button>
+                  <span class="tiny-note">
+                    ${selected
+                      ? `Assign to ${selected.vessel_code} on ${selected.tenant_code}`
+                      : "Select an edge first"}
+                  </span>
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderPackageForm() {
+  if (!elements.packageForm || !elements.packageFormFeedback) {
+    return;
+  }
+
+  const pkg = state.packages.find((item) => item.id === state.packageFormId) || null;
+  const isEditing = Boolean(pkg);
+
+  if (elements.packageFormTitle) {
+    elements.packageFormTitle.textContent = isEditing ? `Edit package: ${pkg.name || pkg.code}` : "Create package";
+  }
+
+  if (elements.packageFormSubmit) {
+    elements.packageFormSubmit.textContent = state.packageSaving ? "Saving..." : isEditing ? "Update package" : "Save package";
+    elements.packageFormSubmit.disabled = state.packageSaving;
+  }
+
+  if (elements.packageFormId) {
+    elements.packageFormId.value = pkg?.id || "";
+  }
+  if (elements.packageFormTenant) {
+    elements.packageFormTenant.value = pkg?.tenant_code || state.filters.tenant || "";
+    elements.packageFormTenant.readOnly = isEditing;
+  }
+  if (elements.packageFormCode) {
+    elements.packageFormCode.value = pkg?.code || "";
+  }
+  if (elements.packageFormName) {
+    elements.packageFormName.value = pkg?.name || "";
+  }
+  if (elements.packageFormDescription) {
+    elements.packageFormDescription.value = pkg?.description || "";
+  }
+  if (elements.packageFormQuota) {
+    elements.packageFormQuota.value = pkg?.quota_mb ?? "";
+  }
+  if (elements.packageFormValidity) {
+    elements.packageFormValidity.value = pkg?.validity_days ?? pkg?.duration_days ?? "";
+  }
+  if (elements.packageFormPrice) {
+    elements.packageFormPrice.value = pkg?.price_usd ?? "";
+  }
+  if (elements.packageFormSpeed) {
+    elements.packageFormSpeed.value = pkg?.speed_limit_kbps ?? "";
+  }
+  if (elements.packageFormActive) {
+    elements.packageFormActive.checked = pkg ? Boolean(pkg.is_active) : true;
+  }
+  elements.packageFormFeedback.textContent = isEditing
+    ? "Editing an existing package. Save will update the record in place."
+    : "Use this form to create a new package or edit an existing one.";
+}
+
+async function assignPackage(packageId) {
+  const selected = selectedEdge();
+  const pkg = state.packages.find((item) => item.id === packageId) || null;
+  if (!pkg) {
+    return;
+  }
+  if (!selected) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: "Select an edge first before assigning a package."
+    };
+    renderDetail();
+    return;
+  }
+
+  const username = window.prompt(`Assign ${pkg.name || pkg.code} to which username?`);
+  const trimmedUsername = String(username || "").trim();
+  if (!trimmedUsername) {
+    return;
+  }
+
+  const confirmText = `Assign ${pkg.name || pkg.code} to ${trimmedUsername} on ${selected.vessel_code}?`;
+  if (!window.confirm(confirmText)) {
+    return;
+  }
+
+  state.packageBusyId = packageId;
+  renderPackagesSection();
+
+  try {
+    const response = await apiFetch(`/api/packages/${encodeURIComponent(packageId)}/assign`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json"
+      },
+      body: JSON.stringify({
+        username: trimmedUsername,
+        vessel_code: selected.vessel_code
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || response.statusText || "package_assign_failed");
+    }
+
+    state.commandFeedback = {
+      kind: "success",
+      text: `Assigned ${pkg.name || pkg.code} to ${trimmedUsername} on ${selected.vessel_code}.`
+    };
+    await refreshSelectedEdge();
+    await loadPackages();
+    await loadPackageAudit();
+  } catch (error) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: error.message || "Unable to assign package"
+    };
+    renderDetail();
+  } finally {
+    state.packageBusyId = null;
+    renderPackagesSection();
+    renderDetail();
+  }
+}
+
+function selectAssignmentDetail(assignmentId) {
+  state.selectedAssignmentId = String(assignmentId || "").trim();
+  state.assignmentDetail = null;
+  renderAssignmentDetailSection();
+  if (state.selectedAssignmentId) {
+    loadAssignmentDetail().catch(renderErrorState);
+  }
+}
+
+function beginPackageEdit(packageId) {
+  state.packageFormId = packageId;
+  renderPackageForm();
+  elements.packageForm?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetPackageForm() {
+  state.packageFormId = "";
+  if (elements.packageForm) {
+    elements.packageForm.reset();
+  }
+  if (elements.packageFormActive) {
+    elements.packageFormActive.checked = true;
+  }
+  if (elements.packageFormTenant && state.filters.tenant) {
+    elements.packageFormTenant.value = state.filters.tenant;
+  }
+  renderPackageForm();
+}
+
+async function savePackageFromForm() {
+  if (!elements.packageForm) {
+    return;
+  }
+
+  const payload = {
+    tenant_code: elements.packageFormTenant?.value.trim() || "",
+    code: elements.packageFormCode?.value.trim() || "",
+    name: elements.packageFormName?.value.trim() || "",
+    description: elements.packageFormDescription?.value.trim() || "",
+    quota_mb: Number(elements.packageFormQuota?.value || 0),
+    validity_days: Number(elements.packageFormValidity?.value || 0),
+    price_usd: Number(elements.packageFormPrice?.value || 0),
+    speed_limit_kbps: elements.packageFormSpeed?.value ? Number(elements.packageFormSpeed.value) : null,
+    is_active: Boolean(elements.packageFormActive?.checked)
+  };
+
+  if (!payload.tenant_code || !payload.code || !payload.name || !Number.isFinite(payload.quota_mb) || payload.quota_mb <= 0 || !Number.isFinite(payload.validity_days) || payload.validity_days <= 0) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: "tenant_code, code, name, quota_mb, and validity_days are required."
+    };
+    renderDetail();
+    return;
+  }
+
+  state.packageSaving = true;
+  renderPackageForm();
+
+  try {
+    const packageId = state.packageFormId || elements.packageFormId?.value || "";
+    const method = packageId ? "PATCH" : "POST";
+    const endpoint = packageId ? `/api/packages/${encodeURIComponent(packageId)}` : "/api/packages";
+    const response = await apiFetch(endpoint, {
+      method,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || response.statusText || "package_save_failed");
+    }
+
+    state.commandFeedback = {
+      kind: "success",
+      text: packageId ? `Updated package ${payload.code}.` : `Created package ${payload.code}.`
+    };
+    state.packageFormId = "";
+    await loadPackages();
+    await loadUsageReport();
+    await loadPackageAudit();
+  } catch (error) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: error.message || "Unable to save package"
+    };
+    renderDetail();
+  } finally {
+    state.packageSaving = false;
+    renderPackageForm();
+    renderDetail();
+  }
+}
+
+async function archivePackage(packageId) {
+  const pkg = state.packages.find((item) => item.id === packageId) || null;
+  if (!pkg) {
+    return;
+  }
+
+  const actionLabel = pkg.is_active ? "archive" : "restore";
+  if (!window.confirm(`Do you want to ${actionLabel} package ${pkg.name || pkg.code}?`)) {
+    return;
+  }
+
+  try {
+    const response = await apiFetch(`/api/packages/${encodeURIComponent(packageId)}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json"
+      }
+      ,
+      body: JSON.stringify({
+        is_active: !pkg.is_active
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || response.statusText || "package_delete_failed");
+    }
+
+    state.commandFeedback = {
+      kind: "success",
+      text: pkg.is_active ? `Archived package ${pkg.code}.` : `Restored package ${pkg.code}.`
+    };
+    await loadPackages();
+    await loadUsageReport();
+    await loadPackageAudit();
+  } catch (error) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: error.message || "Unable to update package status"
+    };
+    renderDetail();
+  } finally {
+    renderPackageForm();
+    renderDetail();
+  }
+}
+
+async function unassignAssignment(assignmentId) {
+  if (!assignmentId) {
+    return;
+  }
+
+  if (!window.confirm("Do you want to unassign this package assignment?")) {
+    return;
+  }
+
+  try {
+    const response = await apiFetch(`/api/package-assignments/${encodeURIComponent(assignmentId)}`, {
+      method: "DELETE",
+      headers: {
+        accept: "application/json"
+      }
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || response.statusText || "package_unassign_failed");
+    }
+
+    state.commandFeedback = {
+      kind: "success",
+      text: "Assignment cancelled."
+    };
+    if (state.selectedAssignmentId === assignmentId) {
+      state.selectedAssignmentId = "";
+      state.assignmentDetail = null;
+    }
+    await refreshSelectedEdge();
+    await loadUsageReport();
+    await loadPackageAudit();
+    await loadAssignmentDetail();
+  } catch (error) {
+    state.commandFeedback = {
+      kind: "danger",
+      text: error.message || "Unable to unassign package"
+    };
+    renderDetail();
+  } finally {
+    renderUsageReportSection();
+    renderDetail();
+  }
+}
+
+function syncUsageFilterInputs() {
+  if (elements.usageDateFrom) {
+    elements.usageDateFrom.value = state.reportFilters.dateFrom;
+  }
+  if (elements.usageDateTo) {
+    elements.usageDateTo.value = state.reportFilters.dateTo;
+  }
+  if (elements.usageBucketSelect) {
+    elements.usageBucketSelect.value = state.reportFilters.bucket;
+  }
+  if (elements.workspaceAdvancedToggle) {
+    elements.workspaceAdvancedToggle.textContent = state.reportFilters.advanced ? "Advanced on" : "Advanced";
+  }
+  if (elements.usageNavItem) {
+    elements.usageNavItem.hidden = !state.reportFilters.advanced;
+  }
+  if (elements.usageExportButton) {
+    elements.usageExportButton.hidden = !state.reportFilters.advanced;
+  }
+}
+
+function applyUsageFiltersFromInputs() {
+  state.reportFilters.dateFrom = elements.usageDateFrom?.value || "";
+  state.reportFilters.dateTo = elements.usageDateTo?.value || "";
+  state.reportFilters.bucket = elements.usageBucketSelect?.value || "day";
+}
+
+function resetUsageFilters() {
+  state.reportFilters.dateFrom = "";
+  state.reportFilters.dateTo = "";
+  state.reportFilters.bucket = "day";
+  syncUsageFilterInputs();
+  refreshAll().catch(renderErrorState);
+}
+
+function toggleAdvancedWorkspace() {
+  state.reportFilters.advanced = !state.reportFilters.advanced;
+  syncUsageFilterInputs();
+  document.querySelector("#usage-section")?.toggleAttribute("hidden", !state.reportFilters.advanced);
+  renderUsageReportSection();
+  loadPackageAudit().catch(renderErrorState);
+  renderPackageAuditSection();
+}
+
+function renderUsageReportSection() {
+  if (!elements.usageSummaryCards) {
+    return;
+  }
+
+  const report = state.usageReport || {};
+  const summary = report.summary || {};
+  const topUsers = Array.isArray(report.top_users) ? report.top_users : [];
+  const topPackages = Array.isArray(report.top_packages) ? report.top_packages : [];
+  const activeAssignments = Array.isArray(report.active_assignments) ? report.active_assignments : [];
+  const timeline = Array.isArray(report.timeline) ? report.timeline : [];
+
+  if (elements.usageWindowPill) {
+    const rangeLabel = report.date_from || report.date_to
+      ? `${report.date_from ? new Date(report.date_from).toLocaleDateString() : "start"} → ${report.date_to ? new Date(report.date_to).toLocaleDateString() : "now"}`
+      : report.window_minutes
+        ? `${report.window_minutes}m`
+        : "24h";
+    elements.usageWindowPill.textContent = `${report.bucket || "day"} · ${rangeLabel}`;
+  }
+
+  const cards = [
+    {
+      label: "Total usage",
+      value: formatDataVolumeMb(summary.total_mb ?? 0),
+      meta: `${formatNumber(summary.samples ?? 0, 0)} samples in window`,
+      icon: "bi bi-bar-chart-fill",
+      color: "info"
+    },
+    {
+      label: "Upload",
+      value: formatDataVolumeMb(summary.upload_mb ?? 0),
+      meta: `${formatNumber(summary.users ?? 0, 0)} users tracked`,
+      icon: "bi bi-cloud-arrow-up-fill",
+      color: "success"
+    },
+    {
+      label: "Download",
+      value: formatDataVolumeMb(summary.download_mb ?? 0),
+      meta: `${formatNumber(summary.vessels ?? 0, 0)} vessels in scope`,
+      icon: "bi bi-cloud-arrow-down-fill",
+      color: "warning"
+    },
+    {
+      label: "Assignments",
+      value: formatNumber(summary.assignments ?? activeAssignments.length, 0),
+      meta: `${formatNumber(summary.packages ?? 0, 0)} packages in use`,
+      icon: "bi bi-patch-check-fill",
+      color: "primary"
+    }
+  ];
+
+  elements.usageSummaryCards.innerHTML = cards
+    .map(
+      (card) => `
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="small-box bg-${escapeHtml(card.color)}">
+            <div class="inner">
+              <h3>${escapeHtml(card.value)}</h3>
+              <p>${escapeHtml(card.label)}</p>
+            </div>
+            <div class="icon">
+              <i class="${escapeHtml(card.icon)}"></i>
+            </div>
+            <div class="small-box-footer">${escapeHtml(card.meta)}</div>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+
+  if (elements.usageUsersTable) {
+    elements.usageUsersTable.innerHTML = topUsers.length
+      ? topUsers
+        .map((item) => `
+          <tr>
+            <td>${escapeHtml(item.username || "unknown")}</td>
+            <td>${escapeHtml(item.vessel_code || "n/a")}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.total_mb || 0))}</td>
+            <td>${escapeHtml(formatDate(item.last_seen))}</td>
+          </tr>
+        `)
+        .join("")
+      : `<tr><td colspan="4" class="usage-empty">No usage rows for the selected scope.</td></tr>`;
+  }
+
+  if (elements.usagePackagesTable) {
+    elements.usagePackagesTable.innerHTML = topPackages.length
+      ? topPackages
+        .map((item) => `
+          <tr>
+            <td>${escapeHtml(item.package_name || item.package_code || "package")}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.total_mb || 0))}</td>
+            <td class="text-end">${escapeHtml(formatNumber(item.user_count || 0, 0))}</td>
+          </tr>
+        `)
+        .join("")
+      : `<tr><td colspan="3" class="usage-empty">No package usage in the current window.</td></tr>`;
+  }
+
+  if (elements.usageAssignmentsTable) {
+    elements.usageAssignmentsTable.innerHTML = activeAssignments.length
+      ? activeAssignments
+        .map((item) => `
+          <tr>
+            <td>${escapeHtml(item.id || "n/a")}</td>
+            <td>${escapeHtml(item.username || "unknown")}</td>
+            <td>${escapeHtml(item.vessel_code || "n/a")}</td>
+            <td>${escapeHtml(item.package_code || item.package_name || "package")}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.remaining_mb || 0))}</td>
+            <td><span class="badge text-bg-${item.status === "active" ? "success" : "secondary"}">${escapeHtml(item.status || "unknown")}</span></td>
+            <td>${escapeHtml(formatDate(item.expires_at))}</td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-light me-1" data-package-view-assignment="${escapeHtml(item.id)}">View</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" data-package-unassign="${escapeHtml(item.id)}">Unassign</button>
+            </td>
+          </tr>
+        `)
+        .join("")
+      : `<tr><td colspan="8" class="usage-empty">No active assignments in the current scope.</td></tr>`;
+  }
+
+  if (elements.usageTimelineTable) {
+    elements.usageTimelineTable.innerHTML = timeline.length
+      ? timeline
+        .map((item) => `
+          <tr>
+            <td>${escapeHtml(formatDate(item.bucket_at))}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.upload_mb || 0))}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.download_mb || 0))}</td>
+            <td class="text-end">${escapeHtml(formatDataVolumeMb(item.total_mb || 0))}</td>
+            <td class="text-end">${escapeHtml(formatNumber(item.samples || 0, 0))}</td>
+          </tr>
+        `)
+        .join("")
+      : `<tr><td colspan="5" class="usage-empty">No timeline data in the selected window.</td></tr>`;
+  }
+}
+
+function renderPackageAuditSection() {
+  if (!elements.packageAuditSection || !elements.packageAuditTable) {
+    return;
+  }
+
+  const isVisible = Boolean(isPackageCatalogWorkspace && state.reportFilters.advanced);
+  elements.packageAuditSection.hidden = !isVisible;
+  if (!isVisible) {
+    elements.packageAuditTable.innerHTML = "";
+    if (elements.packageAuditCount) {
+      elements.packageAuditCount.textContent = "0 events";
+    }
+    return;
+  }
+
+  if (elements.packageAuditCount) {
+    elements.packageAuditCount.textContent = `${state.packageAudit.length} events`;
+  }
+
+  if (!state.packageAudit.length) {
+    elements.packageAuditTable.innerHTML = `<tr><td colspan="5" class="usage-empty">No package audit events in the current scope.</td></tr>`;
+    return;
+  }
+
+  elements.packageAuditTable.innerHTML = state.packageAudit
+    .map((item) => `
+      <tr>
+        <td>${escapeHtml(formatDate(item.created_at))}</td>
+        <td><span class="badge text-bg-secondary">${escapeHtml(item.action_type || "event")}</span></td>
+        <td>${escapeHtml(item.package_code || "n/a")}</td>
+        <td>${escapeHtml([item.tenant_code, item.vessel_code, item.username].filter(Boolean).join(" / ") || "global")}</td>
+        <td>${escapeHtml([item.actor_username, item.actor_role].filter(Boolean).join(" · ") || "system")}</td>
+      </tr>
+    `)
+    .join("");
+}
+
+function renderAssignmentDetailSection() {
+  if (!elements.assignmentDetailShell) {
+    return;
+  }
+
+  if (!state.selectedAssignmentId) {
+    elements.assignmentDetailShell.innerHTML = `
+      <div class="empty-state compact-empty-state">
+        <h3>No assignment selected</h3>
+        <p>Use the View button in the assignment table to open the lifecycle detail.</p>
+      </div>
+    `;
+    if (elements.assignmentDetailPill) {
+      elements.assignmentDetailPill.textContent = "None selected";
+    }
+    return;
+  }
+
+  const detail = state.assignmentDetail;
+  if (!detail) {
+    elements.assignmentDetailShell.innerHTML = `
+      <div class="empty-state compact-empty-state">
+        <h3>Loading assignment</h3>
+        <p>Fetching lifecycle detail for assignment ${escapeHtml(state.selectedAssignmentId.slice(0, 8))}...</p>
+      </div>
+    `;
+    if (elements.assignmentDetailPill) {
+      elements.assignmentDetailPill.textContent = "Loading";
+    }
+    return;
+  }
+
+  const assignment = detail.assignment || {};
+  const recentUsage = Array.isArray(detail.recent_usage) ? detail.recent_usage : [];
+  const auditHistory = Array.isArray(detail.audit_history) ? detail.audit_history : [];
+  const alerts = Array.isArray(detail.alerts) ? detail.alerts : [];
+  const summary = detail.usage_summary || {};
+
+  if (elements.assignmentDetailPill) {
+    elements.assignmentDetailPill.textContent = `${assignment.package_code || "package"} · ${assignment.username || "user"}`;
+  }
+
+  elements.assignmentDetailShell.innerHTML = `
+    <div class="detail-summary">
+      <div class="detail-summary-header">
+        <div>
+          <h3>${escapeHtml(assignment.package_name || assignment.package_code || "Assignment")}</h3>
+          <div class="tiny-note">${escapeHtml(assignment.username || "unknown")} · ${escapeHtml(assignment.vessel_code || "n/a")} · ${escapeHtml(assignment.tenant_name || assignment.tenant_code || "tenant")}</div>
+        </div>
+        <span class="badge text-bg-${assignment.is_active ? "success" : "secondary"}">${escapeHtml(assignment.status || "unknown")}</span>
+      </div>
+      <div class="detail-hero-meta">
+        <span class="meta-chip"><strong>Assigned</strong> ${escapeHtml(formatDate(assignment.assigned_at))}</span>
+        <span class="meta-chip"><strong>Expires</strong> ${escapeHtml(formatDate(assignment.expires_at))}</span>
+        <span class="meta-chip"><strong>Remaining</strong> ${escapeHtml(formatDataVolumeMb(assignment.remaining_mb || 0))}</span>
+        <span class="meta-chip"><strong>Usage</strong> ${escapeHtml(formatDataVolumeMb(summary.total_mb || 0))}</span>
+      </div>
+    </div>
+    <div class="row g-3">
+      ${renderInfoBox("Upload", formatDataVolumeMb(summary.upload_mb || 0), "bi bi-cloud-arrow-up-fill", "success", `${formatNumber(summary.samples || 0, 0)} usage samples`)}
+      ${renderInfoBox("Download", formatDataVolumeMb(summary.download_mb || 0), "bi bi-cloud-arrow-down-fill", "warning", "Lifecycle total")}
+      ${renderInfoBox("Alerts", formatNumber(alerts.length, 0), "bi bi-exclamation-triangle-fill", "danger", "Recent quota alerts")}
+      ${renderInfoBox("Audit events", formatNumber(auditHistory.length, 0), "bi bi-journal-text", "primary", "Package history")}
+    </div>
+    <div class="row g-3 mt-2">
+      <div class="col-lg-6">
+        <div class="card card-outline card-secondary h-100">
+          <div class="card-header"><h3 class="card-title mb-0">Recent usage</h3></div>
+          <div class="card-body">
+            ${renderListItems(
+              recentUsage,
+              (item) => `
+                <li>
+                  <strong>${escapeHtml(formatDate(item.observed_at))}</strong>
+                  <div>${escapeHtml(item.session_id || "session")} · ${escapeHtml(item.vessel_code || "n/a")}</div>
+                  <div>UL ${escapeHtml(formatDataVolumeMb(item.upload_mb || 0))} · DL ${escapeHtml(formatDataVolumeMb(item.download_mb || 0))}</div>
+                </li>
+              `,
+              "No recent usage",
+              "This assignment has not recorded usage yet."
+            )}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card card-outline card-warning h-100">
+          <div class="card-header"><h3 class="card-title mb-0">Lifecycle history</h3></div>
+          <div class="card-body">
+            ${renderListItems(
+              auditHistory,
+              (item) => `
+                <li>
+                  <strong>${escapeHtml(item.action_type || "event")}</strong>
+                  <div>${escapeHtml(item.actor_username || "system")} · ${escapeHtml(item.actor_role || "n/a")}</div>
+                  <div>${escapeHtml(formatDate(item.created_at))}</div>
+                </li>
+              `,
+              "No lifecycle history",
+              "Create, assign, update, and unassign events will appear here."
+            )}
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="card card-outline card-info">
+          <div class="card-header"><h3 class="card-title mb-0">Recent alerts</h3></div>
+          <div class="card-body">
+            ${renderListItems(
+              alerts,
+              (item) => `
+                <li>
+                  <strong>${escapeHtml(item.alert_type || "alert")}</strong>
+                  <div>${escapeHtml(item.message || "No message")}</div>
+                  <div>Remaining ${escapeHtml(formatDataVolumeMb(item.remaining_mb || 0))} · ${escapeHtml(formatDate(item.created_at))}</div>
+                </li>
+              `,
+              "No alerts",
+              "Quota alerts will appear here for the selected assignment."
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEndpointList() {
   if (!elements.endpointList) {
     return;
@@ -545,8 +1508,15 @@ function renderEndpointList() {
       href: currentApiOrigin()
     },
     {
-      label: "Dashboard",
-      href: buildAbsoluteUrl("/dashboard", {
+      label: "Current workspace",
+      href: buildAbsoluteUrl(currentWorkspacePath(), {
+        tenant: state.filters.tenant,
+        vessel: state.filters.vessel
+      })
+    },
+    {
+      label: "Open package catalog",
+      href: buildAbsoluteUrl("/package-catalog", {
         tenant: state.filters.tenant,
         vessel: state.filters.vessel
       })
@@ -561,6 +1531,14 @@ function renderEndpointList() {
         tenant: state.filters.tenant,
         vessel: state.filters.vessel,
         limit: 50
+      })
+    },
+    {
+      label: "Usage report",
+      href: buildAbsoluteUrl("/api/reports/usage", {
+        tenant: state.filters.tenant,
+        vessel: state.filters.vessel,
+        window_minutes: 1440
       })
     }
   ];
@@ -1089,8 +2067,42 @@ function hasPendingCommandJobs(jobs) {
   });
 }
 
+function summarizeCommandJobs(jobs) {
+  const summary = {
+    total: 0,
+    pending: 0,
+    success: 0,
+    failed: 0,
+    latestStatus: "none",
+    latestAt: null
+  };
+
+  if (!Array.isArray(jobs)) {
+    return summary;
+  }
+
+  summary.total = jobs.length;
+  jobs.forEach((job) => {
+    const status = String(job?.status || "").toLowerCase();
+    if (["queued", "sent", "ack"].includes(status)) {
+      summary.pending += 1;
+    }
+    if (status === "success") {
+      summary.success += 1;
+    }
+    if (status === "failed") {
+      summary.failed += 1;
+    }
+  });
+
+  const latest = jobs[0] || null;
+  summary.latestStatus = String(latest?.status || "none").toLowerCase();
+  summary.latestAt = latest?.created_at || latest?.result_at || latest?.ack_at || null;
+  return summary;
+}
+
 function isCommandableEdge(edge) {
-  return Boolean(edge?.online);
+  return Boolean(edge);
 }
 
 function commandActionDefinition(action) {
@@ -1098,6 +2110,7 @@ function commandActionDefinition(action) {
     failback_vsat: {
       label: "Switch to VSAT",
       description: "Move primary work traffic back to VSAT.",
+      icon: "bi-router-fill",
       command_type: "failback_vsat",
       command_payload: {
         preferred_uplink: "vsat",
@@ -1108,6 +2121,7 @@ function commandActionDefinition(action) {
     failover_starlink: {
       label: "Switch to Starlink",
       description: "Move backup or critical traffic to Starlink.",
+      icon: "bi-stars",
       command_type: "failover_starlink",
       command_payload: {
         preferred_uplink: "starlink",
@@ -1118,6 +2132,7 @@ function commandActionDefinition(action) {
     policy_sync: {
       label: "Sync policy",
       description: "Push the current uplink policy to the edge box.",
+      icon: "bi-arrow-repeat",
       command_type: "policy_sync",
       command_payload: {
         scope: "uplink_policy"
@@ -1127,6 +2142,7 @@ function commandActionDefinition(action) {
     restore_automatic: {
       label: "Restore automatic",
       description: "Return the edge box to automatic policy handling.",
+      icon: "bi-diagram-3-fill",
       command_type: "restore_automatic",
       command_payload: {
         mode: "automatic"
@@ -1168,9 +2184,20 @@ function renderCommandJobsList(jobs) {
         .map((job) => {
           const statusClass = commandStatusBadgeClass(job.status);
           const statusLabel = String(job.status || "queued").toUpperCase();
-          const payloadSummary = Object.entries(job.command_payload || {})
-            .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
-            .join(" · ");
+          const payloadSummary = formatCompactValue(
+            Object.entries(job.command_payload || {}).map(([key, value]) => `${key}: ${formatCompactValue(value, 48)}`).join(" · "),
+            180
+          );
+          const resultSummary = job.result_payload && typeof job.result_payload === "object"
+            ? formatCompactValue(
+                Object.entries(job.result_payload)
+                  .filter(([key, value]) => value !== null && value !== undefined && key !== "result_payload")
+                  .slice(0, 3)
+                  .map(([key, value]) => `${key}: ${formatCompactValue(value, 48)}`)
+                  .join(" · "),
+                180
+              )
+            : "";
 
           return `
             <article class="command-job-item">
@@ -1187,6 +2214,7 @@ function renderCommandJobsList(jobs) {
                 ${job.result_at ? `<span><strong>Result</strong> ${escapeHtml(formatDate(job.result_at))}</span>` : ""}
               </div>
               <div class="tiny-note">${escapeHtml(payloadSummary || "No payload details")}</div>
+              ${resultSummary ? `<div class="command-job-result tiny-note">${escapeHtml(resultSummary)}</div>` : ""}
             </article>
           `;
         })
@@ -1201,7 +2229,7 @@ function renderCommandCenterCard() {
     return "";
   }
 
-  const commandable = isCommandableEdge(selected);
+  const commandSummary = summarizeCommandJobs(state.commandJobs);
   const jobPollingActive = hasPendingCommandJobs(state.commandJobs);
 
   const buttons = [
@@ -1222,39 +2250,50 @@ function renderCommandCenterCard() {
           type="button"
           class="btn btn-outline-light command-action-btn"
           data-command-action="${escapeHtml(action)}"
-          ${isBusy || !commandable ? "disabled" : ""}
+          ${isBusy ? "disabled" : ""}
         >
+          <span class="command-action-icon"><i class="bi ${escapeHtml(definition.icon)}"></i></span>
           <span class="command-action-main">
             <span class="command-action-title">${escapeHtml(definition.label)}</span>
             <span class="command-action-desc">${escapeHtml(definition.description)}</span>
           </span>
-          <i class="bi bi-arrow-right-circle"></i>
+          <i class="bi bi-chevron-right command-action-arrow"></i>
         </button>
       `;
     })
     .join("");
 
   return `
-    <div class="card card-outline card-danger mt-3">
+    <div class="card card-outline card-danger mt-3 command-center-card">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">Command center</h3>
+        <div class="d-flex flex-column">
+          <h3 class="card-title mb-0">Command center</h3>
+          <span class="tiny-note">${escapeHtml(selected.edge_code)} ready for control actions</span>
+        </div>
         <span class="badge text-bg-danger">Live control</span>
       </div>
       <div class="card-body">
         <p class="chart-note mb-3">
           Commands publish to the selected edge box and are tracked until ack/result comes back.
         </p>
+        <div class="command-summary-row mb-3">
+          <span class="command-summary-chip"><strong>${escapeHtml(String(commandSummary.total))}</strong> tracked</span>
+          <span class="command-summary-chip"><strong>${escapeHtml(String(commandSummary.pending))}</strong> pending</span>
+          <span class="command-summary-chip"><strong>${escapeHtml(String(commandSummary.success))}</strong> success</span>
+          <span class="command-summary-chip"><strong>${escapeHtml(String(commandSummary.failed))}</strong> failed</span>
+          <span class="command-summary-chip command-summary-chip-muted"><strong>${escapeHtml(commandSummary.latestStatus.toUpperCase())}</strong> latest</span>
+        </div>
         <div class="tiny-note mb-3">
-          ${commandable
+          ${selected.online
             ? "Edge is online. Commands are enabled and live polling stays active while jobs are pending."
-            : "Edge is offline. Commands are disabled until the next heartbeat arrives."}
+            : "Edge looks offline or stale, but commands stay enabled for recovery actions."}
         </div>
         ${renderCommandFeedback()}
         <div class="command-center-grid">
-          <section class="command-action-panel">
+          <section class="command-action-panel command-action-panel-primary">
             <div class="command-panel-head">
               <h4>Quick actions</h4>
-              <span class="tiny-note">${escapeHtml(selected.edge_code)} ready</span>
+              <span class="tiny-note">${escapeHtml(commandSummary.latestAt ? `Latest ${formatDate(commandSummary.latestAt)}` : "No jobs yet")}</span>
             </div>
             <div class="command-action-list">
               ${buttons}
@@ -1390,7 +2429,7 @@ function renderDetail() {
         </div>
 
         <div class="row g-3 mt-3">
-          <div class="col-lg-4">
+          <div class="col-lg-3">
             <div class="card card-outline card-secondary h-100">
               <div class="card-header">
                 <h3 class="card-title mb-0">Recent events</h3>
@@ -1412,7 +2451,7 @@ function renderDetail() {
             </div>
           </div>
 
-          <div class="col-lg-4">
+          <div class="col-lg-3">
             <div class="card card-outline card-secondary h-100">
               <div class="card-header">
                 <h3 class="card-title mb-0">Ingest errors</h3>
@@ -1435,7 +2474,7 @@ function renderDetail() {
             </div>
           </div>
 
-          <div class="col-lg-4">
+          <div class="col-lg-3">
             <div class="card card-outline card-secondary h-100">
               <div class="card-header">
                 <h3 class="card-title mb-0">Top users 24h</h3>
@@ -1456,6 +2495,30 @@ function renderDetail() {
                   latestUsageAt
                     ? "Historical usage exists, but nothing landed in the last 24 hours."
                     : "No user traffic recorded in the last 24 hours."
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-3">
+            <div class="card card-outline card-warning h-100">
+              <div class="card-header">
+                <h3 class="card-title mb-0">Quota alerts</h3>
+                <span class="badge text-bg-warning float-end">${escapeHtml(String(detail.recent_alerts?.length || 0))}</span>
+              </div>
+              <div class="card-body">
+                ${renderListItems(
+                  detail.recent_alerts || [],
+                  (item) => `
+                    <li>
+                      <strong>${escapeHtml(item.alert_type || "alert")}</strong>
+                      <div>${escapeHtml(item.message || "No message")}</div>
+                      <div>Remaining ${escapeHtml(formatDataVolumeMb(item.remaining_mb))}</div>
+                      <div>${escapeHtml(formatDate(item.created_at))}</div>
+                    </li>
+                  `,
+                  "No quota alerts",
+                  "Quota usage is still within healthy limits."
                 )}
               </div>
             </div>
@@ -1619,7 +2682,7 @@ async function sendCommand(action) {
   renderDetail();
 
   try {
-    const response = await fetch("/api/commands", {
+    const response = await apiFetch("/api/commands", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -1636,6 +2699,12 @@ async function sendCommand(action) {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Session expired or unauthorized. Please sign in again.");
+      }
+      if (response.status === 403) {
+        throw new Error("You do not have permission to send this command.");
+      }
       throw new Error(payload?.error || response.statusText || "command_request_failed");
     }
 
@@ -1686,6 +2755,58 @@ function renderErrorState(error) {
   `;
 }
 
+function applyWorkspaceMode() {
+  syncWorkspaceLinks();
+
+  document.body.classList.toggle("package-catalog-workspace", isPackageCatalogWorkspace);
+
+  const headerTitle = document.querySelector(".app-content-header h1");
+  const headerSubtitle = document.querySelector(".app-content-header p.text-muted");
+  const breadcrumbActive = document.querySelector(".breadcrumb .breadcrumb-item.active");
+  document.querySelectorAll(".sidebar-menu .nav-link").forEach((link) => {
+    link.classList.remove("active");
+  });
+  const activeLink = isPackageCatalogWorkspace
+    ? document.querySelector('.sidebar-menu a[href="/package-catalog"]')
+    : document.querySelector('.sidebar-menu a[href="#summary-section"]');
+  activeLink?.classList.add("active");
+
+  if (isPackageCatalogWorkspace) {
+    document.title = "Package Catalog - MCU Fleet Monitor";
+    document.querySelector("#packages-section")?.removeAttribute("hidden");
+    document.querySelector("#usage-section")?.toggleAttribute("hidden", !state.reportFilters.advanced);
+    document.querySelector("#summary-section")?.setAttribute("hidden", "hidden");
+    document.querySelector("#detail-section")?.setAttribute("hidden", "hidden");
+    if (headerTitle) {
+      headerTitle.textContent = "Package catalog";
+    }
+    if (headerSubtitle) {
+      headerSubtitle.textContent = "Package lifecycle, assignment control, and usage aggregation in one workspace.";
+    }
+    if (breadcrumbActive) {
+      breadcrumbActive.textContent = "Workspace";
+    }
+    window.setTimeout(() => {
+      document.querySelector("#packages-section")?.scrollIntoView({ behavior: "auto", block: "start" });
+    }, 0);
+  } else {
+    document.title = "Executive Fleet Monitor";
+    document.querySelector("#summary-section")?.removeAttribute("hidden");
+    document.querySelector("#detail-section")?.removeAttribute("hidden");
+    if (headerTitle) {
+      headerTitle.textContent = "Executive summary";
+    }
+    if (headerSubtitle) {
+      headerSubtitle.textContent = "Fleet scope, uptime, policy, and selected asset detail.";
+    }
+    if (breadcrumbActive) {
+      breadcrumbActive.textContent = "Executive";
+    }
+    document.querySelector("#packages-section")?.remove();
+    document.querySelector("#usage-section")?.remove();
+  }
+}
+
 function setRefreshTimer() {
   if (state.refreshTimer) {
     window.clearInterval(state.refreshTimer);
@@ -1702,8 +2823,14 @@ function setRefreshTimer() {
 }
 
 async function refreshAll() {
-  await loadHealth();
-  await loadEdges();
+  await Promise.all([
+    loadHealth(),
+    loadEdges(),
+    loadPackages(),
+    loadUsageReport(),
+    loadPackageAudit(),
+    loadAssignmentDetail()
+  ]);
   await refreshSelectedEdge();
 }
 
@@ -1711,12 +2838,70 @@ function bindEvents() {
   elements.detailShell.addEventListener("click", (event) => {
     const button = event.target.closest("[data-command-action]");
     if (!button) {
+      const packageButton = event.target.closest("[data-package-assign]");
+      if (!packageButton) {
+        return;
+      }
+      event.preventDefault();
+      assignPackage(packageButton.dataset.packageAssign || "").catch(renderErrorState);
       return;
     }
 
     event.preventDefault();
     const action = button.dataset.commandAction;
     sendCommand(action).catch(renderErrorState);
+  });
+
+  elements.packageList?.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-package-edit]");
+    if (editButton) {
+      event.preventDefault();
+      beginPackageEdit(editButton.dataset.packageEdit || "");
+      return;
+    }
+
+    const deleteButton = event.target.closest("[data-package-delete]");
+    if (deleteButton) {
+      event.preventDefault();
+      archivePackage(deleteButton.dataset.packageDelete || "").catch(renderErrorState);
+      return;
+    }
+
+    const packageButton = event.target.closest("[data-package-assign]");
+    if (!packageButton) {
+      const unassignButton = event.target.closest("[data-package-unassign]");
+      if (unassignButton) {
+        event.preventDefault();
+        unassignAssignment(unassignButton.dataset.packageUnassign || "").catch(renderErrorState);
+      }
+      return;
+    }
+    event.preventDefault();
+    assignPackage(packageButton.dataset.packageAssign || "").catch(renderErrorState);
+  });
+
+  elements.usageAssignmentsTable?.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-package-view-assignment]");
+    if (viewButton) {
+      event.preventDefault();
+      selectAssignmentDetail(viewButton.dataset.packageViewAssignment || "");
+      return;
+    }
+    const unassignButton = event.target.closest("[data-package-unassign]");
+    if (!unassignButton) {
+      return;
+    }
+    event.preventDefault();
+    unassignAssignment(unassignButton.dataset.packageUnassign || "").catch(renderErrorState);
+  });
+
+  elements.packageForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    savePackageFromForm().catch(renderErrorState);
+  });
+
+  elements.packageFormReset?.addEventListener("click", () => {
+    resetPackageForm();
   });
 
   elements.filtersForm.addEventListener("submit", (event) => {
@@ -1744,15 +2929,46 @@ function bindEvents() {
     syncLocationQuery();
     setRefreshTimer();
   });
+
+  elements.workspaceAdvancedToggle?.addEventListener("click", () => {
+    toggleAdvancedWorkspace();
+  });
+
+  elements.usageFilterApply?.addEventListener("click", () => {
+    applyUsageFiltersFromInputs();
+    refreshAll().catch(renderErrorState);
+  });
+
+  elements.usageFilterReset?.addEventListener("click", () => {
+    resetUsageFilters();
+  });
+
+  elements.usageExportButton?.addEventListener("click", () => {
+    const query = createQueryString({
+      tenant: state.filters.tenant,
+      vessel: state.filters.vessel,
+      bucket: state.reportFilters.bucket,
+      date_from: state.reportFilters.dateFrom || undefined,
+      date_to: state.reportFilters.dateTo || undefined
+    });
+    window.open(`/api/reports/usage/export${query ? `?${query}` : ""}`, "_blank", "noopener");
+  });
 }
 
 async function bootstrap() {
   applyQueryFiltersFromLocation();
+  syncUsageFilterInputs();
+  applyWorkspaceMode();
   bindEvents();
   setStatusPill(elements.healthPill, "Checking", "loading");
   setStatusPill(elements.readyPill, "Checking", "loading");
   setStatusPill(elements.streamPill, "Idle", "muted");
   renderEndpointList();
+  renderPackagesSection();
+  renderPackageForm();
+  renderUsageReportSection();
+  renderPackageAuditSection();
+  renderAssignmentDetailSection();
   setRefreshTimer();
   await refreshAll();
 }

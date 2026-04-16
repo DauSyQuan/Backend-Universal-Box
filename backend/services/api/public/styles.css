@@ -7,6 +7,16 @@ body.dark-mode {
   background: #0b1117;
 }
 
+body:not(.package-catalog-workspace) #packages-section,
+body:not(.package-catalog-workspace) #usage-section {
+  display: none !important;
+}
+
+body.package-catalog-workspace #summary-section,
+body.package-catalog-workspace #detail-section {
+  display: none !important;
+}
+
 .brand-text {
   letter-spacing: 0.02em;
 }
@@ -252,6 +262,11 @@ body.dark-mode {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 0.85rem;
+  align-items: start;
+}
+
+.command-center-card {
+  overflow: hidden;
 }
 
 .command-action-panel,
@@ -260,6 +275,12 @@ body.dark-mode {
   border-radius: 0.85rem;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.command-action-panel-primary {
+  background:
+    radial-gradient(circle at top right, rgba(104, 225, 253, 0.12), transparent 32%),
+    rgba(255, 255, 255, 0.025);
 }
 
 .command-panel-head {
@@ -287,28 +308,53 @@ body.dark-mode {
   justify-content: space-between;
   gap: 0.85rem;
   width: 100%;
-  padding: 0.85rem 0.95rem;
+  padding: 0.95rem 1rem;
   text-align: left;
+  cursor: pointer;
   border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.8rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .command-action-btn:hover,
 .command-action-btn:focus {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: none;
+  background: rgba(104, 225, 253, 0.08);
+  border-color: rgba(104, 225, 253, 0.35);
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.command-action-btn:hover .command-action-arrow,
+.command-action-btn:focus .command-action-arrow {
+  transform: translateX(2px);
 }
 
 .command-action-btn:disabled {
   opacity: 0.6;
   cursor: progress;
+  pointer-events: none;
+}
+
+.command-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.7rem;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .command-action-main {
   display: grid;
   gap: 0.2rem;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .command-action-title {
@@ -322,6 +368,40 @@ body.dark-mode {
   line-height: 1.35;
 }
 
+.command-action-arrow {
+  color: #9eaaba;
+  font-size: 0.95rem;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+
+.command-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.command-summary-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c7d1db;
+  font-size: 0.75rem;
+}
+
+.command-summary-chip strong {
+  color: #fff;
+  font-size: 0.92rem;
+}
+
+.command-summary-chip-muted {
+  background: rgba(104, 225, 253, 0.09);
+  color: #68e1fd;
+}
+
 .command-job-list {
   display: grid;
   gap: 0.65rem;
@@ -332,6 +412,10 @@ body.dark-mode {
   border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.command-job-result {
+  margin-top: 0.35rem;
 }
 
 .command-job-header {
@@ -370,6 +454,168 @@ body.dark-mode {
 .port-chart-card,
 .endpoint-card {
   padding: 1rem;
+}
+
+.package-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.phase-card {
+  padding: 1rem;
+  border-radius: 0.95rem;
+  background:
+    radial-gradient(circle at top left, rgba(104, 225, 253, 0.11), transparent 34%),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.phase-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.phase-card-header h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.phase-card .form-label {
+  margin-bottom: 0.25rem;
+}
+
+.phase-card .form-control,
+.phase-card .form-select {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.phase-card .form-control:focus,
+.phase-card .form-select:focus {
+  box-shadow: 0 0 0 0.2rem rgba(104, 225, 253, 0.12);
+  border-color: rgba(104, 225, 253, 0.4);
+}
+
+.phase-card .form-check-input:checked {
+  background-color: #68e1fd;
+  border-color: #68e1fd;
+}
+
+.usage-table {
+  border-radius: 0.85rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.usage-table .table {
+  margin-bottom: 0;
+}
+
+.usage-table thead th {
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfd8e3;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.usage-table tbody td {
+  vertical-align: middle;
+}
+
+.usage-empty {
+  text-align: center;
+  color: #9eaaba;
+  padding: 1rem;
+}
+
+.package-card {
+  padding: 1rem;
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at top right, rgba(255, 157, 92, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0.5rem 1.2rem rgba(0, 0, 0, 0.12);
+}
+
+.package-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.package-card-header h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.package-description {
+  margin: 0.35rem 0 0;
+  color: #9eaaba;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.package-kicker {
+  display: block;
+  color: #9eaaba;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.package-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  color: #ffb17a;
+  background: rgba(255, 157, 92, 0.14);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.package-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.75rem;
+  margin-top: 0.85rem;
+  font-size: 0.84rem;
+  color: #9eaaba;
+}
+
+.package-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.package-assign-btn {
+  flex: 0 0 auto;
+}
+
+.package-admin-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.package-metrics strong {
+  display: block;
+  color: #fff;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.18rem;
 }
 
 .live-value {
@@ -532,6 +778,20 @@ body.dark-mode {
   color: #fff;
 }
 
+@media (max-width: 991.98px) {
+  .command-center-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .command-action-btn {
+    min-height: 4.25rem;
+  }
+
+  .package-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .technical-details {
   padding: 1rem;
 }
@@ -591,7 +851,8 @@ body.dark-mode {
   .comparison-metrics,
   .policy-grid,
   .port-chart-grid,
-  .command-center-grid {
+  .command-center-grid,
+  .package-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -607,7 +868,8 @@ body.dark-mode {
   .policy-grid,
   .port-chart-grid,
   .history-grid,
-  .command-center-grid {
+  .command-center-grid,
+  .package-grid {
     grid-template-columns: 1fr;
   }
 
@@ -626,5 +888,62 @@ body.dark-mode {
   .command-job-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .command-summary-row {
+    gap: 0.35rem;
+  }
+
+  .command-summary-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .command-action-btn {
+    padding: 0.85rem 0.9rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .command-action-btn {
+    align-items: flex-start;
+    gap: 0.7rem;
+  }
+
+  .command-action-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+    margin-top: 0.1rem;
+  }
+
+  .command-action-title {
+    font-size: 0.92rem;
+  }
+
+  .command-action-desc {
+    font-size: 0.8rem;
+  }
+
+  .command-summary-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .command-job-meta {
+    gap: 0.35rem 0.5rem;
+  }
+
+  .command-job-item {
+    padding: 0.75rem 0.8rem;
+  }
+
+  .package-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .package-metrics {
+    grid-template-columns: 1fr;
   }
 }

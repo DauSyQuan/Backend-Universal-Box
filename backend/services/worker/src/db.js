@@ -243,6 +243,203 @@ export async function resolveUserId({ tenantId, userId, username }) {
   return null;
 }
 
+export async function resolveActivePackageAssignment({
+  tenantId,
+  vesselCode,
+  userId
+}) {
+  const result = await pool.query(
+    `
+      select
+        pa.id as package_assignment_id,
+        pa.remaining_mb,
+        pa.expires_at,
+        pa.status,
+        pa.is_active,
+        p.id as package_id,
+        p.code as package_code,
+        p.name as package_name,
+        p.tenant_code,
+        p.quota_mb,
+        coalesce(p.validity_days, p.duration_days) as validity_days,
+        coalesce(pa.remaining_mb, p.quota_mb) as effective_remaining_mb
+      from package_assignments pa
+      join packages p on p.id = pa.package_id
+      join users u on u.id = pa.user_id
+      where pa.user_id = $1
+        and u.tenant_id = $2
+        and pa.status = 'active'
+        and pa.is_active = true
+        and ($3::text is null or pa.vessel_code = $3)
+      order by pa.assigned_at desc
+      limit 1
+    `,
+    [userId, tenantId, vesselCode ?? null]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function recordUsageWithQuota({
+  context,
+  tenantCode,
+  vesselCode,
+  username,
+  userId,
+  payload,
+  observedAt
+}) {
+  const uploadMb = Number(payload.upload_mb ?? 0);
+  const downloadMb = Number(payload.download_mb ?? 0);
+  const usageMb = Number.isFinite(uploadMb) && Number.isFinite(downloadMb) ? uploadMb + downloadMb : 0;
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+
+    const assignmentResult = await client.query(
+      `
+        select
+          pa.id as package_assignment_id,
+          pa.remaining_mb,
+          pa.status,
+          pa.is_active,
+          p.id as package_id,
+          p.code as package_code,
+          p.name as package_name,
+          coalesce(p.validity_days, p.duration_days) as validity_days,
+          p.quota_mb,
+          coalesce(pa.remaining_mb, p.quota_mb) as effective_remaining_mb
+        from package_assignments pa
+        join packages p on p.id = pa.package_id
+        join users u on u.id = pa.user_id
+        where pa.user_id = $1::uuid
+          and u.tenant_id = $2::uuid
+          and pa.status = 'active'
+          and pa.is_active = true
+          and ($3::text is null or pa.vessel_code = $3)
+        order by pa.assigned_at desc
+        limit 1
+        for update
+      `,
+      [userId, context.tenant_id, vesselCode ?? null]
+    );
+
+    const assignment = assignmentResult.rows[0] ?? null;
+    let remainingMb = null;
+    let alertType = null;
+    let quotaMb = null;
+
+    if (assignment) {
+      quotaMb = Number(assignment.quota_mb ?? 0);
+      const startingRemaining = Number(assignment.effective_remaining_mb ?? assignment.quota_mb ?? 0);
+      const normalizedStartingRemaining = Number.isFinite(startingRemaining) ? startingRemaining : 0;
+      remainingMb = Math.max(0, normalizedStartingRemaining - usageMb);
+
+      await client.query(
+        `
+          update package_assignments
+          set
+            remaining_mb = $2::bigint,
+            status = case when $2::bigint <= 0 then 'expired' else status end,
+            is_active = case when $2::bigint <= 0 then false else true end
+          where id = $1::uuid
+        `,
+        [assignment.package_assignment_id, remainingMb]
+      );
+
+      if (quotaMb > 0) {
+        const remainingRatio = remainingMb / quotaMb;
+        if (remainingMb <= 0) {
+          alertType = "quota_exhausted";
+        } else if (remainingRatio <= 0.1) {
+          alertType = "quota_90";
+        } else if (remainingRatio <= 0.2) {
+          alertType = "quota_80";
+        }
+      }
+    }
+
+    const usageResult = await client.query(
+      `
+        insert into user_usage
+          (tenant_id, vessel_id, user_id, tenant_code, vessel_code, username, session_id, package_assignment_id, upload_mb, download_mb, observed_at)
+        values
+          ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::text, $7::text, $8::uuid, $9::numeric, $10::numeric, $11::timestamptz)
+        returning id, total_mb
+      `,
+      [
+        context.tenant_id,
+        context.vessel_id,
+        userId,
+        tenantCode,
+        vesselCode,
+        username,
+        payload.session_id ?? null,
+        assignment?.package_assignment_id ?? null,
+        payload.upload_mb ?? 0,
+        payload.download_mb ?? 0,
+        observedAt
+      ]
+    );
+
+    let alertInserted = false;
+    if (alertType) {
+      const recentAlert = await client.query(
+        `
+          select 1
+          from alerts
+          where tenant_code = $1
+            and vessel_code = $2
+            and username = $3
+            and alert_type = $4
+            and created_at >= now() - interval '24 hours'
+          limit 1
+        `,
+        [tenantCode, vesselCode, username, alertType]
+      );
+
+      if (recentAlert.rowCount === 0) {
+        const quotaLabel =
+          alertType === "quota_exhausted" ? "exhausted" : alertType === "quota_90" ? "below 10%" : "below 20%";
+        await client.query(
+          `
+            insert into alerts
+              (tenant_code, vessel_code, username, alert_type, message, remaining_mb)
+            values
+              ($1::text, $2::text, $3::text, $4::text, $5::text, $6::bigint)
+          `,
+          [
+            tenantCode,
+            vesselCode,
+            username,
+            alertType,
+            `Package quota ${quotaLabel} for ${username}`,
+            remainingMb
+          ]
+        );
+        alertInserted = true;
+      }
+    }
+
+    await client.query("commit");
+
+    return {
+      usage_id: usageResult.rows[0]?.id ?? null,
+      total_mb: usageResult.rows[0]?.total_mb ?? null,
+      package_assignment_id: assignment?.package_assignment_id ?? null,
+      remaining_mb: remainingMb,
+      alert_type: alertType,
+      alert_inserted: alertInserted
+    };
+  } catch (err) {
+    await client.query("rollback");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function markEdgeLastSeen({ vesselId, edgeCode, observedAt }) {
   await pool.query(
     `

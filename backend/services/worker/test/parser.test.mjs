@@ -18,6 +18,16 @@ test("parseTopic parses valid topic", () => {
   });
 });
 
+test("parseTopic accepts command topic", () => {
+  const parsed = parseTopic("mcu/tnr13/vsl-001/edge-001/command");
+  assert.deepEqual(parsed, {
+    tenantCode: "tnr13",
+    vesselCode: "vsl-001",
+    edgeCode: "edge-001",
+    channel: "command"
+  });
+});
+
 test("parseEnvelope preserves missing msg_id without generating a random one", () => {
   const raw = Buffer.from(
     JSON.stringify({

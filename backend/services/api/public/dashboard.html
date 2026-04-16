@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Executive Fleet Monitor</title>
+    <link rel="stylesheet" href="/dashboard/vendor/adminlte/adminlte.min.css">
+    <link rel="stylesheet" href="/dashboard/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/dashboard/styles.css">
+  </head>
+  <body class="layout-fixed sidebar-expand-lg">
+    <div class="app-wrapper">
+      <nav class="app-header navbar navbar-expand bg-body border-bottom">
+        <div class="container-fluid">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button"><i class="bi bi-list"></i></a>
+            </li>
+          </ul>
+          <div class="navbar-brand d-none d-md-flex align-items-center ms-2">
+            <i class="bi bi-network me-2"></i>
+            <span>Executive Fleet Monitor</span>
+          </div>
+          <ul class="navbar-nav ms-auto d-flex align-items-center" style="gap: 0.5rem;">
+            <li class="nav-item"><span id="health-pill" class="status-pill status-loading">Checking</span></li>
+            <li class="nav-item"><span id="ready-pill" class="status-pill status-loading">Checking</span></li>
+            <li class="nav-item"><span id="stream-pill" class="status-pill status-muted">Idle</span></li>
+          </ul>
+        </div>
+      </nav>
+
+      <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+        <div class="sidebar-brand">
+          <a href="/dashboard" class="brand-link" data-app-current-route-link>
+            <span class="brand-text fw-light">MCU Fleet</span>
+          </a>
+        </div>
+
+        <div class="sidebar-wrapper">
+          <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+            <div class="info">
+              <a href="#" class="d-block">Executive view</a>
+              <small class="text-muted">VSAT for work, Starlink for entertainment</small>
+            </div>
+          </div>
+
+          <nav class="mt-2 mb-3">
+            <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+              <li class="nav-item">
+                <a href="#summary-section" class="nav-link active">
+                  <i class="nav-icon bi bi-pie-chart-fill"></i>
+                  <p>Executive summary</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="/package-catalog#packages-section" class="nav-link">
+                  <i class="nav-icon bi bi-box-seam-fill"></i>
+                  <p>Package catalog</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#fleet-section" class="nav-link">
+                  <i class="nav-icon bi bi-diagram-3-fill"></i>
+                  <p>Fleet snapshot</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="#detail-section" class="nav-link">
+                  <i class="nav-icon bi bi-layers-fill"></i>
+                  <p>Selected asset</p>
+                </a>
+              </li>
+            </ul>
+          </nav>
+
+          <div class="card card-outline card-primary">
+            <div class="card-header">
+              <h3 class="card-title">Scope</h3>
+            </div>
+            <div class="card-body">
+              <form id="filters-form" class="d-flex flex-column" style="gap: 0.75rem;">
+                <label class="mb-0">
+                  <span class="text-muted small">Tenant</span>
+                  <input id="tenant-input" name="tenant" type="text" class="form-control form-control-sm" placeholder="tnr13">
+                </label>
+                <label class="mb-0">
+                  <span class="text-muted small">Vessel</span>
+                  <input id="vessel-input" name="vessel" type="text" class="form-control form-control-sm" placeholder="vsl-001">
+                </label>
+                <label class="mb-0">
+                  <span class="text-muted small">Auto refresh</span>
+                  <select id="refresh-interval-select" name="refresh_interval" class="form-control form-control-sm">
+                    <option value="0">Off</option>
+                    <option value="10">10s</option>
+                    <option value="15" selected>15s</option>
+                    <option value="30">30s</option>
+                    <option value="60">60s</option>
+                  </select>
+                </label>
+                <div class="d-flex" style="gap: 0.5rem;">
+                  <button id="refresh-button" class="btn btn-primary btn-sm flex-fill" type="button">Refresh now</button>
+                  <button id="clear-filters-button" class="btn btn-outline-light btn-sm flex-fill" type="button">Clear</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card card-outline card-secondary mt-3">
+            <div class="card-header">
+              <h3 class="card-title">API access</h3>
+            </div>
+            <div class="card-body p-2">
+              <div id="endpoint-list" class="endpoint-list"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="app-main">
+        <div class="app-content-header">
+          <div class="container-fluid">
+            <div class="row mb-2 align-items-end">
+              <div class="col-sm-8">
+                <h1 class="m-0">Executive summary</h1>
+                <p class="text-muted mb-0">Fleet scope, uptime, policy, and selected asset detail.</p>
+              </div>
+              <div class="col-sm-4">
+                <ol class="breadcrumb float-sm-end bg-transparent p-0 m-0">
+                  <li class="breadcrumb-item"><a href="/dashboard" data-app-dashboard-link>Dashboard</a></li>
+                  <li class="breadcrumb-item"><a href="/package-catalog#packages-section" data-app-package-catalog-link>Package catalog</a></li>
+                  <li class="breadcrumb-item active">Executive</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="app-content">
+          <div class="container-fluid">
+            <div id="summary-section">
+              <div id="summary-cards" class="row g-3"></div>
+            </div>
+
+            <div id="fleet-section" class="row g-3">
+              <div class="col-xl-4">
+                <div class="card card-outline card-primary">
+                  <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Fleet snapshot</h3>
+                    <span id="edge-count" class="badge text-bg-secondary">0 devices</span>
+                  </div>
+                  <div class="card-body p-0">
+                    <div id="edge-list"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="detail-section" class="col-xl-8">
+                <div class="card card-outline card-primary">
+                  <div class="card-header">
+                    <div class="d-flex flex-column">
+                      <h3 class="card-title mb-0" id="detail-title">Executive summary</h3>
+                      <span id="detail-meta" class="text-muted small">No selection</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div id="detail-shell" class="detail-shell">
+                      <div class="empty-state">
+                        <h3>No asset selected</h3>
+                        <p>Select an edge on the left to review its executive summary, traffic, and supporting detail.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="app-footer">
+        <strong>MCU Fleet Monitor</strong>
+        <span class="ms-2">AdminLTE executive dashboard</span>
+      </footer>
+    </div>
+
+    <script src="/dashboard/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="/dashboard/vendor/adminlte/adminlte.min.js"></script>
+    <script src="/dashboard/app.js?v=20260416l" defer></script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 import { randomUUID } from "node:crypto";
 
-const VALID_CHANNELS = new Set(["heartbeat", "telemetry", "usage", "event", "vms", "ack", "result"]);
+const VALID_CHANNELS = new Set(["heartbeat", "telemetry", "usage", "event", "vms", "command", "ack", "result"]);
 
 function asNumber(value) {
   if (value === null || value === undefined || value === "") {

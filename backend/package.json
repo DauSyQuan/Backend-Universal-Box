@@ -33,6 +33,7 @@
     "verify": "node ./scripts/check-source.mjs services/api/src services/worker/src services/worker/test scripts && npm test",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "db:seed:phase3": "node scripts/seed-phase3.js"
   }
 }

@@ -529,7 +529,7 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
 
   const summary = edge.rows[0];
 
-  const [heartbeat, telemetry, usageStats, usageRecent, usageOverview, vms, events, ingestErrors, channelActivity] = await Promise.all([
+  const [heartbeat, telemetry, usageStats, usageRecent, usageOverview, vms, events, ingestErrors, channelActivity, recentAlerts] = await Promise.all([
     pool.query(
       `
         select observed_at, status, cpu_usage_pct, ram_usage_pct, firmware_version
@@ -631,6 +631,17 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
         order by channel
       `,
       [tenantCode, vesselCode, edgeCode]
+    ),
+    pool.query(
+      `
+        select created_at, alert_type, message, remaining_mb
+        from alerts
+        where tenant_code = $1
+          and vessel_code = $2
+        order by created_at desc
+        limit 20
+      `,
+      [tenantCode, vesselCode]
     )
   ]);
 
@@ -675,7 +686,8 @@ export async function getMcuEdgeDetail({ tenantCode, vesselCode, edgeCode, onlin
     uplink_policy: uplinkPolicy,
     recent_events: events.rows,
     ingest_errors: ingestErrors.rows,
-    ingest_activity_24h: channelActivity.rows
+    ingest_activity_24h: channelActivity.rows,
+    recent_alerts: recentAlerts.rows
   };
 }
 
