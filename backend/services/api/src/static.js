@@ -164,6 +164,30 @@ export async function maybeServeStatic(req, res, url) {
     return true;
   }
 
+  if (url.pathname === "/alerts" || url.pathname === "/alerts/" || url.pathname === "/alerts/index.html") {
+    res.writeHead(302, { location: "/marine-portal#alerts-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/commands" || url.pathname === "/commands/" || url.pathname === "/commands/index.html") {
+    res.writeHead(302, { location: "/marine-portal#commands-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/alerts" || url.pathname === "/marine-portal/alerts/" || url.pathname === "/marine-portal/alerts/index.html") {
+    res.writeHead(302, { location: "/marine-portal#alerts-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/commands" || url.pathname === "/marine-portal/commands/" || url.pathname === "/marine-portal/commands/index.html") {
+    res.writeHead(302, { location: "/marine-portal#commands-section" });
+    res.end();
+    return true;
+  }
+
   if (url.pathname === "/marine-portal" || url.pathname === "/marine-portal/" || url.pathname === "/marine-portal/index.html") {
     await sendMarinePortalFile(res, "marine-portal.html");
     return true;

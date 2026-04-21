@@ -411,6 +411,12 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
         <i class="bi bi-speedometer2"></i> Executive Summary
       </button>
+      <button class="nav-item" id="nav-alerts" onclick="showPage('alerts')">
+        <i class="bi bi-bell-fill"></i> Alert Center
+      </button>
+      <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
+        <i class="bi bi-terminal-fill"></i> Command History
+      </button>
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
         <i class="bi bi-box-seam-fill"></i> Package Catalog
       </button>
@@ -599,6 +605,141 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
               <i class="bi bi-send"></i> Send command
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── ALERT CENTER ─── -->
+    <div class="page" id="page-alerts">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Alert Center</h1>
+          <p>Fleet-wide alerts · warning and critical tracking</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="alert-mode-badge" class="pill pill-gray">loading</div>
+          <select id="alert-severity-filter" class="form-control" style="width:150px;" onchange="loadAlertsCenter()">
+            <option value="all">All severities</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="loadAlertsCenter()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
+        <div class="stat-card">
+          <div class="stat-label">Total alerts</div>
+          <div class="stat-value stat-accent" id="alert-total">—</div>
+          <div class="stat-note">Collected from edge details</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Critical</div>
+          <div class="stat-value stat-red" id="alert-critical">—</div>
+          <div class="stat-note">Needs immediate attention</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Warnings</div>
+          <div class="stat-value stat-amber" id="alert-warning">—</div>
+          <div class="stat-note">Follow up when possible</div>
+        </div>
+      </div>
+
+      <div id="alert-error" style="display:none;" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="alert-error-msg"></span>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-bell-fill" style="color:var(--amber);"></i> Active alerts</div>
+            <div class="card-subtitle" id="alert-source">Loading…</div>
+          </div>
+          <span class="num-badge" id="alert-count">0</span>
+        </div>
+        <div style="padding:0;">
+          <table class="tbl">
+            <thead>
+              <tr><th>Edge</th><th>Severity</th><th>Message</th><th>Time</th></tr>
+            </thead>
+            <tbody id="alert-body">
+              <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── COMMAND HISTORY ─── -->
+    <div class="page" id="page-commands">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Command History</h1>
+          <p>Review command jobs · retry failed commands</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="cmd-history-mode-badge" class="pill pill-gray">loading</div>
+          <button class="btn btn-ghost btn-sm" onclick="prevHistoryCmdPage()" id="cmd-history-prev" disabled><i class="bi bi-chevron-left"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="nextHistoryCmdPage()" id="cmd-history-next"><i class="bi bi-chevron-right"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="loadCommandHistory()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;" id="command-stats">
+        <div class="stat-card">
+          <div class="stat-label">Total jobs</div>
+          <div class="stat-value stat-accent" id="cmd-history-total">—</div>
+          <div class="stat-note">Current page only</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sent</div>
+          <div class="stat-value stat-green" id="cmd-history-sent">—</div>
+          <div class="stat-note">Queued to MQTT</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Failed</div>
+          <div class="stat-value stat-red" id="cmd-history-failed">—</div>
+          <div class="stat-note">Can retry directly</div>
+        </div>
+      </div>
+
+      <div id="cmd-history-error" style="display:none;" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="cmd-history-error-msg"></span>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-list-check" style="color:var(--accent);"></i> Jobs</div>
+            <div class="card-subtitle" id="cmd-history-source">Loading…</div>
+          </div>
+          <span class="num-badge" id="cmd-history-count">0</span>
+        </div>
+        <div style="padding:0;">
+          <table class="tbl">
+            <thead>
+              <tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th><th style="text-align:right;">Actions</th></tr>
+            </thead>
+            <tbody id="cmd-history-body">
+              <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="cmd-history-detail-card" style="display:none;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-card-text" style="color:var(--green);"></i> Command detail</div>
+            <div class="card-subtitle" id="cmd-history-detail-subtitle">Select a job to inspect</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="closeCommandDetail()"><i class="bi bi-x"></i> Close</button>
+        </div>
+        <div class="card-body" id="cmd-history-detail-body">
+          <div class="empty"><span class="spinner"></span> Loading command detail…</div>
         </div>
       </div>
     </div>
@@ -900,8 +1041,22 @@ function showPage(name) {
 
   currentPage = name;
   if (name === 'dashboard') loadDashboard();
+  if (name === 'alerts') loadAlertsCenter();
+  if (name === 'commands') loadCommandHistory();
   if (name === 'packages') { loadPackages(); loadUsage(); }
   if (name === 'login') refreshLoginPage();
+
+  const hashByPage = {
+    dashboard: '#summary-section',
+    alerts: '#alerts-section',
+    commands: '#commands-section',
+    packages: '#packages-section',
+    login: '#auth-section'
+  };
+  const nextHash = hashByPage[name];
+  if (nextHash && location.hash !== nextHash) {
+    history.replaceState(null, '', nextHash);
+  }
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -947,6 +1102,10 @@ let cmdOffset = 0;
 const CMD_PAGE = 5;
 let pkgList = [];
 let editingPkgId = null;
+let historyCmdOffset = 0;
+const HISTORY_CMD_PAGE = 15;
+let alertList = [];
+let selectedCommandJob = null;
 
 // ─── CONNECTION STATUS ────────────────────────────────────────────────────────
 function updateConnStatus(httpStatus) {
@@ -1154,6 +1313,247 @@ async function prevCmdPage() {
 async function nextCmdPage() {
   cmdOffset += CMD_PAGE;
   await loadDashboard(true);
+}
+
+// ─── ALERT CENTER ────────────────────────────────────────────────────────────
+async function loadAlertsCenter() {
+  const filter = document.getElementById('alert-severity-filter')?.value || 'all';
+  alertList = [];
+  const modeBadge = document.getElementById('alert-mode-badge');
+  const source = document.getElementById('alert-source');
+  if (modeBadge) {
+    modeBadge.textContent = 'loading';
+    modeBadge.className = 'pill pill-gray';
+  }
+  if (source) {
+    source.textContent = 'Collecting alerts from fleet edges…';
+  }
+
+  try {
+    const edgesData = await apiFetch('/api/mcu/edges?limit=20');
+    const edges = edgesData?.edges || edgesData?.data || edgesData || [];
+    const details = await Promise.allSettled(
+      edges.map((edge) => apiFetch(`/api/mcu/edges/${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}?onlineSeconds=120`))
+    );
+
+    const collected = [];
+    details.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return;
+      const edge = edges[index];
+      const alerts = result.value?.recent_alerts || [];
+      alerts.forEach((alert) => {
+        collected.push({
+          ...alert,
+          tenant_code: edge.tenant_code,
+          vessel_code: edge.vessel_code,
+          edge_code: edge.edge_code,
+          edge_key: `${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`
+        });
+      });
+    });
+
+    alertList = collected
+      .filter((alert) => filter === 'all' || String(alert.severity || '').toLowerCase() === filter)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    if (modeBadge) {
+      modeBadge.textContent = 'live';
+      modeBadge.className = 'pill pill-green';
+    }
+    renderAlertsCenter();
+    document.getElementById('alert-error').style.display = 'none';
+  } catch (err) {
+    if (modeBadge) {
+      modeBadge.textContent = 'fallback';
+      modeBadge.className = 'pill pill-amber';
+    }
+    alertList = [];
+    renderAlertsCenter();
+    showEl('alert-error', `Failed to load alerts: ${err.message}`, 'alert-danger');
+    document.getElementById('alert-error').style.display = 'flex';
+  }
+}
+
+function renderAlertsCenter() {
+  const total = alertList.length;
+  const critical = alertList.filter((alert) => String(alert.severity).toLowerCase() === 'critical').length;
+  const warning = alertList.filter((alert) => String(alert.severity).toLowerCase() === 'warning').length;
+
+  document.getElementById('alert-total').textContent = total;
+  document.getElementById('alert-critical').textContent = critical;
+  document.getElementById('alert-warning').textContent = warning;
+  document.getElementById('alert-count').textContent = total;
+  document.getElementById('alert-source').textContent = total ? 'from recent_alerts across selected edges' : 'No alerts found';
+
+  const body = document.getElementById('alert-body');
+  if (!body) return;
+  if (!total) {
+    body.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-bell"></i><p>No alerts found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = alertList.map((alert) => {
+    const pillClass = String(alert.severity).toLowerCase() === 'critical'
+      ? 'pill-red'
+      : String(alert.severity).toLowerCase() === 'warning'
+        ? 'pill-amber'
+        : 'pill-blue';
+    return `
+      <tr>
+        <td class="mono" style="font-size:12px;">${alert.edge_key || '—'}</td>
+        <td><span class="pill ${pillClass}">${alert.severity || 'info'}</span></td>
+        <td>${alert.message || JSON.stringify(alert)}</td>
+        <td style="color:var(--text3);font-size:12px;">${fmtTime(alert.created_at)}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ─── COMMAND HISTORY ─────────────────────────────────────────────────────────
+async function loadCommandHistory() {
+  const modeBadge = document.getElementById('cmd-history-mode-badge');
+  const source = document.getElementById('cmd-history-source');
+  if (modeBadge) {
+    modeBadge.textContent = 'loading';
+    modeBadge.className = 'pill pill-gray';
+  }
+  if (source) {
+    source.textContent = `offset ${historyCmdOffset}, limit ${HISTORY_CMD_PAGE}`;
+  }
+  document.getElementById('cmd-history-error').style.display = 'none';
+
+  try {
+    const params = new URLSearchParams({
+      limit: String(HISTORY_CMD_PAGE),
+      offset: String(historyCmdOffset)
+    });
+    const data = await apiFetch(`/api/commands?${params}`);
+    const jobs = data?.commands || data?.data || data || [];
+    renderCommandHistory(jobs);
+
+    if (modeBadge) {
+      modeBadge.textContent = 'live';
+      modeBadge.className = 'pill pill-green';
+    }
+    document.getElementById('cmd-history-error').style.display = 'none';
+  } catch (err) {
+    renderCommandHistory([]);
+    if (modeBadge) {
+      modeBadge.textContent = 'fallback';
+      modeBadge.className = 'pill pill-amber';
+    }
+    showEl('cmd-history-error', `Failed to load command history: ${err.message}`, 'alert-danger');
+    document.getElementById('cmd-history-error').style.display = 'flex';
+  }
+}
+
+function renderCommandHistory(jobs) {
+  const list = Array.isArray(jobs) ? jobs : [];
+  const sent = list.filter((job) => job.status === 'sent' || job.status === 'delivered').length;
+  const failed = list.filter((job) => job.status === 'failed').length;
+  document.getElementById('cmd-history-total').textContent = list.length;
+  document.getElementById('cmd-history-sent').textContent = sent;
+  document.getElementById('cmd-history-failed').textContent = failed;
+  document.getElementById('cmd-history-count').textContent = list.length;
+  document.getElementById('cmd-history-prev').disabled = historyCmdOffset === 0;
+  document.getElementById('cmd-history-next').disabled = list.length < HISTORY_CMD_PAGE;
+
+  const body = document.getElementById('cmd-history-body');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map((job) => {
+    const pillClass = { sent: 'pill-blue', delivered: 'pill-green', failed: 'pill-red', pending: 'pill-amber' }[job.status] || 'pill-gray';
+    const canRetry = job.status === 'failed';
+    return `
+      <tr class="row-click">
+        <td class="mono" style="font-size:12px;" onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})">${job.edge_code || '—'}</td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="chip">${job.command_type || '—'}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="pill ${pillClass}">${job.status || '—'}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})" style="color:var(--text3);font-size:12px;">${fmtTime(job.created_at)}</td>
+        <td style="text-align:right;">
+          <button class="btn ${canRetry ? 'btn-success' : 'btn-ghost'} btn-sm" ${canRetry ? '' : 'disabled'} onclick="retryCommandJob(${JSON.stringify(JSON.stringify(job))})">
+            <i class="bi bi-arrow-repeat"></i> Retry
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function selectCommandJob(jobJson) {
+  const job = JSON.parse(jobJson);
+  selectedCommandJob = job;
+  const card = document.getElementById('cmd-history-detail-card');
+  const body = document.getElementById('cmd-history-detail-body');
+  const subtitle = document.getElementById('cmd-history-detail-subtitle');
+  card.style.display = 'block';
+  subtitle.textContent = `Loading detail for ${job.id || job.command_id || 'job'}`;
+  body.innerHTML = '<div class="empty"><span class="spinner"></span> Loading command detail…</div>';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const detail = await apiFetch(`/api/commands/${job.id || job.command_id}`);
+    const payload = detail?.command_payload ?? detail?.command?.command_payload ?? job.command_payload ?? {};
+    subtitle.textContent = `${job.tenant_code || 'tenant'}/${job.vessel_code || 'vessel'}/${job.edge_code || 'edge'}`;
+    body.innerHTML = `
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-label">Command</div><div class="stat-value stat-accent" style="font-size:18px;">${detail?.command_type || job.command_type || '—'}</div></div>
+        <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value ${String(detail?.status || job.status) === 'failed' ? 'stat-red' : 'stat-green'}" style="font-size:18px;">${detail?.status || job.status || '—'}</div></div>
+        <div class="stat-card"><div class="stat-label">Created</div><div class="stat-value stat-amber" style="font-size:18px;">${fmtTime(detail?.created_at || job.created_at)}</div></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">Payload</div>
+        <pre style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn btn-success" onclick="retryCommandJob(${JSON.stringify(JSON.stringify(detail || job))})"><i class="bi bi-arrow-repeat"></i> Retry job</button>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Failed to load command detail: ${err.message}</div>`;
+    subtitle.textContent = 'Error loading';
+  }
+}
+
+function closeCommandDetail() {
+  document.getElementById('cmd-history-detail-card').style.display = 'none';
+}
+
+async function retryCommandJob(jobJson) {
+  const job = JSON.parse(jobJson);
+  if (!job?.tenant_code || !job?.vessel_code || !job?.edge_code || !job?.command_type) {
+    toast('Cannot retry job — missing required fields', 'warn');
+    return;
+  }
+
+  try {
+    const res = await apiFetch('/api/commands', {
+      method: 'POST',
+      body: {
+        tenant_code: job.tenant_code,
+        vessel_code: job.vessel_code,
+        edge_code: job.edge_code,
+        command_type: job.command_type,
+        command_payload: job.command_payload || {}
+      }
+    });
+    toast(`Retry sent ✓ ${res?.command?.id || res?.command_id || ''}`, 'success');
+    await loadCommandHistory();
+  } catch (err) {
+    toast(`Retry failed: ${err.message}`, 'danger');
+  }
+}
+
+async function prevHistoryCmdPage() {
+  historyCmdOffset = Math.max(0, historyCmdOffset - HISTORY_CMD_PAGE);
+  await loadCommandHistory();
+}
+
+async function nextHistoryCmdPage() {
+  historyCmdOffset += HISTORY_CMD_PAGE;
+  await loadCommandHistory();
 }
 
 // ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
@@ -1519,6 +1919,15 @@ function showEl(id, msg, cls) {
   el.innerHTML = msg;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 // ─── TOAST ────────────────────────────────────────────────────────────────────
 let toastId = 0;
 function toast(msg, type = 'info') {
@@ -1563,7 +1972,13 @@ function init() {
 
   const hasAuth = !!localStorage.getItem('marine_auth');
   refreshLoginPage();
-  initialPage = location.hash.includes('packages-section') ? 'packages' : 'dashboard';
+  initialPage = location.hash.includes('alerts-section')
+    ? 'alerts'
+    : location.hash.includes('commands-section')
+      ? 'commands'
+      : location.hash.includes('packages-section')
+        ? 'packages'
+        : 'dashboard';
 
   if (hasAuth) {
     document.getElementById('login-page').style.display = 'none';
@@ -1578,6 +1993,20 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('hashchange', () => {
+  if (document.getElementById('login-page').style.display !== 'none') return;
+  const hash = location.hash || '';
+  const nextPage = hash.includes('alerts-section')
+    ? 'alerts'
+    : hash.includes('commands-section')
+      ? 'commands'
+      : hash.includes('packages-section')
+        ? 'packages'
+        : 'dashboard';
+  if (nextPage !== currentPage) {
+    showPage(nextPage);
+  }
+});
 </script>
 </body>
 </html>
