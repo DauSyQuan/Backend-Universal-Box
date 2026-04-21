@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Marine Pro — Fleet Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
+<style>
+:root {
+  --bg: #060d18;
+  --bg2: #0b1525;
+  --bg3: #111f35;
+  --surface: rgba(16, 28, 50, 0.7);
+  --surface2: rgba(22, 38, 66, 0.6);
+  --glass: rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+  --accent: #38bdf8;
+  --accent2: #0ea5e9;
+  --accent3: #7dd3fc;
+  --green: #34d399;
+  --green-dim: rgba(52,211,153,0.15);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251,191,36,0.15);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,0.15);
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --sidebar: 240px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(56,189,248,0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 85% 15%, rgba(14,165,233,0.09), transparent),
+    radial-gradient(ellipse 40% 60% at 75% 85%, rgba(52,211,153,0.06), transparent);
+}
+
+/* Layout */
+#app { display: flex; height: 100vh; position: relative; z-index: 1; }
+
+/* ─── Sidebar ─── */
+.sidebar {
+  width: var(--sidebar);
+  min-width: var(--sidebar);
+  background: rgba(6,13,24,0.9);
+  border-right: 1px solid var(--glass-border);
+  display: flex; flex-direction: column;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.sidebar-brand {
+  padding: 20px 18px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex; align-items: center; gap: 12px;
+}
+
+.brand-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: white;
+  flex-shrink: 0;
+}
+
+.brand-name { font-size: 13px; font-weight: 700; color: white; letter-spacing: 1.5px; text-transform: uppercase; }
+.brand-sub { font-size: 10px; color: var(--accent3); letter-spacing: 2.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+
+.sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+
+.nav-section-label {
+  font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 8px 8px 4px; font-family: 'JetBrains Mono', monospace;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  cursor: pointer; color: var(--text2);
+  font-size: 13px; font-weight: 500;
+  transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left;
+}
+
+.nav-item:hover { background: var(--glass); color: var(--text); }
+.nav-item.active { background: rgba(56,189,248,0.12); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); }
+.nav-item i { font-size: 16px; width: 18px; text-align: center; flex-shrink: 0; }
+
+.sidebar-footer {
+  padding: 14px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.conn-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.conn-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: white; position: relative; flex-shrink: 0;
+}
+
+.conn-dot {
+  position: absolute; bottom: 0; right: 0;
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid var(--bg);
+}
+
+.dot-good { background: var(--green); }
+.dot-warn { background: var(--amber); }
+.dot-bad { background: var(--red); }
+.dot-idle { background: var(--text3); }
+
+/* ─── Main content ─── */
+.main {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar */
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+
+/* ─── Page ─── */
+.page { display: none; padding: 24px; animation: fadeIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ─── Topbar ─── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px; gap: 12px; flex-wrap: wrap;
+}
+
+.page-title h1 { font-size: 20px; font-weight: 700; color: white; }
+.page-title p { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+.topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ─── Buttons ─── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease;
+  font-family: inherit; white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent2); color: white; border-color: var(--accent2);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+
+.btn-ghost {
+  background: var(--glass); color: var(--text2); border-color: var(--glass-border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+.btn-danger { background: rgba(248,113,113,0.15); color: var(--red); border-color: rgba(248,113,113,0.3); }
+.btn-danger:hover:not(:disabled) { background: rgba(248,113,113,0.25); }
+.btn-success { background: rgba(52,211,153,0.15); color: var(--green); border-color: rgba(52,211,153,0.3); }
+.btn-success:hover:not(:disabled) { background: rgba(52,211,153,0.25); }
+
+/* ─── Cards ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.card-body { padding: 20px; }
+.card-header { padding: 16px 20px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.card-title { font-size: 13px; font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; }
+.card-subtitle { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Grid ─── */
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-auto { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+
+/* ─── Stat cards ─── */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: rgba(255,255,255,0.14); }
+.stat-label { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
+.stat-value { font-size: 26px; font-weight: 700; color: white; line-height: 1.1; }
+.stat-note { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.stat-accent { color: var(--accent); }
+.stat-green { color: var(--green); }
+.stat-amber { color: var(--amber); }
+.stat-red { color: var(--red); }
+
+/* ─── Pills / Badges ─── */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 100px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+}
+.pill-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+.pill-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+.pill-red { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+.pill-blue { background: rgba(56,189,248,0.1); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); }
+.pill-gray { background: rgba(148,163,184,0.1); color: var(--text2); border: 1px solid rgba(148,163,184,0.15); }
+
+.pill::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ─── Table ─── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 10px 14px; border-bottom: 1px solid var(--glass-border); text-align: left; font-family: 'JetBrains Mono', monospace; }
+.tbl td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr.row-click:hover { background: var(--glass); cursor: pointer; }
+.tbl tr.row-selected td { background: rgba(56,189,248,0.06); }
+
+/* ─── Form ─── */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; }
+.form-control {
+  width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border); border-radius: 8px;
+  color: var(--text); font-size: 13px; font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.form-control:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 3px rgba(56,189,248,0.1); }
+.form-control::placeholder { color: var(--text3); }
+select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%2364748b'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ─── Alert / Toast ─── */
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+.alert-warn { background: var(--amber-dim); border: 1px solid rgba(251,191,36,0.25); color: var(--amber); }
+.alert-danger { background: var(--red-dim); border: 1px solid rgba(248,113,113,0.25); color: var(--red); }
+.alert-info { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.2); color: var(--accent3); }
+.alert-success { background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
+
+/* ─── Toast stack ─── */
+.toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast-item {
+  background: var(--bg3); border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 12px 16px; font-size: 13px;
+  max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: slideIn 0.2s ease; display: flex; align-items: flex-start; gap: 10px;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+.toast-dismiss { margin-left: auto; cursor: pointer; color: var(--text3); font-size: 16px; flex-shrink: 0; }
+
+/* ─── Loading spinner ─── */
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--glass-border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Traffic bars ─── */
+.traffic-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.traffic-bar-bg { flex: 1; height: 5px; background: var(--glass); border-radius: 3px; overflow: hidden; }
+.traffic-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.bar-rx { background: var(--accent2); }
+.bar-tx { background: var(--green); }
+
+/* ─── Empty state ─── */
+.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+.empty i { font-size: 32px; display: block; margin-bottom: 10px; }
+.empty p { font-size: 13px; }
+
+/* ─── Pagination ─── */
+.pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding-top: 12px; }
+.pagination span { font-size: 12px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Status banner ─── */
+.status-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); margin-bottom: 20px; flex-wrap: wrap; }
+.status-banner-label { font-size: 12px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-right: auto; }
+
+/* ─── Edge panel ─── */
+.edge-detail-panel { margin-top: 16px; }
+.detail-section { margin-bottom: 20px; }
+.detail-section-title { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--glass-border); }
+
+/* ─── Login page ─── */
+.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+.login-card { width: 100%; max-width: 400px; }
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo .brand-icon { margin: 0 auto 12px; width: 56px; height: 56px; font-size: 26px; border-radius: 14px; }
+.login-logo h2 { font-size: 20px; font-weight: 700; color: white; }
+.login-logo p { font-size: 12px; color: var(--text3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Divider ─── */
+.divider { height: 1px; background: var(--glass-border); margin: 16px 0; }
+
+/* ─── Mini chart (sparkline) ─── */
+.sparkline-wrap { width: 100%; height: 50px; overflow: hidden; }
+.sparkline-bar-row { display: flex; align-items: flex-end; gap: 2px; height: 100%; }
+.sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .sidebar { display: none; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+
+/* ─── Kicker label ─── */
+.kicker { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; display: block; }
+
+/* ─── Mono text ─── */
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Number badge ─── */
+.num-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 5px; background: rgba(56,189,248,0.15); color: var(--accent); border-radius: 100px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+/* Uplink mode chips */
+.chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; background: var(--glass); color: var(--text2); border: 1px solid var(--glass-border); }
+
+/* input checkbox */
+input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page" class="login-wrap" style="display:none;">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="brand-icon"><i class="bi bi-compass"></i></div>
+      <h2>Marine Pro</h2>
+      <p>FLEET OPS · SECURE ACCESS</p>
+    </div>
+    <div class="card card-body">
+      <div id="login-notice" style="display:none;" class="alert alert-info" style="margin-bottom:12px;"></div>
+      <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
+        <i class="bi bi-shield-check"></i>
+        <div>
+          <strong>Auth header saved</strong><br/>
+          <span style="font-size:12px;">Your credentials are stored in this browser.</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input id="login-user" class="form-control" placeholder="admin" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input id="login-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="login-err" style="display:none;" class="alert alert-danger"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
+        <button class="btn btn-primary" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Save & continue</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')">
+        <i class="bi bi-skip-forward"></i> Continue without auth
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><i class="bi bi-compass"></i></div>
+      <div>
+        <div class="brand-name">Marine Pro</div>
+        <div class="brand-sub">Fleet Ops</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu chính</div>
+      <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
+        <i class="bi bi-speedometer2"></i> Executive Summary
+      </button>
+      <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
+        <i class="bi bi-box-seam-fill"></i> Package Catalog
+      </button>
+      <div class="nav-section-label" style="margin-top:8px;">Hệ thống</div>
+      <button class="nav-item" id="nav-login" onclick="showPage('login')">
+        <i class="bi bi-key-fill"></i> Auth Settings
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="conn-card">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="conn-avatar">
+            M
+            <span class="conn-dot" id="sidebar-dot"></span>
+          </div>
+          <div style="flex:1;overflow:hidden;">
+            <div style="font-size:13px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
+            <div style="font-size:11px;color:var(--text3);" id="sidebar-conn-label">Idle</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="pill pill-gray" id="sidebar-conn-status">idle</span>
+          <span class="pill pill-gray" id="sidebar-rate" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="main">
+
+    <!-- ─── DASHBOARD ─── -->
+    <div class="page active" id="page-dashboard">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Fleet Command Center</h1>
+          <p>NOC · Real-time monitoring · Auto-refresh 60s</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="dash-mode-badge" class="pill pill-gray">loading</div>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
+          <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Status banner -->
+      <div class="status-banner" id="dash-status-banner">
+        <span class="kicker" style="margin-bottom:0;">Portal status</span>
+        <span id="dash-conn-label" style="font-size:13px;color:var(--text);">Checking backend…</span>
+        <span class="status-banner-label"></span>
+        <span class="pill pill-gray" id="dash-conn-pill">idle</span>
+      </div>
+
+      <!-- Error -->
+      <div id="dash-error" style="display:none;" class="alert alert-warn">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="dash-error-msg"></span>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="grid grid-4" style="margin-bottom:16px;" id="dash-stats">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Backend health + Current mode -->
+      <div class="grid grid-2" style="margin-bottom:16px;">
+        <div class="card card-body">
+          <span class="kicker">Backend status</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-health-pills">
+            <span class="pill pill-gray">checking…</span>
+          </div>
+        </div>
+        <div class="card card-body">
+          <span class="kicker">System metrics</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-metrics-pills">
+            <span class="pill pill-gray">n/a</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edges + Commands -->
+      <div class="grid grid-2" style="margin-bottom:16px;">
+        <!-- Fleet snapshot -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-router-fill" style="color:var(--accent);"></i> Fleet snapshot</div>
+              <div class="card-subtitle" id="edges-source">Loading…</div>
+            </div>
+            <span class="num-badge" id="edges-count">0</span>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl" id="edges-table">
+              <thead>
+                <tr>
+                  <th>Edge</th>
+                  <th>Status</th>
+                  <th>WAN IP</th>
+                  <th>Last seen</th>
+                </tr>
+              </thead>
+              <tbody id="edges-body">
+                <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Commands -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-terminal-fill" style="color:var(--amber);"></i> Command jobs</div>
+              <div class="card-subtitle" id="commands-source">Loading…</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" id="cmd-prev" onclick="prevCmdPage()" disabled><i class="bi bi-chevron-left"></i></button>
+              <button class="btn btn-ghost btn-sm" id="cmd-next" onclick="nextCmdPage()"><i class="bi bi-chevron-right"></i></button>
+            </div>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl">
+              <thead>
+                <tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th></tr>
+              </thead>
+              <tbody id="commands-body">
+                <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected edge detail -->
+      <div class="card" id="edge-detail-card" style="display:none;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-cpu-fill" style="color:var(--accent);"></i> <span id="edge-detail-title">Edge detail</span></div>
+            <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="closeEdgeDetail()"><i class="bi bi-x"></i> Close</button>
+        </div>
+        <div class="card-body" id="edge-detail-body">
+          <div class="empty"><span class="spinner"></span> Loading edge detail…</div>
+        </div>
+      </div>
+
+      <!-- Create command -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-send-fill" style="color:var(--green);"></i> Send command</div>
+        </div>
+        <div class="card-body">
+          <div id="cmd-notice" style="display:none;" class="alert"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tenant code</label>
+              <input id="cmd-tenant" class="form-control" value="tnr13" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vessel code</label>
+              <input id="cmd-vessel" class="form-control" value="vsl-001" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Edge code</label>
+              <input id="cmd-edge" class="form-control" value="edge-001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Command type</label>
+              <select id="cmd-type" class="form-control">
+                <option value="failover_starlink">failover_starlink</option>
+                <option value="failover_vsat">failover_vsat</option>
+                <option value="policy_sync">policy_sync</option>
+                <option value="reboot">reboot</option>
+                <option value="ping">ping</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-primary" id="cmd-submit-btn" onclick="sendCommand()">
+              <i class="bi bi-send"></i> Send command
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PACKAGES ─── -->
+    <div class="page" id="page-packages">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Package Catalog</h1>
+          <p>Quản lý gói cước · Phân công · Báo cáo sử dụng</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="pkg-mode-badge" class="pill pill-gray">loading</div>
+          <button class="btn btn-ghost btn-sm" onclick="togglePkgForm()"><i class="bi bi-plus-lg"></i> New package</button>
+          <button class="btn btn-primary btn-sm" onclick="loadPackages()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+
+      <!-- Summary stats -->
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Total packages</div>
+          <div class="stat-value stat-accent" id="pkg-total">—</div>
+          <div class="stat-note" id="pkg-source-note">Loading…</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active packages</div>
+          <div class="stat-value stat-green" id="pkg-active">—</div>
+          <div class="stat-note">Assignable to vessels</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total usage (window)</div>
+          <div class="stat-value stat-amber" id="pkg-usage">0 MB</div>
+          <div class="stat-note">Current reporting window</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="pkg-error" style="display:none;" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="pkg-error-msg"></span>
+      </div>
+
+      <!-- New package form (hidden) -->
+      <div class="card" id="pkg-form-card" style="display:none;margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-plus-circle-fill" style="color:var(--green);"></i> <span id="pkg-form-title">Create package</span></div>
+          <button class="btn btn-ghost btn-sm" onclick="togglePkgForm(false)"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="card-body">
+          <div id="pkg-form-notice" style="display:none;" class="alert"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Code</label>
+              <input id="pkg-code" class="form-control" placeholder="basic-50gb" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input id="pkg-name" class="form-control" placeholder="Basic 50GB" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <input id="pkg-desc" class="form-control" placeholder="Starter package for pilot users" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Quota (MB)</label>
+              <input id="pkg-quota" class="form-control" type="number" value="51200" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Validity (days)</label>
+              <input id="pkg-validity" class="form-control" type="number" value="30" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Speed limit (Kbps)</label>
+              <input id="pkg-speed" class="form-control" type="number" value="5120" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Price (USD)</label>
+              <input id="pkg-price" class="form-control" type="number" value="0" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="togglePkgForm(false)">Cancel</button>
+            <button class="btn btn-primary" id="pkg-save-btn" onclick="savePackage()"><i class="bi bi-check-lg"></i> <span id="pkg-save-label">Create</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Package list -->
+      <div class="grid grid-2" style="margin-bottom:16px;">
+        <div class="card" style="grid-column:1/-1;">
+          <div class="card-header">
+            <div class="card-title"><i class="bi bi-box-seam-fill" style="color:var(--accent);"></i> Packages</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;">
+              <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
+            </label>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr><th>Code</th><th>Name</th><th>Quota</th><th>Speed</th><th>Validity</th><th>Status</th><th style="text-align:right;">Actions</th></tr>
+            </thead>
+            <tbody id="pkg-body">
+              <tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Assign package -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-person-plus-fill" style="color:var(--amber);"></i> Assign package</div>
+        </div>
+        <div class="card-body">
+          <div id="assign-notice" style="display:none;" class="alert"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Package</label>
+              <select id="assign-pkg" class="form-control"><option value="">— select package —</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <input id="assign-user" class="form-control" placeholder="user123" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Vessel code</label>
+              <input id="assign-vessel" class="form-control" value="vsl-001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tenant code</label>
+              <input id="assign-tenant" class="form-control" value="tnr13" />
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-success" onclick="doAssign()"><i class="bi bi-person-check"></i> Assign</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Usage report -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-bar-chart-fill" style="color:var(--green);"></i> Usage report</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportUsage()"><i class="bi bi-download"></i> Export CSV</button>
+        </div>
+        <div class="card-body">
+          <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Vessel</label>
+              <input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Bucket</label>
+              <select id="usage-bucket" class="form-control">
+                <option value="hour">Hour</option>
+                <option value="day" selected>Day</option>
+                <option value="week">Week</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="loadUsage()" style="margin-bottom:12px;"><i class="bi bi-search"></i> Run report</button>
+
+          <div id="usage-results" style="display:none;">
+            <div class="grid grid-3" style="margin-bottom:12px;">
+              <div class="stat-card">
+                <div class="stat-label">Total MB used</div>
+                <div class="stat-value stat-amber" id="usage-total-mb">—</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Active assignments</div>
+                <div class="stat-value stat-green" id="usage-active-assign">—</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Report rows</div>
+                <div class="stat-value stat-accent" id="usage-rows">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── LOGIN PAGE (inline) ─── -->
+    <div class="page" id="page-login">
+      <div style="max-width:400px;margin:0 auto;padding-top:40px;">
+        <div class="topbar">
+          <div class="page-title"><h1>Auth Settings</h1><p>HTTP Basic Auth · Browser storage</p></div>
+        </div>
+        <div class="card card-body">
+          <div id="login-inline-notice" style="display:none;" class="alert alert-info"></div>
+          <div id="login-inline-saved" style="display:none;" class="alert alert-success">
+            <i class="bi bi-shield-check"></i> Auth header currently saved in this browser.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <div id="inline-err" style="display:none;" class="alert alert-danger"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
+            <button class="btn btn-primary" onclick="doLoginInline()"><i class="bi bi-check-lg"></i> Save & continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast stack -->
+<div class="toast-stack" id="toast-stack"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const API_BASE = (window.location.search.match(/[?&]api=([^&]+)/) || [])[1]
+  || localStorage.getItem('marine_api_base')
+  || '';
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+function getAuthHeader() {
+  const stored = localStorage.getItem('marine_auth');
+  if (stored) return stored;
+  const u = document.getElementById('login-user')?.value || document.getElementById('inline-user')?.value || '';
+  const p = document.getElementById('login-pass')?.value || document.getElementById('inline-pass')?.value || '';
+  if (u && p) return 'Basic ' + btoa(u + ':' + p);
+  return '';
+}
+
+function saveBasicAuth(u, p) {
+  localStorage.setItem('marine_auth', 'Basic ' + btoa(u + ':' + p));
+}
+
+function clearAuth() {
+  localStorage.removeItem('marine_auth');
+  toast('Auth cleared', 'info');
+  refreshLoginPage();
+}
+
+function refreshLoginPage() {
+  const has = !!localStorage.getItem('marine_auth');
+  const s1 = document.getElementById('saved-auth-banner');
+  const s2 = document.getElementById('login-inline-saved');
+  if (s1) s1.style.display = has ? 'flex' : 'none';
+  if (s2) s2.style.display = has ? 'flex' : 'none';
+}
+
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if (!u || !p) { showLoginErr('Username and password required.'); return; }
+  saveBasicAuth(u, p);
+  showPage(initialPage);
+}
+
+function doLoginInline() {
+  const u = document.getElementById('inline-user').value.trim();
+  const p = document.getElementById('inline-pass').value;
+  if (!u || !p) { showEl('inline-err', 'Username and password required.', 'alert-danger'); return; }
+  saveBasicAuth(u, p);
+  toast('Auth saved ✓', 'success');
+  refreshLoginPage();
+  if (document.getElementById('app').style.display !== 'none') {
+    showPage(initialPage);
+  }
+}
+
+function showLoginErr(msg) {
+  const el = document.getElementById('login-err');
+  if (el) { el.textContent = msg; el.style.display = 'flex'; }
+}
+
+// ─── ROUTING ──────────────────────────────────────────────────────────────────
+let currentPage = 'dashboard';
+let initialPage = 'dashboard';
+
+function showPage(name) {
+  if (name === 'login' && document.getElementById('login-page').style.display !== 'none') return;
+
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const nav = document.getElementById('nav-' + name);
+  if (nav) nav.classList.add('active');
+
+  currentPage = name;
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'packages') { loadPackages(); loadUsage(); }
+  if (name === 'login') refreshLoginPage();
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const url = (API_BASE || '').replace(/\/$/, '') + path;
+  const auth = getAuthHeader();
+  const headers = { 'accept': 'application/json', ...opts.headers };
+  if (auth) headers['authorization'] = auth;
+  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+    headers['content-type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(url, { ...opts, headers, signal: controller.signal });
+    clearTimeout(timeout);
+
+    updateConnStatus(res.status);
+    parseRateLimit(res);
+
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try { const j = await res.json(); errMsg = j.error || j.message || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') throw new Error('Request timeout');
+    updateConnStatus(0);
+    throw err;
+  }
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let connStatus = { status: 'idle', label: 'Idle', tone: 'idle' };
+let rateLimit = null;
+let dashRefreshTimer = null;
+let cmdOffset = 0;
+const CMD_PAGE = 5;
+let pkgList = [];
+let editingPkgId = null;
+
+// ─── CONNECTION STATUS ────────────────────────────────────────────────────────
+function updateConnStatus(httpStatus) {
+  if (httpStatus >= 200 && httpStatus < 300) {
+    connStatus = { status: 'active', label: 'Active', tone: 'good' };
+  } else if (httpStatus === 429) {
+    connStatus = { status: 'limited', label: 'Rate limited', tone: 'warn' };
+  } else if (httpStatus === 401 || httpStatus === 403) {
+    connStatus = { status: 'auth error', label: 'Auth error', tone: 'bad' };
+  } else if (httpStatus === 0) {
+    connStatus = { status: 'offline', label: 'Backend offline', tone: 'bad' };
+  }
+  renderSidebarConn();
+  renderDashConn();
+}
+
+function parseRateLimit(res) {
+  const rem = res.headers.get('x-ratelimit-remaining');
+  const lim = res.headers.get('x-ratelimit-limit');
+  if (rem !== null) {
+    rateLimit = { remaining: Number(rem), limit: lim ? Number(lim) : null };
+    const el = document.getElementById('sidebar-rate');
+    if (el) { el.textContent = `Rate ${rem}/${lim || '?'}`; el.style.display = 'inline-flex'; }
+    if (Number(rem) <= 5) toast(`Rate limit low: ${rem} requests left`, 'warn');
+  }
+}
+
+function renderSidebarConn() {
+  const dot = document.getElementById('sidebar-dot');
+  const label = document.getElementById('sidebar-conn-label');
+  const pill = document.getElementById('sidebar-conn-status');
+  if (!dot) return;
+  dot.className = 'conn-dot ' + { good: 'dot-good', warn: 'dot-warn', bad: 'dot-bad', idle: 'dot-idle' }[connStatus.tone];
+  if (label) label.textContent = connStatus.label;
+  if (pill) { pill.textContent = connStatus.status; pill.className = 'pill ' + { good: 'pill-green', warn: 'pill-amber', bad: 'pill-red', idle: 'pill-gray' }[connStatus.tone]; }
+}
+
+function renderDashConn() {
+  const label = document.getElementById('dash-conn-label');
+  const pill = document.getElementById('dash-conn-pill');
+  if (label) label.textContent = connStatus.label;
+  if (pill) { pill.textContent = connStatus.status; pill.className = 'pill ' + { good: 'pill-green', warn: 'pill-amber', bad: 'pill-red', idle: 'pill-gray' }[connStatus.tone]; }
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+let dashData = { edges: null, commands: null, health: null, ready: null, metrics: null, packages: null, mode: 'loading' };
+
+async function loadDashboard(silent = false) {
+  if (!silent) {
+    const btn = document.getElementById('dash-refresh-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading'; }
+  }
+  document.getElementById('dash-error').style.display = 'none';
+
+  try {
+    const [health, ready, edges, commands, packages] = await Promise.allSettled([
+      apiFetch('/api/health'),
+      apiFetch('/api/ready'),
+      apiFetch('/api/mcu/edges?limit=20'),
+      apiFetch(`/api/commands?limit=${CMD_PAGE}&offset=${cmdOffset}`),
+      apiFetch('/api/packages?include_inactive=false')
+    ]);
+
+    dashData.health = health.status === 'fulfilled' ? health.value : null;
+    dashData.ready = ready.status === 'fulfilled' ? ready.value : null;
+    dashData.edges = edges.status === 'fulfilled' ? (edges.value?.edges || edges.value?.data || edges.value || []) : null;
+    dashData.commands = commands.status === 'fulfilled' ? (commands.value?.commands || commands.value?.data || commands.value || []) : null;
+    dashData.packages = packages.status === 'fulfilled' ? (packages.value?.packages || packages.value?.data || packages.value || []) : null;
+    dashData.mode = dashData.edges !== null ? 'live' : 'fallback';
+
+    if (dashData.edges === null) {
+      dashData.edges = FALLBACK_EDGES;
+      dashData.commands = dashData.commands || FALLBACK_COMMANDS;
+      dashData.packages = dashData.packages || FALLBACK_PACKAGES;
+      const errMsg = [health, ready, edges, commands].find(r => r.status === 'rejected')?.reason?.message || 'Could not reach backend';
+      showEl('dash-error', `Backend unavailable — showing fallback data. (${errMsg})`, '');
+      document.getElementById('dash-error').style.display = 'flex';
+    }
+
+    renderDashboard();
+    updateConnStatus(dashData.health ? 200 : 0);
+
+    // Try metrics
+    try {
+      const m = await apiFetch('/metrics');
+      dashData.metrics = m;
+    } catch {}
+    renderHealthPills();
+
+  } catch (err) {
+    showEl('dash-error', `Dashboard error: ${err.message}`, '');
+    document.getElementById('dash-error').style.display = 'flex';
+  } finally {
+    if (!silent) {
+      const btn = document.getElementById('dash-refresh-btn');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh'; }
+    }
+  }
+}
+
+const FALLBACK_EDGES = [{ tenant_code: 'tnr13', vessel_code: 'vsl-001', edge_code: 'edge-001', online: false, public_wan_ip: null, edge_firmware_version: '1.0.0', last_seen_at: null, error_count_24h: 1, last_error_at: '2026-04-16T03:02:16.967Z' }];
+const FALLBACK_COMMANDS = [{ id: '8ef4adef', tenant_code: 'tnr13', vessel_code: 'vsl-001', edge_code: 'edge-001', command_type: 'failover_starlink', status: 'sent', created_at: '2026-04-16T03:04:16.773Z' }];
+const FALLBACK_PACKAGES = [{ code: 'basic-50gb', name: 'Basic 50GB', is_active: true }, { code: 'standard-100gb', name: 'Standard 100GB', is_active: true }];
+
+function renderDashboard() {
+  const edges = dashData.edges || [];
+  const commands = dashData.commands || [];
+  const packages = dashData.packages || [];
+  const mode = dashData.mode;
+
+  // Mode badge
+  const modeBadge = document.getElementById('dash-mode-badge');
+  if (modeBadge) { modeBadge.textContent = mode === 'live' ? 'live' : 'fallback'; modeBadge.className = 'pill ' + (mode === 'live' ? 'pill-green' : 'pill-amber'); }
+
+  // Summary cards
+  const onlineEdges = edges.filter(e => e.online).length;
+  const warnEdges = edges.filter(e => !e.online && e.error_count_24h > 0).length;
+  const activePkgs = packages.filter(p => p.is_active !== false).length;
+
+  const stats = [
+    { label: 'Total edges', value: edges.length, tone: 'accent', note: mode === 'live' ? 'from /api/mcu/edges' : 'fallback data' },
+    { label: 'Online edges', value: onlineEdges, tone: onlineEdges > 0 ? 'green' : 'red', note: `${warnEdges} with warnings` },
+    { label: 'Recent commands', value: commands.length, tone: 'amber', note: `page ${Math.floor(cmdOffset/CMD_PAGE)+1}` },
+    { label: 'Active packages', value: activePkgs, tone: 'accent', note: 'Phase 3 catalog' }
+  ];
+
+  const statsEl = document.getElementById('dash-stats');
+  if (statsEl) statsEl.innerHTML = stats.map(s => `
+    <div class="stat-card">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value stat-${s.tone}">${s.value}</div>
+      <div class="stat-note">${s.note}</div>
+    </div>`).join('');
+
+  // Edges table
+  const edgesBody = document.getElementById('edges-body');
+  const edgesSource = document.getElementById('edges-source');
+  if (edgesSource) edgesSource.textContent = mode === 'live' ? 'from /api/mcu/edges' : 'fallback preview data';
+  document.getElementById('edges-count').textContent = edges.length;
+
+  if (edgesBody) {
+    if (!edges.length) {
+      edgesBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-router"></i><p>No edges registered</p></div></td></tr>';
+    } else {
+      edgesBody.innerHTML = edges.map(e => {
+        const st = e.online ? 'Online' : e.error_count_24h > 0 ? 'Warning' : 'Offline';
+        const pillCls = e.online ? 'pill-green' : e.error_count_24h > 0 ? 'pill-amber' : 'pill-red';
+        return `<tr class="row-click" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})">
+          <td><span class="mono" style="font-size:12px;">${e.tenant_code}/${e.vessel_code}/${e.edge_code}</span></td>
+          <td><span class="pill ${pillCls}">${st}</span></td>
+          <td style="color:var(--text2);">${e.public_wan_ip || '—'}</td>
+          <td style="color:var(--text3);font-size:12px;">${fmtTime(e.last_seen_at)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Commands table
+  const cmdBody = document.getElementById('commands-body');
+  const cmdSource = document.getElementById('commands-source');
+  if (cmdSource) cmdSource.textContent = `offset ${cmdOffset}, limit ${CMD_PAGE}`;
+  document.getElementById('cmd-prev').disabled = cmdOffset === 0;
+
+  if (cmdBody) {
+    if (!commands.length) {
+      cmdBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs found</p></div></td></tr>';
+    } else {
+      cmdBody.innerHTML = commands.map(c => {
+        const sc = { sent: 'pill-blue', delivered: 'pill-green', failed: 'pill-red', pending: 'pill-amber' }[c.status] || 'pill-gray';
+        return `<tr>
+          <td style="font-size:12px;" class="mono">${c.edge_code || '—'}</td>
+          <td><span class="chip">${c.command_type}</span></td>
+          <td><span class="pill ${sc}">${c.status}</span></td>
+          <td style="color:var(--text3);font-size:12px;">${fmtTime(c.created_at)}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
+function renderHealthPills() {
+  const h = dashData.health;
+  const el = document.getElementById('dash-health-pills');
+  if (!el) return;
+  if (!h) { el.innerHTML = '<span class="pill pill-red">backend offline</span>'; return; }
+
+  const db = h.checks?.database || {};
+  el.innerHTML = [
+    `<span class="pill ${h.status === 'ok' ? 'pill-green' : 'pill-red'}">API ${h.status || '?'}</span>`,
+    `<span class="pill ${db.status === 'ok' ? 'pill-green' : 'pill-amber'}">DB ${db.status || 'n/a'}</span>`,
+    db.latency_ms !== undefined ? `<span class="pill pill-gray">${db.latency_ms}ms</span>` : '',
+    db.pool?.usage_percent !== undefined ? `<span class="pill pill-gray">pool ${db.pool.usage_percent}%</span>` : ''
+  ].join('');
+
+  const mEl = document.getElementById('dash-metrics-pills');
+  if (mEl) {
+    mEl.innerHTML = '<span class="pill pill-gray">metrics n/a</span>';
+  }
+}
+
+async function prevCmdPage() {
+  cmdOffset = Math.max(0, cmdOffset - CMD_PAGE);
+  await loadDashboard(true);
+}
+async function nextCmdPage() {
+  cmdOffset += CMD_PAGE;
+  await loadDashboard(true);
+}
+
+// ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
+async function selectEdge(edgeJson) {
+  const edge = JSON.parse(edgeJson);
+  const card = document.getElementById('edge-detail-card');
+  const body = document.getElementById('edge-detail-body');
+  const title = document.getElementById('edge-detail-title');
+  const subtitle = document.getElementById('edge-detail-subtitle');
+
+  card.style.display = 'block';
+  title.textContent = `${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`;
+  subtitle.textContent = 'Loading detail…';
+  body.innerHTML = '<div class="empty"><span class="spinner"></span> Loading edge detail…</div>';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const [detail, traffic] = await Promise.allSettled([
+      apiFetch(`/api/mcu/edges/${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}?onlineSeconds=120`),
+      apiFetch(`/api/mcu/edges/${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}/traffic?windowMinutes=60&limit=12`)
+    ]);
+
+    const d = detail.status === 'fulfilled' ? detail.value : null;
+    const t = traffic.status === 'fulfilled' ? traffic.value : null;
+
+    if (!d && !t) throw new Error('No data returned from backend');
+
+    subtitle.textContent = `Firmware: ${edge.edge_firmware_version || '?'} · Last seen: ${fmtTime(edge.last_seen_at)}`;
+
+    const samples = t?.samples || [];
+    const maxKbps = samples.length ? Math.max(...samples.flatMap(s => [s.rx_kbps || 0, s.tx_kbps || 0]), 1) : 1;
+
+    const hb = d?.latest?.heartbeat || {};
+    const tel = d?.latest?.telemetry || {};
+    const usage = d?.usage_24h || {};
+    const topUsers = d?.top_users_24h || [];
+    const alerts = d?.recent_alerts || [];
+    const errors = d?.ingest_errors || [];
+
+    body.innerHTML = `
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-label">CPU</div><div class="stat-value stat-accent">${tel.cpu_percent !== undefined ? tel.cpu_percent + '%' : '—'}</div></div>
+        <div class="stat-card"><div class="stat-label">Memory</div><div class="stat-value stat-green">${tel.memory_percent !== undefined ? tel.memory_percent + '%' : '—'}</div></div>
+        <div class="stat-card"><div class="stat-label">24h usage</div><div class="stat-value stat-amber">${usage.total_mb !== undefined ? Number(usage.total_mb).toFixed(0) + ' MB' : '—'}</div></div>
+      </div>
+
+      ${samples.length ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Traffic (last 60 min)</div>
+        <div style="display:flex;gap:4px;align-items:flex-end;height:60px;">
+          ${samples.slice(-12).map(s => {
+            const rxH = Math.max(4, Math.round(((s.rx_kbps || 0) / maxKbps) * 60));
+            const txH = Math.max(4, Math.round(((s.tx_kbps || 0) / maxKbps) * 60));
+            return `<div style="flex:1;display:flex;gap:1px;align-items:flex-end;">
+              <div style="flex:1;height:${rxH}px;background:var(--accent2);border-radius:2px 2px 0 0;" title="RX ${s.rx_kbps}kbps"></div>
+              <div style="flex:1;height:${txH}px;background:var(--green);border-radius:2px 2px 0 0;" title="TX ${s.tx_kbps}kbps"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--text3);">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--accent2);border-radius:1px;display:inline-block;"></span>RX</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--green);border-radius:1px;display:inline-block;"></span>TX</span>
+        </div>
+      </div>` : ''}
+
+      ${topUsers.length ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Top users (24h)</div>
+        ${topUsers.slice(0,5).map(u => `
+        <div class="traffic-bar-wrap" style="margin-bottom:6px;">
+          <span style="width:120px;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username || '?'}</span>
+          <div class="traffic-bar-bg"><div class="traffic-bar bar-rx" style="width:${Math.max(4,Math.round((u.total_mb||0)/Math.max(...topUsers.map(x=>x.total_mb||0),1)*100))}%;"></div></div>
+          <span style="font-size:11px;color:var(--text3);min-width:60px;text-align:right;">${Number(u.total_mb||0).toFixed(0)} MB</span>
+        </div>`).join('')}
+      </div>` : ''}
+
+      ${alerts.length ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Alerts</div>
+        ${alerts.slice(0,3).map(a => `<div class="alert alert-${a.severity === 'critical' ? 'danger' : 'warn'}"><i class="bi bi-exclamation-circle"></i> ${a.message || JSON.stringify(a)}</div>`).join('')}
+      </div>` : ''}
+
+      ${errors.length ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Ingest errors (recent)</div>
+        ${errors.slice(0,2).map(e => `<div class="alert alert-danger" style="font-size:12px;"><i class="bi bi-bug"></i> ${e.error_message || JSON.stringify(e)}</div>`).join('')}
+      </div>` : ''}
+
+      ${!d ? '<div class="alert alert-warn"><i class="bi bi-exclamation-triangle"></i> Edge detail unavailable from backend — showing partial data from traffic endpoint.</div>' : ''}
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Failed to load edge detail: ${err.message}</div>`;
+    subtitle.textContent = 'Error loading';
+  }
+}
+
+function closeEdgeDetail() {
+  document.getElementById('edge-detail-card').style.display = 'none';
+}
+
+// ─── SEND COMMAND ─────────────────────────────────────────────────────────────
+async function sendCommand() {
+  const btn = document.getElementById('cmd-submit-btn');
+  const noticeEl = document.getElementById('cmd-notice');
+  const tenant = document.getElementById('cmd-tenant').value.trim();
+  const vessel = document.getElementById('cmd-vessel').value.trim();
+  const edge = document.getElementById('cmd-edge').value.trim();
+  const type = document.getElementById('cmd-type').value;
+
+  if (!tenant || !vessel || !edge || !type) {
+    showEl('cmd-notice', 'All fields required.', 'alert-warn');
+    noticeEl.style.display = 'flex';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sending';
+  noticeEl.style.display = 'none';
+
+  try {
+    const res = await apiFetch('/api/commands', {
+      method: 'POST',
+      body: { tenant_code: tenant, vessel_code: vessel, edge_code: edge, command_type: type }
+    });
+    showEl('cmd-notice', `Command sent successfully! ID: ${res.id || res.command_id || '?'}`, 'alert-success');
+    noticeEl.style.display = 'flex';
+    toast('Command sent ✓', 'success');
+    await loadDashboard(true);
+  } catch (err) {
+    showEl('cmd-notice', `Failed: ${err.message}`, 'alert-danger');
+    noticeEl.style.display = 'flex';
+    toast(`Command failed: ${err.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send"></i> Send command';
+  }
+}
+
+// ─── PACKAGES ─────────────────────────────────────────────────────────────────
+async function loadPackages() {
+  const includeInactive = document.getElementById('show-inactive')?.checked;
+  try {
+    const data = await apiFetch('/api/packages' + (includeInactive ? '?include_inactive=true' : ''));
+    pkgList = data?.packages || data?.data || data || [];
+    renderPackages();
+    populateAssignSelect();
+    document.getElementById('pkg-mode-badge').textContent = 'live';
+    document.getElementById('pkg-mode-badge').className = 'pill pill-green';
+    document.getElementById('pkg-source-note').textContent = 'from /api/packages';
+    document.getElementById('pkg-error').style.display = 'none';
+  } catch (err) {
+    pkgList = FALLBACK_PACKAGES;
+    renderPackages();
+    document.getElementById('pkg-mode-badge').textContent = 'fallback';
+    document.getElementById('pkg-mode-badge').className = 'pill pill-amber';
+    showEl('pkg-error', `Backend error: ${err.message} — showing fallback data`, '');
+    document.getElementById('pkg-error').style.display = 'flex';
+  }
+}
+
+function renderPackages() {
+  const active = pkgList.filter(p => p.is_active !== false).length;
+  document.getElementById('pkg-total').textContent = pkgList.length;
+  document.getElementById('pkg-active').textContent = active;
+
+  const body = document.getElementById('pkg-body');
+  if (!pkgList.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="bi bi-box-seam"></i><p>No packages found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = pkgList.map(p => `
+    <tr>
+      <td><span class="mono" style="font-size:12px;">${p.code}</span></td>
+      <td style="font-weight:500;">${p.name}</td>
+      <td>${p.quota_mb !== undefined ? Number(p.quota_mb/1024).toFixed(0)+' GB' : p.quota !== undefined ? Number(p.quota/1024).toFixed(0)+' GB' : '—'}</td>
+      <td>${p.speed_limit_kbps !== undefined ? p.speed_limit_kbps + ' K' : p.speedLimit !== undefined ? p.speedLimit + ' K' : '—'}</td>
+      <td>${p.validity_days !== undefined ? p.validity_days + 'd' : p.validity !== undefined ? p.validity + 'd' : '—'}</td>
+      <td><span class="pill ${p.is_active !== false ? 'pill-green' : 'pill-gray'}">${p.is_active !== false ? 'Active' : 'Inactive'}</span></td>
+      <td style="text-align:right;">
+        <button class="btn btn-ghost btn-sm" onclick="editPackage(${JSON.stringify(JSON.stringify(p))})"><i class="bi bi-pencil"></i></button>
+        <button class="btn ${p.is_active !== false ? 'btn-danger' : 'btn-success'} btn-sm" onclick="togglePackage(${JSON.stringify(p.id||'')},${!p.is_active})">
+          ${p.is_active !== false ? '<i class="bi bi-archive"></i>' : '<i class="bi bi-arrow-up-circle"></i>'}
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function populateAssignSelect() {
+  const sel = document.getElementById('assign-pkg');
+  const active = pkgList.filter(p => p.is_active !== false);
+  sel.innerHTML = '<option value="">— select package —</option>' + active.map(p => `<option value="${p.id}">${p.name} (${p.code})</option>`).join('');
+}
+
+function togglePkgForm(show = true) {
+  const card = document.getElementById('pkg-form-card');
+  card.style.display = show ? 'block' : 'none';
+  if (show && !editingPkgId) resetPkgForm();
+}
+
+function resetPkgForm() {
+  editingPkgId = null;
+  document.getElementById('pkg-form-title').textContent = 'Create package';
+  document.getElementById('pkg-save-label').textContent = 'Create';
+  ['pkg-code','pkg-name','pkg-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pkg-quota').value = '51200';
+  document.getElementById('pkg-validity').value = '30';
+  document.getElementById('pkg-speed').value = '5120';
+  document.getElementById('pkg-price').value = '0';
+  document.getElementById('pkg-form-notice').style.display = 'none';
+}
+
+function editPackage(pkgJson) {
+  const p = JSON.parse(pkgJson);
+  editingPkgId = p.id;
+  document.getElementById('pkg-form-title').textContent = 'Edit package';
+  document.getElementById('pkg-save-label').textContent = 'Update';
+  document.getElementById('pkg-code').value = p.code || '';
+  document.getElementById('pkg-name').value = p.name || '';
+  document.getElementById('pkg-desc').value = p.description || '';
+  document.getElementById('pkg-quota').value = p.quota_mb || p.quota || 51200;
+  document.getElementById('pkg-validity').value = p.validity_days || p.validity || 30;
+  document.getElementById('pkg-speed').value = p.speed_limit_kbps || p.speedLimit || 5120;
+  document.getElementById('pkg-price').value = p.price || 0;
+  togglePkgForm(true);
+  document.getElementById('pkg-form-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function savePackage() {
+  const btn = document.getElementById('pkg-save-btn');
+  btn.disabled = true;
+
+  const payload = {
+    code: document.getElementById('pkg-code').value.trim(),
+    name: document.getElementById('pkg-name').value.trim(),
+    description: document.getElementById('pkg-desc').value.trim(),
+    quota_mb: Number(document.getElementById('pkg-quota').value),
+    validity_days: Number(document.getElementById('pkg-validity').value),
+    speed_limit_kbps: Number(document.getElementById('pkg-speed').value),
+    price: Number(document.getElementById('pkg-price').value),
+    tenant_code: 'tnr13'
+  };
+
+  if (!payload.code || !payload.name) {
+    showEl('pkg-form-notice', 'Code and name are required.', 'alert-warn');
+    document.getElementById('pkg-form-notice').style.display = 'flex';
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    if (editingPkgId) {
+      await apiFetch('/api/packages/' + editingPkgId, { method: 'PATCH', body: payload });
+      toast('Package updated ✓', 'success');
+    } else {
+      await apiFetch('/api/packages', { method: 'POST', body: payload });
+      toast('Package created ✓', 'success');
+    }
+    togglePkgForm(false);
+    await loadPackages();
+  } catch (err) {
+    showEl('pkg-form-notice', `Error: ${err.message}`, 'alert-danger');
+    document.getElementById('pkg-form-notice').style.display = 'flex';
+    toast(`Save failed: ${err.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function togglePackage(id, makeActive) {
+  if (!id) { toast('Cannot toggle — package has no id (fallback data)', 'warn'); return; }
+  try {
+    await apiFetch('/api/packages/' + id, { method: 'PATCH', body: { is_active: makeActive } });
+    toast(`Package ${makeActive ? 'activated' : 'archived'} ✓`, 'success');
+    await loadPackages();
+  } catch (err) {
+    toast(`Failed: ${err.message}`, 'danger');
+  }
+}
+
+async function doAssign() {
+  const pkgId = document.getElementById('assign-pkg').value;
+  const user = document.getElementById('assign-user').value.trim();
+  const vessel = document.getElementById('assign-vessel').value.trim();
+  const tenant = document.getElementById('assign-tenant').value.trim();
+  const noticeEl = document.getElementById('assign-notice');
+
+  if (!pkgId || !user || !vessel) {
+    showEl('assign-notice', 'Package, username, and vessel are required.', 'alert-warn');
+    noticeEl.style.display = 'flex';
+    return;
+  }
+  noticeEl.style.display = 'none';
+
+  try {
+    const res = await apiFetch('/api/packages/' + pkgId + '/assign', {
+      method: 'POST',
+      body: { username: user, vessel_code: vessel, tenant_code: tenant }
+    });
+    showEl('assign-notice', `Assigned successfully! Assignment ID: ${res.id || res.assignment_id || '?'}`, 'alert-success');
+    noticeEl.style.display = 'flex';
+    toast(`Package assigned to ${user} ✓`, 'success');
+    await loadUsage();
+  } catch (err) {
+    showEl('assign-notice', `Error: ${err.message}`, 'alert-danger');
+    noticeEl.style.display = 'flex';
+    toast(`Assign failed: ${err.message}`, 'danger');
+  }
+}
+
+// ─── USAGE ────────────────────────────────────────────────────────────────────
+async function loadUsage() {
+  const vessel = document.getElementById('usage-vessel')?.value.trim() || '';
+  const bucket = document.getElementById('usage-bucket')?.value || 'day';
+
+  try {
+    const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+    if (vessel) params.set('vessel', vessel);
+
+    const data = await apiFetch('/api/reports/usage?' + params);
+    const totalMb = data?.summary?.total_mb || 0;
+    const activeAssign = (data?.active_assignments || []).length;
+    const rows = (data?.rows || data?.data || []).length;
+
+    document.getElementById('usage-total-mb').textContent = Number(totalMb).toFixed(0) + ' MB';
+    document.getElementById('pkg-usage').textContent = Number(totalMb).toFixed(0) + ' MB';
+    document.getElementById('usage-active-assign').textContent = activeAssign;
+    document.getElementById('usage-rows').textContent = rows;
+    document.getElementById('usage-results').style.display = 'block';
+  } catch (err) {
+    // silent fail, usage is optional
+    document.getElementById('pkg-usage').textContent = '—';
+  }
+}
+
+async function exportUsage() {
+  const vessel = document.getElementById('usage-vessel')?.value.trim() || '';
+  const bucket = document.getElementById('usage-bucket')?.value || 'day';
+  const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+  if (vessel) params.set('vessel', vessel);
+  const url = (API_BASE || '') + '/api/reports/usage/export?' + params;
+  toast('Opening export URL…', 'info');
+  window.open(url, '_blank');
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function fmtTime(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (isNaN(d)) return String(val);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return d.toLocaleDateString();
+}
+
+function showEl(id, msg, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (cls !== undefined) el.className = 'alert ' + cls;
+  el.innerHTML = msg;
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+let toastId = 0;
+function toast(msg, type = 'info') {
+  const id = ++toastId;
+  const colors = { success: 'var(--green)', danger: 'var(--red)', warn: 'var(--amber)', info: 'var(--accent3)' };
+  const icons = { success: 'bi-check-circle-fill', danger: 'bi-exclamation-circle-fill', warn: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
+
+  const el = document.createElement('div');
+  el.className = 'toast-item';
+  el.id = 'toast-' + id;
+  el.innerHTML = `
+    <i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};font-size:16px;flex-shrink:0;"></i>
+    <span style="flex:1;">${msg}</span>
+    <span class="toast-dismiss" onclick="document.getElementById('toast-${id}').remove()"><i class="bi bi-x"></i></span>`;
+
+  document.getElementById('toast-stack').appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+// ─── AUTO REFRESH ─────────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  if (dashRefreshTimer) clearInterval(dashRefreshTimer);
+  dashRefreshTimer = setInterval(() => {
+    if (currentPage === 'dashboard') loadDashboard(true);
+  }, 60000);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  // Check if we need to show the API setup prompt
+  if (!API_BASE) {
+    const apiBase = prompt(
+      'Marine Portal — Backend API URL\n\nEnter your backend base URL (e.g. http://localhost:3000)\nLeave blank to use relative URLs (same host):',
+      'http://localhost:3000'
+    );
+    if (apiBase && apiBase.trim()) {
+      localStorage.setItem('marine_api_base', apiBase.trim());
+      location.reload();
+      return;
+    }
+  }
+
+  const hasAuth = !!localStorage.getItem('marine_auth');
+  refreshLoginPage();
+  initialPage = location.hash.includes('packages-section') ? 'packages' : 'dashboard';
+
+  if (hasAuth) {
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    showPage(initialPage);
+  } else {
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+
+  startAutoRefresh();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
