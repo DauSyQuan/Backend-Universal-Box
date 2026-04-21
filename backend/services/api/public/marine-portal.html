@@ -326,6 +326,66 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
 .sparkline-bar-row { display: flex; align-items: flex-end; gap: 2px; height: 100%; }
 .sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
 
+/* ─── Live telemetry ─── */
+.live-chart-shell {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+}
+.live-chart {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+.live-chart-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.live-sample-trail {
+  display: grid;
+  gap: 8px;
+}
+.live-sample-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.live-sample-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.live-sample-time {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+}
+.live-sample-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text);
+}
+.live-sample-grid span {
+  color: var(--text2);
+}
+.live-sample-grid strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 900px) {
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
@@ -417,10 +477,19 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
         <i class="bi bi-terminal-fill"></i> Command History
       </button>
+      <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
+        <i class="bi bi-sliders"></i> Policy Center
+      </button>
+      <button class="nav-item" id="nav-traffic" onclick="showPage('traffic')">
+        <i class="bi bi-graph-up"></i> Traffic View
+      </button>
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
         <i class="bi bi-box-seam-fill"></i> Package Catalog
       </button>
       <div class="nav-section-label" style="margin-top:8px;">Hệ thống</div>
+      <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
+        <i class="bi bi-gear-fill"></i> Tenant Settings
+      </button>
       <button class="nav-item" id="nav-login" onclick="showPage('login')">
         <i class="bi bi-key-fill"></i> Auth Settings
       </button>
@@ -624,6 +693,10 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             <option value="warning">Warning</option>
             <option value="info">Info</option>
           </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;">
+            <input id="alert-unread-only" type="checkbox" checked onchange="loadAlertsCenter()" />
+            Unread only
+          </label>
           <button class="btn btn-primary btn-sm" onclick="loadAlertsCenter()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
@@ -740,6 +813,293 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         </div>
         <div class="card-body" id="cmd-history-detail-body">
           <div class="empty"><span class="spinner"></span> Loading command detail…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── POLICY CENTER ─── -->
+    <div class="page" id="page-policy">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Policy Center</h1>
+          <p>Compose uplink policy payloads and dispatch them as command jobs</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="policy-mode-badge" class="pill pill-gray">idle</div>
+          <button class="btn btn-ghost btn-sm" onclick="fillPolicyFromSelectedEdge()"><i class="bi bi-arrow-return-right"></i> Use selected edge</button>
+          <button class="btn btn-primary btn-sm" onclick="applyPolicy()"><i class="bi bi-send"></i> Apply policy</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Policy target</div>
+          <div class="stat-value stat-accent" id="policy-target">—</div>
+          <div class="stat-note">Tenant / vessel / edge</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Command mode</div>
+          <div class="stat-value stat-green">policy_sync</div>
+          <div class="stat-note">Uses existing command flow</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Latest result</div>
+          <div class="stat-value stat-amber" id="policy-result">—</div>
+          <div class="stat-note">Shows created command job id</div>
+        </div>
+      </div>
+
+      <div id="policy-error" style="display:none;" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="policy-error-msg"></span>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-sliders2" style="color:var(--accent);"></i> Uplink policy</div>
+            <div class="card-subtitle">Enter work / entertainment IP ranges and gateway hints</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tenant code</label>
+              <input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vessel code</label>
+              <input id="policy-vessel" class="form-control" value="vsl-001" oninput="updatePolicyPreview()" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Edge code</label>
+              <input id="policy-edge" class="form-control" value="edge-001" oninput="updatePolicyPreview()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Active uplink</label>
+              <select id="policy-active-uplink" class="form-control" onchange="updatePolicyPreview()">
+                <option value="automatic">automatic</option>
+                <option value="starlink">starlink</option>
+                <option value="vsat">vsat</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">VSAT gateway</label>
+              <input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Starlink gateway</label>
+              <input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Work IPs</label>
+            <textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Entertainment IPs</label>
+            <textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24, 192.168.101.0/24" oninput="updatePolicyPreview()"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea>
+          </div>
+          <div class="detail-section" style="margin-bottom:14px;">
+            <div class="detail-section-title">Payload preview</div>
+            <pre id="policy-preview" style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;min-height:120px;">{}</pre>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="fillPolicyFromSelectedEdge()">Use selected edge</button>
+            <button class="btn btn-primary" onclick="applyPolicy()"><i class="bi bi-send"></i> Apply Policy</button>
+          </div>
+          <div id="policy-notice" style="display:none;margin-top:12px;" class="alert"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TRAFFIC VIEW ─── -->
+    <div class="page" id="page-traffic">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Traffic View</h1>
+          <p>Daily and monthly telemetry summary built from /api/telemetry and /api/traffic/summary</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="traffic-mode-badge" class="pill pill-gray">idle</div>
+          <select id="traffic-period" class="form-control" style="width:130px;" onchange="loadTrafficView()">
+            <option value="day">Daily</option>
+            <option value="month">Monthly</option>
+          </select>
+          <input id="traffic-month" class="form-control" style="width:120px;" type="month" onchange="loadTrafficView()" />
+          <button class="btn btn-ghost btn-sm" onclick="loadTrafficView()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Average RX</div>
+          <div class="stat-value stat-accent" id="traffic-avg-rx">—</div>
+          <div class="stat-note">Across selected vessel window</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Average TX</div>
+          <div class="stat-value stat-green" id="traffic-avg-tx">—</div>
+          <div class="stat-note">Across selected vessel window</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Quota remaining</div>
+          <div class="stat-value stat-amber" id="traffic-quota-remaining">—</div>
+          <div class="stat-note">Active assignment nearest to vessel</div>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Monthly total</div>
+          <div class="stat-value stat-accent" id="traffic-month-total">—</div>
+          <div class="stat-note">From /api/traffic/summary</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monthly RX</div>
+          <div class="stat-value stat-green" id="traffic-month-rx">—</div>
+          <div class="stat-note">Aggregated for selected month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monthly TX</div>
+          <div class="stat-value stat-amber" id="traffic-month-tx">—</div>
+          <div class="stat-note">Aggregated for selected month</div>
+        </div>
+      </div>
+
+      <div id="traffic-error" style="display:none;" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="traffic-error-msg"></span>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-graph-up-arrow" style="color:var(--accent);"></i> Traffic summary</div>
+            <div class="card-subtitle" id="traffic-source">Loading…</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="traffic-vessel" class="form-control" style="width:140px;" value="vsl-001" placeholder="vessel code" />
+            <input id="traffic-days" class="form-control" style="width:120px;" type="number" min="1" max="365" value="30" />
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="traffic-chart" class="live-chart" style="height:240px;"></canvas>
+          <div class="live-chart-meta" style="margin-top:10px;">
+            <span class="pill pill-blue" id="traffic-chart-peek">peak —</span>
+            <span class="pill pill-gray" id="traffic-chart-count">0 buckets</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-diagram-3" style="color:var(--green);"></i> Daily buckets</div>
+              <div class="card-subtitle">Aggregated RX/TX by day</div>
+            </div>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+              <tbody id="traffic-daily-body">
+                <tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-calendar-month" style="color:var(--amber);"></i> Monthly buckets</div>
+              <div class="card-subtitle">Aggregated RX/TX by month</div>
+            </div>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl">
+              <thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+              <tbody id="traffic-monthly-body">
+                <tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TENANT SETTINGS ─── -->
+    <div class="page" id="page-settings">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Tenant Settings</h1>
+          <p>Local operator settings for alerts webhook and tenant scope</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="settings-mode-badge" class="pill pill-gray">local</div>
+          <button class="btn btn-ghost btn-sm" onclick="resetTenantSettings()"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+          <button class="btn btn-primary btn-sm" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-label">Webhook</div>
+          <div class="stat-value stat-accent" id="settings-webhook-state">disabled</div>
+          <div class="stat-note">POST alert payloads when new alerts arrive</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tenant</div>
+          <div class="stat-value stat-green" id="settings-tenant-state">tnr13</div>
+          <div class="stat-note">Applied to forms and filters</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unread alerts</div>
+          <div class="stat-value stat-amber" id="settings-unread-state">0</div>
+          <div class="stat-note">Tracked locally in browser</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-gear-fill" style="color:var(--accent);"></i> Webhook notifications</div>
+            <div class="card-subtitle">Optional browser-side webhook URL for alert notifications</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="settings-notice" style="display:none;" class="alert"></div>
+          <div class="form-group">
+            <label class="form-label">Tenant code</label>
+            <input id="settings-tenant-code" class="form-control" value="tnr13" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Webhook URL</label>
+            <input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Webhook enabled</label>
+            <select id="settings-webhook-enabled" class="form-control">
+              <option value="false">Disabled</option>
+              <option value="true">Enabled</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Note</label>
+            <textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="testWebhookSettings()"><i class="bi bi-send-check"></i> Test webhook</button>
+            <button class="btn btn-primary" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1040,17 +1400,29 @@ function showPage(name) {
   if (nav) nav.classList.add('active');
 
   currentPage = name;
+  if (name !== 'dashboard') {
+    stopEdgeStream();
+  }
+  if (name !== 'commands') {
+    stopCommandDetailPoll();
+  }
   if (name === 'dashboard') loadDashboard();
   if (name === 'alerts') loadAlertsCenter();
   if (name === 'commands') loadCommandHistory();
+  if (name === 'policy') loadPolicyPage();
+  if (name === 'traffic') loadTrafficView();
   if (name === 'packages') { loadPackages(); loadUsage(); }
+  if (name === 'settings') loadTenantSettings();
   if (name === 'login') refreshLoginPage();
 
   const hashByPage = {
     dashboard: '#summary-section',
     alerts: '#alerts-section',
     commands: '#commands-section',
+    policy: '#policy-section',
+    traffic: '#traffic-section',
     packages: '#packages-section',
+    settings: '#settings-section',
     login: '#auth-section'
   };
   const nextHash = hashByPage[name];
@@ -1060,11 +1432,16 @@ function showPage(name) {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+function buildRequestHeaders(extraHeaders = {}) {
+  const auth = getAuthHeader();
+  const headers = { accept: 'application/json', ...extraHeaders };
+  if (auth) headers['authorization'] = auth;
+  return headers;
+}
+
 async function apiFetch(path, opts = {}) {
   const url = (API_BASE || '').replace(/\/$/, '') + path;
-  const auth = getAuthHeader();
-  const headers = { 'accept': 'application/json', ...opts.headers };
-  if (auth) headers['authorization'] = auth;
+  const headers = buildRequestHeaders(opts.headers);
   if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
     headers['content-type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
@@ -1106,6 +1483,511 @@ let historyCmdOffset = 0;
 const HISTORY_CMD_PAGE = 15;
 let alertList = [];
 let selectedCommandJob = null;
+let edgeStreamSocket = null;
+let edgeStreamReconnectTimer = null;
+let edgeStreamContext = null;
+let liveEdgeState = null;
+let liveEdgeHistory = [];
+const LIVE_EDGE_HISTORY_LIMIT = 24;
+let commandDetailTimer = null;
+let selectedEdgeContext = null;
+const ALERT_READ_STORAGE_KEY = 'marine_alert_reads';
+const ALERT_NOTIFIED_STORAGE_KEY = 'marine_alert_notified';
+const TENANT_SETTINGS_KEY = 'marine_tenant_settings';
+let alertReadIds = new Set();
+let alertedWebhookIds = new Set();
+let tenantSettings = { tenant_code: 'tnr13', webhook_url: '', webhook_enabled: false, note: '' };
+
+function clearEdgeStreamReconnectTimer() {
+  if (edgeStreamReconnectTimer) {
+    clearTimeout(edgeStreamReconnectTimer);
+    edgeStreamReconnectTimer = null;
+  }
+}
+
+function stopEdgeStream() {
+  clearEdgeStreamReconnectTimer();
+  if (edgeStreamSocket) {
+    try {
+      edgeStreamSocket.close();
+    } catch {}
+    edgeStreamSocket = null;
+  }
+  edgeStreamContext = null;
+}
+
+function setEdgeStreamStatus(label, tone = 'gray') {
+  const el = document.getElementById('edge-stream-status');
+  if (!el) return;
+  el.textContent = label;
+  el.className = `pill pill-${tone}`;
+}
+
+function setEdgeStreamField(id, value, fallback = '—') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = value !== null && value !== undefined && String(value).trim() !== '' ? String(value) : fallback;
+  el.textContent = text;
+}
+
+function loadJsonStorage(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJsonStorage(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function syncTenantSettingsFromStorage() {
+  const stored = loadJsonStorage(TENANT_SETTINGS_KEY, tenantSettings);
+  tenantSettings = {
+    tenant_code: stored?.tenant_code || 'tnr13',
+    webhook_url: stored?.webhook_url || '',
+    webhook_enabled: Boolean(stored?.webhook_enabled),
+    note: stored?.note || ''
+  };
+  alertReadIds = new Set(loadJsonStorage(ALERT_READ_STORAGE_KEY, []));
+  alertedWebhookIds = new Set(loadJsonStorage(ALERT_NOTIFIED_STORAGE_KEY, []));
+}
+
+function persistAlertReadIds() {
+  saveJsonStorage(ALERT_READ_STORAGE_KEY, Array.from(alertReadIds));
+  updateUnreadCounter();
+}
+
+function persistAlertWebhookIds() {
+  saveJsonStorage(ALERT_NOTIFIED_STORAGE_KEY, Array.from(alertedWebhookIds));
+}
+
+function persistTenantSettings() {
+  saveJsonStorage(TENANT_SETTINGS_KEY, tenantSettings);
+  updateSettingsPanels();
+}
+
+function isAlertRead(id) {
+  return Boolean(id) && alertReadIds.has(String(id));
+}
+
+function markAlertReadLocal(id) {
+  if (!id) return;
+  alertReadIds.add(String(id));
+  persistAlertReadIds();
+}
+
+function updateUnreadCounter() {
+  const unread = Array.isArray(alertList) ? alertList.filter((alert) => !isAlertRead(alert.id)).length : 0;
+  const el = document.getElementById('settings-unread-state');
+  if (el) el.textContent = String(unread);
+}
+
+function updateSettingsPanels() {
+  const webhookState = document.getElementById('settings-webhook-state');
+  const tenantState = document.getElementById('settings-tenant-state');
+  const webhookEnabled = document.getElementById('settings-webhook-enabled');
+  const webhookUrl = document.getElementById('settings-webhook-url');
+  const tenantCode = document.getElementById('settings-tenant-code');
+  const webhookNote = document.getElementById('settings-webhook-note');
+  if (webhookEnabled) webhookEnabled.value = String(Boolean(tenantSettings.webhook_enabled));
+  if (webhookUrl) webhookUrl.value = tenantSettings.webhook_url || '';
+  if (tenantCode) tenantCode.value = tenantSettings.tenant_code || 'tnr13';
+  if (webhookNote) webhookNote.value = tenantSettings.note || '';
+  if (webhookState) webhookState.textContent = tenantSettings.webhook_enabled ? 'enabled' : 'disabled';
+  if (tenantState) tenantState.textContent = tenantSettings.tenant_code || 'tnr13';
+}
+
+function showNotice(id, msg, cls) {
+  showEl(id, msg, cls);
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'flex';
+}
+
+function normalizeLiveEdgeSample(sample, meta = {}) {
+  if (!sample && !meta) return null;
+  const rxKbps = Number(sample?.rx_kbps ?? meta.rx_kbps);
+  const txKbps = Number(sample?.tx_kbps ?? meta.tx_kbps);
+  const throughputRaw = sample?.throughput_kbps ?? meta.throughput_kbps;
+  const throughputKbps = Number.isFinite(Number(throughputRaw))
+    ? Number(throughputRaw)
+    : (Number.isFinite(rxKbps) && Number.isFinite(txKbps) ? rxKbps + txKbps : null);
+  const latencyRaw = sample?.latency_ms ?? sample?.rtt_ms ?? meta.latency_ms;
+  const lossRaw = sample?.loss_pct ?? sample?.packet_loss_percent ?? meta.packet_loss_percent;
+  const observedAt = sample?.observed_at || sample?.timestamp || meta.observed_at || null;
+
+  return {
+    observed_at: observedAt,
+    active_uplink: sample?.active_uplink ?? sample?.active_interface ?? meta.active_uplink ?? null,
+    latency_ms: Number.isFinite(Number(latencyRaw)) ? Number(latencyRaw) : null,
+    loss_pct: Number.isFinite(Number(lossRaw)) ? Number(lossRaw) : null,
+    rx_kbps: Number.isFinite(rxKbps) ? rxKbps : null,
+    tx_kbps: Number.isFinite(txKbps) ? txKbps : null,
+    throughput_kbps: Number.isFinite(throughputKbps) ? throughputKbps : null,
+    interfaces: Array.isArray(sample?.interfaces) ? sample.interfaces : [],
+    vessel_code: sample?.vessel_code ?? meta.vessel_code ?? null,
+    edge_code: sample?.edge_code ?? meta.edge_code ?? null
+  };
+}
+
+function resetLiveEdgeHistory() {
+  liveEdgeHistory = [];
+  renderLiveEdgeTrend();
+  renderLiveEdgeTrail();
+}
+
+function seedLiveEdgeHistory(samples = []) {
+  const sorted = Array.isArray(samples)
+    ? samples
+        .map((sample) => normalizeLiveEdgeSample(sample))
+        .filter(Boolean)
+        .sort((a, b) => new Date(a.observed_at || 0) - new Date(b.observed_at || 0))
+    : [];
+
+  liveEdgeHistory = sorted.slice(-LIVE_EDGE_HISTORY_LIMIT);
+  renderLiveEdgeTrend();
+  renderLiveEdgeTrail();
+}
+
+function appendLiveEdgeHistory(sample, meta = {}) {
+  const normalized = normalizeLiveEdgeSample(sample, meta);
+  if (!normalized) return;
+
+  const last = liveEdgeHistory[liveEdgeHistory.length - 1];
+  if (
+    last &&
+    last.observed_at === normalized.observed_at &&
+    last.rx_kbps === normalized.rx_kbps &&
+    last.tx_kbps === normalized.tx_kbps &&
+    last.throughput_kbps === normalized.throughput_kbps
+  ) {
+    return;
+  }
+
+  liveEdgeHistory.push(normalized);
+  while (liveEdgeHistory.length > LIVE_EDGE_HISTORY_LIMIT) {
+    liveEdgeHistory.shift();
+  }
+}
+
+function resizeLiveCanvas(canvas) {
+  if (!canvas) return { width: 0, height: 0, ctx: null };
+  const cssWidth = Math.max(320, canvas.clientWidth || 0);
+  const cssHeight = Math.max(180, canvas.clientHeight || 0);
+  const dpr = window.devicePixelRatio || 1;
+  const pixelWidth = Math.round(cssWidth * dpr);
+  const pixelHeight = Math.round(cssHeight * dpr);
+
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  return { width: cssWidth, height: cssHeight, ctx };
+}
+
+function renderLiveEdgeTrend() {
+  const canvas = document.getElementById('edge-live-chart');
+  const summaryEl = document.getElementById('edge-live-chart-peek');
+  const countEl = document.getElementById('edge-live-chart-count');
+  if (!canvas) return;
+
+  const { width, height, ctx } = resizeLiveCanvas(canvas);
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(0, 0, width, height);
+
+  const pad = { top: 18, right: 16, bottom: 28, left: 44 };
+  const plotWidth = Math.max(1, width - pad.left - pad.right);
+  const plotHeight = Math.max(1, height - pad.top - pad.bottom);
+  const points = liveEdgeHistory.map((sample) => ({
+    label: sample.observed_at || '',
+    rx: Number.isFinite(Number(sample.rx_kbps)) ? Number(sample.rx_kbps) : 0,
+    tx: Number.isFinite(Number(sample.tx_kbps)) ? Number(sample.tx_kbps) : 0
+  }));
+
+  const values = points.flatMap((point) => [point.rx, point.tx]).filter((value) => Number.isFinite(value));
+  if (!points.length || !values.length) {
+    ctx.fillStyle = 'rgba(148,163,184,0.9)';
+    ctx.font = '12px Space Grotesk, system-ui, sans-serif';
+    ctx.fillText('Waiting for live samples…', pad.left, height / 2);
+    if (summaryEl) summaryEl.textContent = 'peak —';
+    if (countEl) countEl.textContent = '0 samples';
+    return;
+  }
+
+  const maxVal = Math.max(...values, 1);
+  const scaleMax = maxVal * 1.15;
+  const xStep = points.length > 1 ? plotWidth / (points.length - 1) : 0;
+  const toY = (value) => pad.top + (plotHeight - (value / scaleMax) * plotHeight);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(148,163,184,0.9)';
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + (plotHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+    const labelValue = scaleMax * (1 - i / 4);
+    ctx.fillText(formatKbps(labelValue), 6, y + 3);
+  }
+
+  const drawSeries = (key, color) => {
+    const coords = points.map((point, index) => ({
+      x: pad.left + (xStep * index),
+      y: toY(point[key]),
+      value: point[key]
+    }));
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    coords.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.stroke();
+
+    coords.forEach((point, index) => {
+      if (!Number.isFinite(point.value)) return;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, index === coords.length - 1 ? 3.8 : 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  };
+
+  drawSeries('rx', 'rgba(56,189,248,0.95)');
+  drawSeries('tx', 'rgba(52,211,153,0.95)');
+
+  // Last sample marker
+  const last = points[points.length - 1];
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(width - pad.right, pad.top);
+  ctx.lineTo(width - pad.right, height - pad.bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(226,232,240,0.8)';
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillText(fmtTime(last.label), width - pad.right - 120, height - 8);
+
+  if (summaryEl) summaryEl.textContent = `peak ${formatKbps(scaleMax)}`;
+  if (countEl) countEl.textContent = `${points.length} samples`;
+}
+
+function renderLiveEdgeTrail() {
+  const wrap = document.getElementById('edge-live-samples');
+  if (!wrap) return;
+
+  if (!liveEdgeHistory.length) {
+    wrap.innerHTML = '<div class="empty" style="padding:18px 10px;"><span class="spinner"></span> Waiting for live samples…</div>';
+    return;
+  }
+
+  const trail = liveEdgeHistory.slice(-5).reverse();
+  wrap.innerHTML = trail.map((sample) => `
+    <div class="live-sample-item">
+      <div class="live-sample-head">
+        <div class="live-sample-time">${escapeHtml(fmtTime(sample.observed_at))}</div>
+        <span class="pill pill-blue">${escapeHtml(sample.active_uplink || 'uplink')}</span>
+      </div>
+      <div class="live-sample-grid">
+        <span><strong>RX</strong> ${formatKbps(sample.rx_kbps)}</span>
+        <span><strong>TX</strong> ${formatKbps(sample.tx_kbps)}</span>
+        <span><strong>THR</strong> ${formatKbps(sample.throughput_kbps)}</span>
+        <span><strong>LAT</strong> ${sample.latency_ms !== null && sample.latency_ms !== undefined ? `${Number(sample.latency_ms).toFixed(Number(sample.latency_ms) >= 100 ? 0 : 1)} ms` : '—'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatKbps(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  if (num >= 1000) return `${(num / 1000).toFixed(num >= 10000 ? 0 : 1)} Mbps`;
+  return `${num.toFixed(0)} Kbps`;
+}
+
+function formatLatency(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  return `${num.toFixed(num >= 100 ? 0 : 1)} ms`;
+}
+
+function renderLiveEdgeInterfaces(sample) {
+  const wrap = document.getElementById('edge-live-interfaces');
+  if (!wrap) return;
+
+  const interfaces = Array.isArray(sample?.interfaces) ? sample.interfaces.filter((iface) => iface && iface.name) : [];
+  if (!interfaces.length) {
+    wrap.innerHTML = '<div class="empty" style="padding:18px 10px;"><i class="bi bi-wifi-off"></i><p>Waiting for live interface samples…</p></div>';
+    return;
+  }
+
+  const maxThroughput = Math.max(...interfaces.map((iface) => Number(iface.throughput_kbps || 0)), 1);
+  wrap.innerHTML = interfaces.map((iface) => {
+    const rx = Number(iface.rx_kbps || 0);
+    const tx = Number(iface.tx_kbps || 0);
+    const throughput = Number(iface.throughput_kbps || (rx + tx) || 0);
+    const totalGb = iface.total_gb !== undefined && iface.total_gb !== null ? Number(iface.total_gb).toFixed(2) : '—';
+    const width = Math.max(8, Math.round((throughput / maxThroughput) * 100));
+    return `
+      <div class="detail-section" style="margin-bottom:10px;padding:12px;border:1px solid var(--glass-border);border-radius:12px;background:rgba(0,0,0,0.12);">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+          <div>
+            <div style="font-weight:600;color:white;">${escapeHtml(iface.name)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">RX ${formatKbps(rx)} · TX ${formatKbps(tx)}</div>
+          </div>
+          <span class="pill pill-blue">${formatKbps(throughput)}</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,0.05);border-radius:999px;margin:10px 0 8px;overflow:hidden;">
+          <div style="width:${width}%;height:100%;background:linear-gradient(90deg,var(--accent2),var(--green));border-radius:999px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--text3);">
+          <span>Total ${totalGb} GB</span>
+          <span>${escapeHtml(String(iface.source || iface.kind || 'live'))}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderLiveEdgeSample(sample, meta = {}) {
+  const normalized = normalizeLiveEdgeSample(sample, meta);
+  liveEdgeState = normalized;
+  appendLiveEdgeHistory(sample, meta);
+  const observedAt = normalized?.observed_at || null;
+  const activeInterface = normalized?.active_uplink || sample?.interfaces?.[0]?.name || meta.active_interface || '—';
+  const rxKbps = normalized?.rx_kbps;
+  const txKbps = normalized?.tx_kbps;
+  const throughputKbps = normalized?.throughput_kbps;
+  const latencyMs = normalized?.latency_ms ?? null;
+  const loss = normalized?.loss_pct ?? null;
+
+  setEdgeStreamStatus('live', 'green');
+  setEdgeStreamField('edge-stream-last', observedAt ? `last ${fmtTime(observedAt)}` : 'waiting');
+  setEdgeStreamField('edge-stream-interface', activeInterface || '—');
+
+  setEdgeStreamField('edge-live-rx', formatKbps(rxKbps));
+  setEdgeStreamField('edge-live-rx-note', Number.isFinite(rxKbps) ? 'RX from live stream' : 'Waiting for live sample…');
+  setEdgeStreamField('edge-live-tx', formatKbps(txKbps));
+  setEdgeStreamField('edge-live-tx-note', Number.isFinite(txKbps) ? 'TX from live stream' : 'Waiting for live sample…');
+  setEdgeStreamField('edge-live-throughput', formatKbps(throughputKbps));
+  setEdgeStreamField('edge-live-throughput-note', Number.isFinite(throughputKbps) ? 'Combined RX + TX' : 'Waiting for live sample…');
+  setEdgeStreamField('edge-live-latency', formatLatency(latencyMs));
+  setEdgeStreamField('edge-live-loss-note', loss !== null && loss !== undefined ? `Loss ${loss}%` : 'Loss / jitter pending');
+  renderLiveEdgeInterfaces(sample);
+  renderLiveEdgeTrend();
+  renderLiveEdgeTrail();
+}
+
+function queueEdgeStreamReconnect(edge) {
+  clearEdgeStreamReconnectTimer();
+  if (!edge || currentPage !== 'dashboard') return;
+  edgeStreamReconnectTimer = setTimeout(() => {
+    edgeStreamReconnectTimer = null;
+    startEdgeStream(edge).catch(() => {});
+  }, 3000);
+}
+
+async function startEdgeStream(edge) {
+  if (!edge || currentPage !== 'dashboard') return;
+  stopEdgeStream();
+  edgeStreamContext = edge;
+
+  setEdgeStreamStatus('connecting', 'gray');
+  setEdgeStreamField('edge-stream-last', 'waiting');
+  setEdgeStreamField('edge-stream-interface', '—');
+  setEdgeStreamField('edge-live-rx', '—');
+  setEdgeStreamField('edge-live-rx-note', 'Connecting to live stream…');
+  setEdgeStreamField('edge-live-tx', '—');
+  setEdgeStreamField('edge-live-tx-note', 'Connecting to live stream…');
+  setEdgeStreamField('edge-live-throughput', '—');
+  setEdgeStreamField('edge-live-throughput-note', 'Connecting to live stream…');
+  setEdgeStreamField('edge-live-latency', '—');
+  setEdgeStreamField('edge-live-loss-note', 'Connecting to live stream…');
+  const interfacesWrap = document.getElementById('edge-live-interfaces');
+  if (interfacesWrap) {
+    interfacesWrap.innerHTML = '<div class="empty" style="padding:18px 10px;"><span class="spinner"></span> Connecting to live stream…</div>';
+  }
+
+  const httpBase = (API_BASE || location.origin).replace(/\/$/, '');
+  const wsBase = httpBase.replace(/^http(s?):\/\//, 'ws$1://');
+  const wsUrl = `${wsBase}/ws`;
+
+  try {
+    const socket = new WebSocket(wsUrl);
+    edgeStreamSocket = socket;
+
+    socket.onopen = () => {
+      updateConnStatus(200);
+      setEdgeStreamStatus('connected', 'green');
+      setEdgeStreamField('edge-stream-last', 'socket open');
+      socket.send(JSON.stringify({ subscribe: edge.vessel_code }));
+    };
+
+    socket.onmessage = (event) => {
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (payload?.type === 'connected') {
+        setEdgeStreamStatus('connected', 'green');
+        setEdgeStreamField('edge-stream-last', 'awaiting subscription');
+        return;
+      }
+
+      if (payload?.type === 'subscribed') {
+        setEdgeStreamStatus('streaming', 'blue');
+        setEdgeStreamField('edge-stream-last', 'stream ready');
+        setEdgeStreamField('edge-stream-interface', edge.vessel_code || '—');
+        return;
+      }
+
+      if (payload?.type === 'telemetry') {
+        renderLiveEdgeSample(payload, payload);
+      }
+    };
+
+    socket.onclose = () => {
+      if (edgeStreamSocket === socket) {
+        edgeStreamSocket = null;
+      }
+      if (currentPage === 'dashboard' && edgeStreamContext === edge) {
+        setEdgeStreamStatus('disconnected', 'amber');
+        setEdgeStreamField('edge-stream-last', 'socket closed');
+        queueEdgeStreamReconnect(edge);
+      }
+    };
+
+    socket.onerror = () => {
+      setEdgeStreamStatus('retrying', 'amber');
+      setEdgeStreamField('edge-stream-last', 'socket error');
+    };
+  } catch (err) {
+    setEdgeStreamStatus('retrying', 'amber');
+    setEdgeStreamField('edge-stream-last', `stream error: ${err.message}`);
+    queueEdgeStreamReconnect(edge);
+  }
+}
 
 // ─── CONNECTION STATUS ────────────────────────────────────────────────────────
 function updateConnStatus(httpStatus) {
@@ -1153,6 +2035,19 @@ function renderDashConn() {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 let dashData = { edges: null, commands: null, health: null, ready: null, metrics: null, packages: null, mode: 'loading' };
 
+function unwrapListResponse(payload, keys = []) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  for (const key of keys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.rows)) return payload.rows;
+  return [];
+}
+
 async function loadDashboard(silent = false) {
   if (!silent) {
     const btn = document.getElementById('dash-refresh-btn');
@@ -1171,10 +2066,10 @@ async function loadDashboard(silent = false) {
 
     dashData.health = health.status === 'fulfilled' ? health.value : null;
     dashData.ready = ready.status === 'fulfilled' ? ready.value : null;
-    dashData.edges = edges.status === 'fulfilled' ? (edges.value?.edges || edges.value?.data || edges.value || []) : null;
-    dashData.commands = commands.status === 'fulfilled' ? (commands.value?.commands || commands.value?.data || commands.value || []) : null;
-    dashData.packages = packages.status === 'fulfilled' ? (packages.value?.packages || packages.value?.data || packages.value || []) : null;
-    dashData.mode = dashData.edges !== null ? 'live' : 'fallback';
+    dashData.edges = edges.status === 'fulfilled' ? unwrapListResponse(edges.value, ['edges', 'items']) : null;
+    dashData.commands = commands.status === 'fulfilled' ? unwrapListResponse(commands.value, ['commands', 'items']) : null;
+    dashData.packages = packages.status === 'fulfilled' ? unwrapListResponse(packages.value, ['packages', 'items']) : null;
+    dashData.mode = Array.isArray(dashData.edges) ? 'live' : 'fallback';
 
     if (dashData.edges === null) {
       dashData.edges = FALLBACK_EDGES;
@@ -1211,9 +2106,9 @@ const FALLBACK_COMMANDS = [{ id: '8ef4adef', tenant_code: 'tnr13', vessel_code: 
 const FALLBACK_PACKAGES = [{ code: 'basic-50gb', name: 'Basic 50GB', is_active: true }, { code: 'standard-100gb', name: 'Standard 100GB', is_active: true }];
 
 function renderDashboard() {
-  const edges = dashData.edges || [];
-  const commands = dashData.commands || [];
-  const packages = dashData.packages || [];
+  const edges = Array.isArray(dashData.edges) ? dashData.edges : [];
+  const commands = Array.isArray(dashData.commands) ? dashData.commands : [];
+  const packages = Array.isArray(dashData.packages) ? dashData.packages : [];
   const mode = dashData.mode;
 
   // Mode badge
@@ -1290,19 +2185,32 @@ function renderHealthPills() {
   const h = dashData.health;
   const el = document.getElementById('dash-health-pills');
   if (!el) return;
-  if (!h) { el.innerHTML = '<span class="pill pill-red">backend offline</span>'; return; }
+  if (!h) {
+    el.innerHTML = [
+      '<span class="pill pill-red">API unavailable</span>',
+      '<span class="pill pill-gray">DB unknown</span>',
+      '<span class="pill pill-gray">edge feed idle</span>'
+    ].join('');
+    return;
+  }
 
   const db = h.checks?.database || {};
+  const apiOk = h.status === 'ok' || h.status === 'ready';
+  const edgeOnline = Array.isArray(dashData.edges) ? dashData.edges.filter((edge) => edge.online).length : 0;
   el.innerHTML = [
-    `<span class="pill ${h.status === 'ok' ? 'pill-green' : 'pill-red'}">API ${h.status || '?'}</span>`,
+    `<span class="pill ${apiOk ? 'pill-green' : 'pill-red'}">API ${apiOk ? 'online' : (h.status || 'degraded')}</span>`,
     `<span class="pill ${db.status === 'ok' ? 'pill-green' : 'pill-amber'}">DB ${db.status || 'n/a'}</span>`,
     db.latency_ms !== undefined ? `<span class="pill pill-gray">${db.latency_ms}ms</span>` : '',
-    db.pool?.usage_percent !== undefined ? `<span class="pill pill-gray">pool ${db.pool.usage_percent}%</span>` : ''
+    db.pool?.usage_percent !== undefined ? `<span class="pill pill-gray">pool ${db.pool.usage_percent}%</span>` : '',
+    `<span class="pill ${edgeOnline > 0 ? 'pill-green' : 'pill-amber'}">edges ${edgeOnline}/${Array.isArray(dashData.edges) ? dashData.edges.length : 0}</span>`
   ].join('');
 
   const mEl = document.getElementById('dash-metrics-pills');
   if (mEl) {
-    mEl.innerHTML = '<span class="pill pill-gray">metrics n/a</span>';
+    mEl.innerHTML = [
+      '<span class="pill pill-gray">metrics live</span>',
+      '<span class="pill pill-gray">route metrics ready</span>'
+    ].join('');
   }
 }
 
@@ -1318,6 +2226,7 @@ async function nextCmdPage() {
 // ─── ALERT CENTER ────────────────────────────────────────────────────────────
 async function loadAlertsCenter() {
   const filter = document.getElementById('alert-severity-filter')?.value || 'all';
+  const unreadOnly = document.getElementById('alert-unread-only')?.checked !== false;
   alertList = [];
   const modeBadge = document.getElementById('alert-mode-badge');
   const source = document.getElementById('alert-source');
@@ -1326,41 +2235,34 @@ async function loadAlertsCenter() {
     modeBadge.className = 'pill pill-gray';
   }
   if (source) {
-    source.textContent = 'Collecting alerts from fleet edges…';
+    source.textContent = 'Collecting alerts from /api/alerts…';
   }
 
   try {
-    const edgesData = await apiFetch('/api/mcu/edges?limit=20');
-    const edges = edgesData?.edges || edgesData?.data || edgesData || [];
-    const details = await Promise.allSettled(
-      edges.map((edge) => apiFetch(`/api/mcu/edges/${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}?onlineSeconds=120`))
-    );
+    const params = new URLSearchParams();
+    if (tenantSettings?.tenant_code) params.set('tenant_code', tenantSettings.tenant_code);
+    if (tenantSettings?.vessel_code) params.set('vessel_code', tenantSettings.vessel_code);
+    if (unreadOnly) params.set('unread', 'true');
+    params.set('limit', '200');
 
-    const collected = [];
-    details.forEach((result, index) => {
-      if (result.status !== 'fulfilled') return;
-      const edge = edges[index];
-      const alerts = result.value?.recent_alerts || [];
-      alerts.forEach((alert) => {
-        collected.push({
-          ...alert,
-          tenant_code: edge.tenant_code,
-          vessel_code: edge.vessel_code,
-          edge_code: edge.edge_code,
-          edge_key: `${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`
-        });
-      });
-    });
+    const alertsData = await apiFetch(`/api/alerts?${params.toString()}`);
+    const items = unwrapListResponse(alertsData, ['items', 'alerts', 'events']);
 
-    alertList = collected
+    alertList = items
+      .map((alert) => ({
+        ...alert,
+        edge_key: alert.edge_code ? `${alert.tenant_code || tenantSettings?.tenant_code || '—'}/${alert.vessel_code || '—'}/${alert.edge_code}` : '—'
+      }))
       .filter((alert) => filter === 'all' || String(alert.severity || '').toLowerCase() === filter)
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      .filter((alert) => !unreadOnly || !isAlertRead(alert.id))
+      .sort((a, b) => new Date(b.created_at || b.observed_at || 0) - new Date(a.created_at || a.observed_at || 0));
 
     if (modeBadge) {
       modeBadge.textContent = 'live';
       modeBadge.className = 'pill pill-green';
     }
     renderAlertsCenter();
+    notifyWebhookForNewAlerts(alertList).catch(() => {});
     document.getElementById('alert-error').style.display = 'none';
   } catch (err) {
     if (modeBadge) {
@@ -1383,7 +2285,8 @@ function renderAlertsCenter() {
   document.getElementById('alert-critical').textContent = critical;
   document.getElementById('alert-warning').textContent = warning;
   document.getElementById('alert-count').textContent = total;
-  document.getElementById('alert-source').textContent = total ? 'from recent_alerts across selected edges' : 'No alerts found';
+  document.getElementById('alert-source').textContent = total ? 'from /api/alerts (events stream)' : 'No alerts found';
+  updateUnreadCounter();
 
   const body = document.getElementById('alert-body');
   if (!body) return;
@@ -1398,14 +2301,75 @@ function renderAlertsCenter() {
       : String(alert.severity).toLowerCase() === 'warning'
         ? 'pill-amber'
         : 'pill-blue';
+    const read = isAlertRead(alert.id);
     return `
-      <tr>
-        <td class="mono" style="font-size:12px;">${alert.edge_key || '—'}</td>
+      <tr class="row-click ${read ? '' : 'row-selected'}" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})">
+        <td class="mono" style="font-size:12px;">${alert.edge_key || '—'}${read ? '' : ' · unread'}</td>
         <td><span class="pill ${pillClass}">${alert.severity || 'info'}</span></td>
         <td>${alert.message || JSON.stringify(alert)}</td>
         <td style="color:var(--text3);font-size:12px;">${fmtTime(alert.created_at)}</td>
       </tr>`;
   }).join('');
+}
+
+async function openAlert(alertJson) {
+  const alert = JSON.parse(alertJson);
+  await markAlertReadRemote(alert.id);
+  toast(`Marked alert as read`, 'info');
+  loadAlertsCenter();
+}
+
+async function markAlertReadRemote(id) {
+  if (!id) return false;
+  try {
+    const res = await apiFetch(`/api/alerts/${encodeURIComponent(id)}/read`, { method: 'POST' });
+    if (res?.read) {
+      markAlertReadLocal(id);
+      return true;
+    }
+  } catch (err) {
+    console.warn('Failed to mark alert read:', err);
+  }
+  markAlertReadLocal(id);
+  return false;
+}
+
+async function notifyWebhookForNewAlerts(alerts) {
+  const settings = tenantSettings || {};
+  if (!settings.webhook_enabled || !settings.webhook_url) return;
+  const newAlerts = (Array.isArray(alerts) ? alerts : []).filter((alert) => alert?.id && !alertedWebhookIds.has(String(alert.id)));
+  if (!newAlerts.length) return;
+
+  const payload = {
+    source: 'marine-portal',
+    tenant_code: settings.tenant_code || 'tnr13',
+    note: settings.note || '',
+    alerts: newAlerts.map((alert) => ({
+      id: alert.id,
+      tenant_code: alert.tenant_code,
+      vessel_code: alert.vessel_code,
+      edge_code: alert.edge_code,
+      username: alert.username,
+      alert_type: alert.alert_type,
+      severity: alert.severity || alert.alert_type || 'warning',
+      message: alert.message,
+      remaining_mb: alert.remaining_mb,
+      created_at: alert.created_at
+    }))
+  };
+
+  try {
+    await fetch(settings.webhook_url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'content-type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload)
+    });
+    newAlerts.forEach((alert) => alertedWebhookIds.add(String(alert.id)));
+    persistAlertWebhookIds();
+  } catch (err) {
+    console.warn('Webhook notification failed:', err?.message || err);
+  }
 }
 
 // ─── COMMAND HISTORY ─────────────────────────────────────────────────────────
@@ -1495,22 +2459,8 @@ async function selectCommandJob(jobJson) {
 
   try {
     const detail = await apiFetch(`/api/commands/${job.id || job.command_id}`);
-    const payload = detail?.command_payload ?? detail?.command?.command_payload ?? job.command_payload ?? {};
-    subtitle.textContent = `${job.tenant_code || 'tenant'}/${job.vessel_code || 'vessel'}/${job.edge_code || 'edge'}`;
-    body.innerHTML = `
-      <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card"><div class="stat-label">Command</div><div class="stat-value stat-accent" style="font-size:18px;">${detail?.command_type || job.command_type || '—'}</div></div>
-        <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value ${String(detail?.status || job.status) === 'failed' ? 'stat-red' : 'stat-green'}" style="font-size:18px;">${detail?.status || job.status || '—'}</div></div>
-        <div class="stat-card"><div class="stat-label">Created</div><div class="stat-value stat-amber" style="font-size:18px;">${fmtTime(detail?.created_at || job.created_at)}</div></div>
-      </div>
-      <div class="detail-section">
-        <div class="detail-section-title">Payload</div>
-        <pre style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;">
-        <button class="btn btn-success" onclick="retryCommandJob(${JSON.stringify(JSON.stringify(detail || job))})"><i class="bi bi-arrow-repeat"></i> Retry job</button>
-      </div>
-    `;
+    renderCommandDetail(detail, job);
+    startCommandDetailPoll(job);
   } catch (err) {
     body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Failed to load command detail: ${err.message}</div>`;
     subtitle.textContent = 'Error loading';
@@ -1518,7 +2468,60 @@ async function selectCommandJob(jobJson) {
 }
 
 function closeCommandDetail() {
+  stopCommandDetailPoll();
   document.getElementById('cmd-history-detail-card').style.display = 'none';
+}
+
+function stopCommandDetailPoll() {
+  if (commandDetailTimer) {
+    clearInterval(commandDetailTimer);
+    commandDetailTimer = null;
+  }
+}
+
+function startCommandDetailPoll(job) {
+  stopCommandDetailPoll();
+  if (!job?.id && !job?.command_id) return;
+  commandDetailTimer = setInterval(() => {
+    if (currentPage !== 'commands' || !selectedCommandJob) {
+      stopCommandDetailPoll();
+      return;
+    }
+    refreshSelectedCommandJob().catch(() => {});
+  }, 5000);
+}
+
+async function refreshSelectedCommandJob() {
+  if (!selectedCommandJob) return;
+  const jobId = selectedCommandJob.id || selectedCommandJob.command_id;
+  if (!jobId) return;
+  try {
+    const detail = await apiFetch(`/api/commands/${jobId}`);
+    renderCommandDetail(detail, selectedCommandJob);
+  } catch {}
+}
+
+function renderCommandDetail(detail, fallbackJob) {
+  const job = detail || fallbackJob || {};
+  const payload = job.command_payload ?? job.command?.command_payload ?? fallbackJob?.command_payload ?? {};
+  const subtitle = document.getElementById('cmd-history-detail-subtitle');
+  const body = document.getElementById('cmd-history-detail-body');
+  if (subtitle) subtitle.textContent = `${job.tenant_code || 'tenant'}/${job.vessel_code || 'vessel'}/${job.edge_code || 'edge'}`;
+  if (!body) return;
+  body.innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-label">Command</div><div class="stat-value stat-accent" style="font-size:18px;">${job.command_type || '—'}</div></div>
+      <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value ${String(job.status) === 'failed' ? 'stat-red' : 'stat-green'}" style="font-size:18px;">${job.status || '—'}</div></div>
+      <div class="stat-card"><div class="stat-label">Created</div><div class="stat-value stat-amber" style="font-size:18px;">${fmtTime(job.created_at)}</div></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Payload</div>
+      <pre style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-success" onclick="retryCommandJob(${JSON.stringify(JSON.stringify(job))})"><i class="bi bi-arrow-repeat"></i> Retry job</button>
+    </div>
+  `;
 }
 
 async function retryCommandJob(jobJson) {
@@ -1559,6 +2562,7 @@ async function nextHistoryCmdPage() {
 // ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
 async function selectEdge(edgeJson) {
   const edge = JSON.parse(edgeJson);
+  selectedEdgeContext = edge;
   const card = document.getElementById('edge-detail-card');
   const body = document.getElementById('edge-detail-body');
   const title = document.getElementById('edge-detail-title');
@@ -1568,6 +2572,7 @@ async function selectEdge(edgeJson) {
   title.textContent = `${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`;
   subtitle.textContent = 'Loading detail…';
   body.innerHTML = '<div class="empty"><span class="spinner"></span> Loading edge detail…</div>';
+  resetLiveEdgeHistory();
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
@@ -1598,6 +2603,57 @@ async function selectEdge(edgeJson) {
         <div class="stat-card"><div class="stat-label">CPU</div><div class="stat-value stat-accent">${tel.cpu_percent !== undefined ? tel.cpu_percent + '%' : '—'}</div></div>
         <div class="stat-card"><div class="stat-label">Memory</div><div class="stat-value stat-green">${tel.memory_percent !== undefined ? tel.memory_percent + '%' : '—'}</div></div>
         <div class="stat-card"><div class="stat-label">24h usage</div><div class="stat-value stat-amber">${usage.total_mb !== undefined ? Number(usage.total_mb).toFixed(0) + ' MB' : '—'}</div></div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Live telemetry stream</div>
+        <div class="status-banner" style="margin-bottom:12px;">
+          <span class="kicker" style="margin-bottom:0;">Stream</span>
+          <span id="edge-stream-status" class="pill pill-gray">connecting</span>
+          <span id="edge-stream-last" class="pill pill-gray">waiting</span>
+          <span id="edge-stream-interface" class="pill pill-gray">—</span>
+        </div>
+        <div class="grid grid-4">
+          <div class="stat-card">
+            <div class="stat-label">RX</div>
+            <div class="stat-value stat-accent" id="edge-live-rx">—</div>
+            <div class="stat-note" id="edge-live-rx-note">Waiting for stream…</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">TX</div>
+            <div class="stat-value stat-green" id="edge-live-tx">—</div>
+            <div class="stat-note" id="edge-live-tx-note">Waiting for stream…</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Throughput</div>
+            <div class="stat-value stat-amber" id="edge-live-throughput">—</div>
+            <div class="stat-note" id="edge-live-throughput-note">Combined RX + TX</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Latency</div>
+            <div class="stat-value stat-red" id="edge-live-latency">—</div>
+            <div class="stat-note" id="edge-live-loss-note">Loss / jitter pending</div>
+          </div>
+        </div>
+        <div class="detail-section" style="margin-top:12px;">
+          <div class="detail-section-title">Interfaces</div>
+          <div id="edge-live-interfaces" class="portal-live-list">
+            <div class="empty" style="padding:18px 10px;"><span class="spinner"></span> Waiting for live stream…</div>
+          </div>
+        </div>
+        <div class="detail-section" style="margin-top:12px;">
+          <div class="detail-section-title">Realtime trend</div>
+          <div class="live-chart-shell">
+            <canvas id="edge-live-chart" class="live-chart"></canvas>
+            <div class="live-chart-meta">
+              <span class="pill pill-blue" id="edge-live-chart-peek">peak —</span>
+              <span class="pill pill-gray" id="edge-live-chart-count">0 samples</span>
+            </div>
+          </div>
+          <div id="edge-live-samples" class="live-sample-trail" style="margin-top:10px;">
+            <div class="empty" style="padding:18px 10px;"><span class="spinner"></span> Waiting for live samples…</div>
+          </div>
+        </div>
       </div>
 
       ${samples.length ? `
@@ -1636,7 +2692,7 @@ async function selectEdge(edgeJson) {
         ${alerts.slice(0,3).map(a => `<div class="alert alert-${a.severity === 'critical' ? 'danger' : 'warn'}"><i class="bi bi-exclamation-circle"></i> ${a.message || JSON.stringify(a)}</div>`).join('')}
       </div>` : ''}
 
-      ${errors.length ? `
+    ${errors.length ? `
       <div class="detail-section">
         <div class="detail-section-title">Ingest errors (recent)</div>
         ${errors.slice(0,2).map(e => `<div class="alert alert-danger" style="font-size:12px;"><i class="bi bi-bug"></i> ${e.error_message || JSON.stringify(e)}</div>`).join('')}
@@ -1644,13 +2700,18 @@ async function selectEdge(edgeJson) {
 
       ${!d ? '<div class="alert alert-warn"><i class="bi bi-exclamation-triangle"></i> Edge detail unavailable from backend — showing partial data from traffic endpoint.</div>' : ''}
     `;
+
+    seedLiveEdgeHistory(samples);
+    startEdgeStream(edge).catch(() => {});
   } catch (err) {
+    stopEdgeStream();
     body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Failed to load edge detail: ${err.message}</div>`;
     subtitle.textContent = 'Error loading';
   }
 }
 
 function closeEdgeDetail() {
+  stopEdgeStream();
   document.getElementById('edge-detail-card').style.display = 'none';
 }
 
@@ -1899,6 +2960,366 @@ async function exportUsage() {
   window.open(url, '_blank');
 }
 
+// ─── POLICY / TRAFFIC / SETTINGS ──────────────────────────────────────────────
+function normalizeCsvList(value) {
+  return String(value || '')
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function updatePolicyPreview() {
+  const payload = getPolicyPayload();
+  const preview = document.getElementById('policy-preview');
+  if (preview) preview.textContent = JSON.stringify(payload, null, 2);
+  const target = document.getElementById('policy-target');
+  if (target) target.textContent = `${payload.tenant_code}/${payload.vessel_code}/${payload.edge_code}`;
+}
+
+function loadPolicyPage() {
+  syncTenantSettingsFromStorage();
+  updatePolicyPreview();
+  updateSettingsPanels();
+  const modeBadge = document.getElementById('policy-mode-badge');
+  if (modeBadge) {
+    modeBadge.textContent = 'ready';
+    modeBadge.className = 'pill pill-green';
+  }
+  const target = document.getElementById('policy-target');
+  if (target && selectedEdgeContext) {
+    target.textContent = `${selectedEdgeContext.tenant_code}/${selectedEdgeContext.vessel_code}/${selectedEdgeContext.edge_code}`;
+  }
+}
+
+function getPolicyPayload() {
+  const workIps = normalizeCsvList(document.getElementById('policy-work-ips')?.value);
+  const entertainmentIps = normalizeCsvList(document.getElementById('policy-ent-ips')?.value);
+  const groups = [];
+
+  if (workIps.length || document.getElementById('policy-vsat-gateway')?.value.trim()) {
+    groups.push({
+      name: 'work',
+      preferred_uplink: 'vsat',
+      source_addresses: workIps,
+      gateway: document.getElementById('policy-vsat-gateway')?.value.trim() || ''
+    });
+  }
+
+  if (entertainmentIps.length || document.getElementById('policy-starlink-gateway')?.value.trim()) {
+    groups.push({
+      name: 'entertainment',
+      preferred_uplink: 'starlink',
+      source_addresses: entertainmentIps,
+      gateway: document.getElementById('policy-starlink-gateway')?.value.trim() || ''
+    });
+  }
+
+  return {
+    tenant_code: document.getElementById('policy-tenant')?.value.trim() || tenantSettings.tenant_code || 'tnr13',
+    vessel_code: document.getElementById('policy-vessel')?.value.trim() || 'vsl-001',
+    edge_code: document.getElementById('policy-edge')?.value.trim() || 'edge-001',
+    groups
+  };
+}
+
+function fillPolicyFromSelectedEdge() {
+  if (!selectedEdgeContext) {
+    toast('Select an edge from dashboard first', 'warn');
+    return;
+  }
+  const edge = selectedEdgeContext;
+  const tenant = document.getElementById('policy-tenant');
+  const vessel = document.getElementById('policy-vessel');
+  const edgeCode = document.getElementById('policy-edge');
+  if (tenant) tenant.value = edge.tenant_code || tenant.value;
+  if (vessel) vessel.value = edge.vessel_code || vessel.value;
+  if (edgeCode) edgeCode.value = edge.edge_code || edgeCode.value;
+  updatePolicyPreview();
+  toast('Policy form filled from selected edge', 'success');
+}
+
+async function applyPolicy() {
+  const notice = document.getElementById('policy-notice');
+  const modeBadge = document.getElementById('policy-mode-badge');
+  const payload = getPolicyPayload();
+
+  if (!payload.tenant_code || !payload.vessel_code || !payload.edge_code) {
+    showNotice('policy-notice', 'Tenant, vessel, and edge are required.', 'alert-warn');
+    return;
+  }
+
+  if (!Array.isArray(payload.groups) || payload.groups.length === 0) {
+    showNotice('policy-notice', 'Add at least one policy group with gateway and source addresses.', 'alert-warn');
+    return;
+  }
+
+  if (notice) {
+    notice.style.display = 'none';
+  }
+  if (modeBadge) {
+    modeBadge.textContent = 'sending';
+    modeBadge.className = 'pill pill-amber';
+  }
+
+  try {
+    const res = await apiFetch('/api/policies', { method: 'POST', body: payload });
+    const policyId = res?.policy?.id || res?.policy_id || 'unknown';
+    const commandId = res?.command?.id || res?.command?.command_id || res?.command_id || 'unknown';
+    const status = res?.command?.status || res?.command?.command_status || 'sent';
+    showNotice('policy-notice', `Policy saved: ${policyId} | command ${commandId} (${status})`, 'alert-success');
+    document.getElementById('policy-result').textContent = `${policyId} / ${commandId}`;
+    if (modeBadge) {
+      modeBadge.textContent = 'sent';
+      modeBadge.className = 'pill pill-green';
+    }
+    toast('Policy applied ✓', 'success');
+    await loadCommandHistory();
+    await loadDashboard(true);
+  } catch (err) {
+    showNotice('policy-notice', `Policy dispatch failed: ${err.message}`, 'alert-danger');
+    if (modeBadge) {
+      modeBadge.textContent = 'error';
+      modeBadge.className = 'pill pill-red';
+    }
+    toast(`Policy failed: ${err.message}`, 'danger');
+  }
+}
+
+function aggregateTelemetryBuckets(samples, bucket = 'day') {
+  const groups = new Map();
+  for (const sample of samples) {
+    const date = new Date(sample.observed_at);
+    if (Number.isNaN(date.getTime())) continue;
+    const key = bucket === 'month'
+      ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+      : date.toISOString().slice(0, 10);
+    const group = groups.get(key) || { bucket: key, rx: 0, tx: 0, throughput: 0, count: 0 };
+    group.rx += Number(sample.rx_kbps || 0);
+    group.tx += Number(sample.tx_kbps || 0);
+    group.throughput += Number(sample.throughput_kbps || (Number(sample.rx_kbps || 0) + Number(sample.tx_kbps || 0)));
+    group.count += 1;
+    groups.set(key, group);
+  }
+  return Array.from(groups.values()).sort((a, b) => String(a.bucket).localeCompare(String(b.bucket)));
+}
+
+function resizeTrafficCanvas(canvas) {
+  if (!canvas) return { width: 0, height: 0, ctx: null };
+  const cssWidth = Math.max(320, canvas.clientWidth || 0);
+  const cssHeight = Math.max(220, canvas.clientHeight || 0);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+  const ctx = canvas.getContext('2d');
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { width: cssWidth, height: cssHeight, ctx };
+}
+
+function renderTrafficCanvas(summary) {
+  const canvas = document.getElementById('traffic-chart');
+  const peek = document.getElementById('traffic-chart-peek');
+  const count = document.getElementById('traffic-chart-count');
+  if (!canvas) return;
+  const { width, height, ctx } = resizeTrafficCanvas(canvas);
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.fillRect(0, 0, width, height);
+
+  if (!summary.length) {
+    ctx.fillStyle = 'rgba(148,163,184,0.9)';
+    ctx.font = '12px Space Grotesk, system-ui, sans-serif';
+    ctx.fillText('No telemetry samples found', 20, height / 2);
+    if (peek) peek.textContent = 'peak —';
+    if (count) count.textContent = '0 buckets';
+    return;
+  }
+
+  const maxVal = Math.max(...summary.flatMap((bucket) => [bucket.rx, bucket.tx]), 1);
+  const pad = { top: 18, right: 18, bottom: 34, left: 48 };
+  const plotWidth = Math.max(1, width - pad.left - pad.right);
+  const plotHeight = Math.max(1, height - pad.top - pad.bottom);
+  const xStep = summary.length > 1 ? plotWidth / (summary.length - 1) : 0;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillStyle = 'rgba(148,163,184,0.9)';
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + (plotHeight / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(width - pad.right, y);
+    ctx.stroke();
+    ctx.fillText(formatKbps(maxVal * (1 - i / 4)), 6, y + 3);
+  }
+
+  const toY = (value) => pad.top + (plotHeight - ((value / (maxVal * 1.15)) * plotHeight));
+  const drawSeries = (key, color) => {
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    summary.forEach((bucket, index) => {
+      const x = pad.left + (xStep * index);
+      const y = toY(bucket[key]);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    summary.forEach((bucket, index) => {
+      const x = pad.left + (xStep * index);
+      const y = toY(bucket[key]);
+      ctx.beginPath();
+      ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  };
+
+  drawSeries('rx', 'rgba(56,189,248,0.95)');
+  drawSeries('tx', 'rgba(52,211,153,0.95)');
+
+  if (peek) {
+    const peak = Math.max(...summary.flatMap((bucket) => [bucket.rx, bucket.tx]));
+    peek.textContent = `peak ${formatKbps(peak)}`;
+  }
+  if (count) count.textContent = `${summary.length} buckets`;
+}
+
+function renderTrafficTables(daily, monthly) {
+  const dailyBody = document.getElementById('traffic-daily-body');
+  const monthlyBody = document.getElementById('traffic-monthly-body');
+  if (dailyBody) {
+    dailyBody.innerHTML = daily.length ? daily.map((row) => `
+      <tr>
+        <td class="mono">${escapeHtml(row.bucket)}</td>
+        <td>${formatKbps(row.rx)}</td>
+        <td>${formatKbps(row.tx)}</td>
+        <td>${formatKbps(row.throughput)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4"><div class="empty"><i class="bi bi-graph-up"></i><p>No traffic data</p></div></td></tr>';
+  }
+  if (monthlyBody) {
+    monthlyBody.innerHTML = monthly.length ? monthly.map((row) => `
+      <tr>
+        <td class="mono">${escapeHtml(row.bucket)}</td>
+        <td>${formatKbps(row.rx)}</td>
+        <td>${formatKbps(row.tx)}</td>
+        <td>${formatKbps(row.throughput)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="4"><div class="empty"><i class="bi bi-calendar-month"></i><p>No monthly traffic data</p></div></td></tr>';
+  }
+}
+
+async function loadTrafficView() {
+  const modeBadge = document.getElementById('traffic-mode-badge');
+  const source = document.getElementById('traffic-source');
+  const vessel = document.getElementById('traffic-vessel')?.value.trim() || 'vsl-001';
+  const period = document.getElementById('traffic-period')?.value || 'day';
+  const days = Math.max(1, Math.min(365, Number(document.getElementById('traffic-days')?.value || 30)));
+  const month = document.getElementById('traffic-month')?.value || new Date().toISOString().slice(0, 7);
+
+  if (source) source.textContent = `Loading telemetry for ${vessel}…`;
+  if (modeBadge) {
+    modeBadge.textContent = 'loading';
+    modeBadge.className = 'pill pill-gray';
+  }
+  document.getElementById('traffic-error').style.display = 'none';
+
+  try {
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const data = await apiFetch(`/api/telemetry?vessel_code=${encodeURIComponent(vessel)}&limit=1000&from=${encodeURIComponent(from)}`);
+    const rows = Array.isArray(data) ? data : data?.items || data?.data || [];
+    const buckets = aggregateTelemetryBuckets(rows, period);
+    const daily = aggregateTelemetryBuckets(rows, 'day');
+    const monthly = aggregateTelemetryBuckets(rows, 'month');
+    const [summaryRes, quotaRes] = await Promise.allSettled([
+      apiFetch(`/api/traffic/summary?vessel_code=${encodeURIComponent(vessel)}&month=${encodeURIComponent(month)}`),
+      apiFetch(`/api/quota/remaining?vessel_code=${encodeURIComponent(vessel)}`)
+    ]);
+    const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : null;
+    const quota = quotaRes.status === 'fulfilled' ? quotaRes.value : null;
+
+    const avgRx = rows.length ? rows.reduce((sum, row) => sum + Number(row.rx_kbps || 0), 0) / rows.length : 0;
+    const avgTx = rows.length ? rows.reduce((sum, row) => sum + Number(row.tx_kbps || 0), 0) / rows.length : 0;
+    document.getElementById('traffic-avg-rx').textContent = formatKbps(avgRx);
+    document.getElementById('traffic-avg-tx').textContent = formatKbps(avgTx);
+
+    document.getElementById('traffic-quota-remaining').textContent = quota?.remaining_gb !== undefined && quota?.remaining_gb !== null
+      ? `${Number(quota.remaining_gb).toFixed(2)} GB`
+      : '—';
+    document.getElementById('traffic-month-total').textContent = summary?.total_gb !== undefined && summary?.total_gb !== null
+      ? `${Number(summary.total_gb).toFixed(2)} GB`
+      : '—';
+    document.getElementById('traffic-month-rx').textContent = summary?.rx_gb !== undefined && summary?.rx_gb !== null
+      ? `${Number(summary.rx_gb).toFixed(2)} GB`
+      : '—';
+    document.getElementById('traffic-month-tx').textContent = summary?.tx_gb !== undefined && summary?.tx_gb !== null
+      ? `${Number(summary.tx_gb).toFixed(2)} GB`
+      : '—';
+    document.getElementById('traffic-source').textContent = `${rows.length} telemetry samples for ${vessel} · month ${month}`;
+    renderTrafficCanvas(buckets);
+    renderTrafficTables(daily, monthly);
+    if (modeBadge) {
+      modeBadge.textContent = 'live';
+      modeBadge.className = 'pill pill-green';
+    }
+  } catch (err) {
+    if (modeBadge) {
+      modeBadge.textContent = 'fallback';
+      modeBadge.className = 'pill pill-amber';
+    }
+    showNotice('traffic-error', `Failed to load traffic view: ${err.message}`, 'alert-danger');
+    document.getElementById('traffic-error').style.display = 'flex';
+  }
+}
+
+function loadTenantSettings() {
+  syncTenantSettingsFromStorage();
+  updateSettingsPanels();
+  updateUnreadCounter();
+}
+
+function saveTenantSettings() {
+  tenantSettings.tenant_code = document.getElementById('settings-tenant-code')?.value.trim() || 'tnr13';
+  tenantSettings.webhook_url = document.getElementById('settings-webhook-url')?.value.trim() || '';
+  tenantSettings.webhook_enabled = document.getElementById('settings-webhook-enabled')?.value === 'true';
+  tenantSettings.note = document.getElementById('settings-webhook-note')?.value.trim() || '';
+  persistTenantSettings();
+  showNotice('settings-notice', 'Settings saved locally in this browser.', 'alert-success');
+  toast('Tenant settings saved ✓', 'success');
+}
+
+function resetTenantSettings() {
+  tenantSettings = { tenant_code: 'tnr13', webhook_url: '', webhook_enabled: false, note: '' };
+  persistTenantSettings();
+  updateSettingsPanels();
+  showNotice('settings-notice', 'Settings reset to defaults.', 'alert-info');
+}
+
+async function testWebhookSettings() {
+  if (!tenantSettings.webhook_url) {
+    showNotice('settings-notice', 'Webhook URL is required.', 'alert-warn');
+    return;
+  }
+  try {
+    await fetch(tenantSettings.webhook_url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'content-type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({
+        source: 'marine-portal',
+        tenant_code: tenantSettings.tenant_code || 'tnr13',
+        alerts: [{ message: 'Webhook test from Marine Portal' }]
+      })
+    });
+    showNotice('settings-notice', 'Webhook test sent.', 'alert-success');
+    toast('Webhook test sent ✓', 'success');
+  } catch (err) {
+    showNotice('settings-notice', `Webhook test failed: ${err.message}`, 'alert-danger');
+  }
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function fmtTime(val) {
   if (!val) return '—';
@@ -1970,14 +3391,21 @@ function init() {
     }
   }
 
+  syncTenantSettingsFromStorage();
   const hasAuth = !!localStorage.getItem('marine_auth');
   refreshLoginPage();
   initialPage = location.hash.includes('alerts-section')
     ? 'alerts'
     : location.hash.includes('commands-section')
       ? 'commands'
+      : location.hash.includes('policy-section')
+        ? 'policy'
+      : location.hash.includes('traffic-section')
+        ? 'traffic'
       : location.hash.includes('packages-section')
         ? 'packages'
+      : location.hash.includes('settings-section')
+        ? 'settings'
         : 'dashboard';
 
   if (hasAuth) {
@@ -2000,13 +3428,21 @@ window.addEventListener('hashchange', () => {
     ? 'alerts'
     : hash.includes('commands-section')
       ? 'commands'
+      : hash.includes('policy-section')
+        ? 'policy'
+      : hash.includes('traffic-section')
+        ? 'traffic'
       : hash.includes('packages-section')
         ? 'packages'
+      : hash.includes('settings-section')
+        ? 'settings'
         : 'dashboard';
   if (nextPage !== currentPage) {
     showPage(nextPage);
   }
 });
+window.addEventListener('beforeunload', stopEdgeStream);
+window.addEventListener('beforeunload', stopCommandDetailPoll);
 </script>
 </body>
 </html>

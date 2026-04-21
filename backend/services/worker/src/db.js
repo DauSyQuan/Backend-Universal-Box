@@ -102,6 +102,56 @@ export async function hasRecentEvent({ vesselId, edgeBoxId, eventType, withinSec
   return result.rowCount > 0;
 }
 
+export async function listStaleEdges({ olderThanMinutes = 2, limit = 500 }) {
+  const safeOlderThanMinutes = Math.max(1, Math.min(1440, Number.parseInt(String(olderThanMinutes), 10) || 2));
+  const safeLimit = Math.max(1, Math.min(5000, Number.parseInt(String(limit), 10) || 500));
+
+  const result = await pool.query(
+    `
+      select
+        e.id as edge_box_id,
+        e.edge_code,
+        e.last_seen_at,
+        e.created_at,
+        v.id as vessel_id,
+        v.code as vessel_code,
+        t.id as tenant_id,
+        t.code as tenant_code
+      from edge_boxes e
+      join vessels v on v.id = e.vessel_id
+      join tenants t on t.id = v.tenant_id
+      where coalesce(e.last_seen_at, e.created_at) <= now() - ($1::int || ' minutes')::interval
+      order by coalesce(e.last_seen_at, e.created_at) asc
+      limit $2
+    `,
+    [safeOlderThanMinutes, safeLimit]
+  );
+
+  return result.rows;
+}
+
+export async function getEdgeLastSeenSnapshot({ edgeBoxId }) {
+  if (!edgeBoxId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+      select
+        id as edge_box_id,
+        vessel_id,
+        last_seen_at,
+        created_at
+      from edge_boxes
+      where id = $1::uuid
+      limit 1
+    `,
+    [edgeBoxId]
+  );
+
+  return result.rows[0] ?? null;
+}
+
 export async function resolveTenantVesselContext({ tenantCode, vesselCode }) {
   const cacheKey = `tv:${tenantCode}:${vesselCode}`;
   const cached = getCachedContext(cacheKey);
@@ -281,6 +331,158 @@ export async function resolveActivePackageAssignment({
   );
 
   return result.rows[0] ?? null;
+}
+
+function clampDay(year, monthIndex, day) {
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  return Math.min(Math.max(1, day), lastDay);
+}
+
+function computeBillingCycleRange(now, resetDayOfMonth) {
+  const current = new Date(now);
+  const safeResetDay = Math.min(Math.max(1, Number.parseInt(String(resetDayOfMonth ?? 1), 10) || 1), 31);
+  const year = current.getUTCFullYear();
+  const monthIndex = current.getUTCMonth();
+  const cycleStartDay = clampDay(year, monthIndex, safeResetDay);
+  let start = new Date(Date.UTC(year, monthIndex, cycleStartDay, 0, 0, 0, 0));
+
+  if (current < start) {
+    const prevMonth = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+    prevMonth.setUTCMonth(prevMonth.getUTCMonth() - 1);
+    const prevYear = prevMonth.getUTCFullYear();
+    const prevMonthIndex = prevMonth.getUTCMonth();
+    const prevDay = clampDay(prevYear, prevMonthIndex, safeResetDay);
+    start = new Date(Date.UTC(prevYear, prevMonthIndex, prevDay, 0, 0, 0, 0));
+  }
+
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 1);
+  return { start, end, resetDayOfMonth: safeResetDay };
+}
+
+function kbpsSumToGb(sumKbps) {
+  const value = Number(sumKbps ?? 0);
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Number(((value * 5) / 8 / 1024 / 1024).toFixed(3));
+}
+
+export async function maybeCreateQuotaWarning({ context, observedAt }) {
+  if (!context?.tenant_id || !context?.vessel_id) {
+    return { triggered: false, reason: "missing_context" };
+  }
+
+  const assignmentResult = await pool.query(
+    `
+      select
+        pa.id as package_assignment_id,
+        pa.vessel_code,
+        p.id as package_id,
+        p.code as package_code,
+        p.name as package_name,
+        coalesce(pq.quota_gb, p.quota_mb::numeric / 1024) as quota_gb,
+        coalesce(pq.reset_day_of_month, 1) as reset_day_of_month
+      from package_assignments pa
+      join packages p on p.id = pa.package_id
+      left join package_quotas pq on pq.vessel_id = $1::uuid and pq.package_id = p.id
+      where pa.vessel_code = (
+          select code from vessels where id = $1::uuid limit 1
+        )
+        and pa.status = 'active'
+        and pa.is_active = true
+      order by pa.assigned_at desc
+      limit 1
+    `,
+    [context.vessel_id]
+  );
+
+  const assignment = assignmentResult.rows[0] ?? null;
+  if (!assignment) {
+    return { triggered: false, reason: "no_assignment" };
+  }
+
+  const quotaGb = Number(assignment.quota_gb ?? 0);
+  if (!Number.isFinite(quotaGb) || quotaGb <= 0) {
+    return { triggered: false, reason: "no_quota" };
+  }
+
+  const cycle = computeBillingCycleRange(observedAt, assignment.reset_day_of_month ?? 1);
+  const usageResult = await pool.query(
+    `
+      select
+        coalesce(sum(coalesce(rx_kbps, 0)), 0) as rx_kbps,
+        coalesce(sum(coalesce(tx_kbps, 0)), 0) as tx_kbps
+      from telemetry
+      where vessel_id = $1::uuid
+        and observed_at >= $2::timestamptz
+        and observed_at <= $3::timestamptz
+    `,
+    [context.vessel_id, cycle.start.toISOString(), new Date(observedAt).toISOString()]
+  );
+
+  const usageRow = usageResult.rows[0] ?? {};
+  const usedGb = Number((kbpsSumToGb(usageRow.rx_kbps) + kbpsSumToGb(usageRow.tx_kbps)).toFixed(3));
+  const ratio = quotaGb > 0 ? usedGb / quotaGb : 0;
+  if (ratio < 0.9) {
+    return {
+      triggered: false,
+      quota_gb: Number(quotaGb.toFixed(3)),
+      used_gb: usedGb,
+      ratio: Number(ratio.toFixed(3))
+    };
+  }
+
+  const recent = await hasRecentEvent({
+    vesselId: context.vessel_id,
+    edgeBoxId: null,
+    eventType: "quota_warning",
+    withinSeconds: 3600
+  });
+
+  if (recent) {
+    return {
+      triggered: false,
+      quota_gb: Number(quotaGb.toFixed(3)),
+      used_gb: usedGb,
+      ratio: Number(ratio.toFixed(3)),
+      suppressed: true
+    };
+  }
+
+  const remainingGb = Number((quotaGb - usedGb).toFixed(3));
+  await insertEvent({
+    context: {
+      tenant_id: context.tenant_id,
+      vessel_id: context.vessel_id,
+      edge_box_id: null
+    },
+    payload: {
+      event_type: "quota_warning",
+      severity: "warning",
+      details: {
+        package_assignment_id: assignment.package_assignment_id,
+        package_id: assignment.package_id,
+        package_code: assignment.package_code,
+        package_name: assignment.package_name,
+        quota_gb: Number(quotaGb.toFixed(3)),
+        used_gb: usedGb,
+        remaining_gb: remainingGb,
+        ratio: Number(ratio.toFixed(3)),
+        cycle_start: cycle.start.toISOString(),
+        cycle_end: cycle.end.toISOString()
+      }
+    },
+    observedAt: new Date(observedAt).toISOString()
+  });
+
+  return {
+    triggered: true,
+    quota_gb: Number(quotaGb.toFixed(3)),
+    used_gb: usedGb,
+    remaining_gb: remainingGb,
+    ratio: Number(ratio.toFixed(3))
+  };
 }
 
 export async function recordUsageWithQuota({

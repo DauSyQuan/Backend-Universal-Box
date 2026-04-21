@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { isIP } from "node:net";
 import { pool } from "./db.js";
+import { realtimeBus } from "../../../shared/realtime-bus.js";
 import { createLogger } from "../../../shared/logger.js";
 
 const console = createLogger("api:mcu");
@@ -69,9 +70,27 @@ async function ensureNotificationListener() {
       try {
         const payload = JSON.parse(msg.payload);
         if (payload?.edge_box_id && payload?.telemetry_id) {
+          const locationResult = await pool.query(
+            `
+              select
+                t.code as tenant_code,
+                v.code as vessel_code,
+                e.edge_code
+              from edge_boxes e
+              join vessels v on v.id = e.vessel_id
+              join tenants t on t.id = v.tenant_id
+              where e.id = $1
+              limit 1
+            `,
+            [payload.edge_box_id]
+          );
+          const location = locationResult.rows[0] ?? {};
           const telemetry = {
             id: payload.telemetry_id,
             edge_box_id: payload.edge_box_id,
+            tenant_code: location.tenant_code ?? null,
+            vessel_code: location.vessel_code ?? null,
+            edge_code: location.edge_code ?? null,
             active_interface: payload.active_interface ?? null,
             rx_kbps: payload.rx_kbps ?? null,
             tx_kbps: payload.tx_kbps ?? null,
@@ -80,6 +99,7 @@ async function ensureNotificationListener() {
             interfaces: Array.isArray(payload.interfaces) ? payload.interfaces : []
           };
           sseEmitter.emit(`edge:${payload.edge_box_id}`, telemetry);
+          realtimeBus.emit("telemetry", telemetry);
           return;
         }
 
@@ -89,11 +109,15 @@ async function ensureNotificationListener() {
               select
                 t.id,
                 t.edge_box_id,
+                t.tenant_id,
                 t.active_uplink as active_interface,
                 t.rx_kbps,
                 t.tx_kbps,
                 t.throughput_kbps,
                 t.observed_at,
+                v.code as vessel_code,
+                te.code as tenant_code,
+                e.edge_code,
                 (
                   select json_agg(json_build_object(
                     'name', ti.interface_name,
@@ -106,6 +130,9 @@ async function ensureNotificationListener() {
                   where ti.telemetry_id = t.id
                 ) as interfaces
               from telemetry t
+              join vessels v on v.id = t.vessel_id
+              join tenants te on te.id = t.tenant_id
+              left join edge_boxes e on e.id = t.edge_box_id
               where t.id = $1
             `,
             [payload.telemetry_id]
@@ -113,6 +140,19 @@ async function ensureNotificationListener() {
           if (telemetryResult.rowCount > 0) {
             const t = telemetryResult.rows[0];
             sseEmitter.emit(`edge:${t.edge_box_id}`, t);
+            realtimeBus.emit("telemetry", {
+              id: t.id,
+              edge_box_id: t.edge_box_id,
+              tenant_code: t.tenant_code ?? null,
+              vessel_code: t.vessel_code ?? null,
+              edge_code: t.edge_code ?? null,
+              active_interface: t.active_interface ?? null,
+              rx_kbps: t.rx_kbps ?? null,
+              tx_kbps: t.tx_kbps ?? null,
+              throughput_kbps: t.throughput_kbps ?? null,
+              observed_at: t.observed_at ?? null,
+              interfaces: Array.isArray(t.interfaces) ? t.interfaces : []
+            });
           }
         }
       } catch (err) {
@@ -139,6 +179,10 @@ async function ensureNotificationListener() {
   sharedListenerClient.on("end", () => {
     sharedListenerClient = null;
   });
+}
+
+export async function ensureMcuTelemetryListener() {
+  await ensureNotificationListener();
 }
 
 function ensurePool() {
@@ -1311,6 +1355,258 @@ export async function getMcuEdgeTrafficByWanIp({ publicWanIp, interfaceName, win
     windowMinutes,
     limit
   });
+}
+
+export async function listTelemetry({ vesselCode, edgeCode = null, limit = 100, from = null, to = null }) {
+  ensurePool();
+
+  const safeLimit = Math.min(Math.max(toInt(limit, 100), 1), 1000);
+  const where = [];
+  const params = [];
+  const addCondition = (sql, value) => {
+    params.push(value);
+    where.push(sql.replace("$", `$${params.length}`));
+  };
+
+  if (!String(vesselCode ?? "").trim()) {
+    const error = new Error("vessel_code is required");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  addCondition("v.code = $", String(vesselCode).trim());
+
+  const normalizedEdgeCode = String(edgeCode ?? "").trim();
+  if (normalizedEdgeCode) {
+    addCondition("e.edge_code = $", normalizedEdgeCode);
+  }
+
+  if (from) {
+    const fromDate = new Date(from);
+    if (Number.isNaN(fromDate.getTime())) {
+      const error = new Error("from must be a valid ISO-8601 timestamp");
+      error.code = "bad_request";
+      throw error;
+    }
+    addCondition("t.observed_at >= $::timestamptz", fromDate.toISOString());
+  }
+
+  if (to) {
+    const toDate = new Date(to);
+    if (Number.isNaN(toDate.getTime())) {
+      const error = new Error("to must be a valid ISO-8601 timestamp");
+      error.code = "bad_request";
+      throw error;
+    }
+    addCondition("t.observed_at <= $::timestamptz", toDate.toISOString());
+  }
+
+  params.push(safeLimit);
+
+  const query = `
+    select
+      t.observed_at,
+      t.active_uplink,
+      t.latency_ms,
+      t.loss_pct,
+      t.rx_kbps,
+      t.tx_kbps,
+      coalesce(
+        nullif(t.interfaces, 'null'::jsonb),
+        coalesce(
+          (
+            select jsonb_agg(
+              jsonb_build_object(
+                'name', ti.interface_name,
+                'rx_kbps', ti.rx_kbps,
+                'tx_kbps', ti.tx_kbps,
+                'throughput_kbps', ti.throughput_kbps,
+                'total_gb', ti.total_gb
+              )
+              order by ti.interface_name
+            )
+            from telemetry_interfaces ti
+            where ti.telemetry_id = t.id
+          ),
+          '[]'::jsonb
+        )
+      ) as interfaces
+    from telemetry t
+    join vessels v on v.id = t.vessel_id
+    left join edge_boxes e on e.id = t.edge_box_id
+    where ${where.join(" and ")}
+    order by t.observed_at desc
+    limit $${params.length}
+  `;
+
+  const result = await pool.query(query, params);
+
+  return result.rows.map((row) => ({
+    observed_at: row.observed_at,
+    active_uplink: row.active_uplink,
+    latency_ms: row.latency_ms === null || row.latency_ms === undefined ? null : Number(row.latency_ms),
+    loss_pct: row.loss_pct === null || row.loss_pct === undefined ? null : Number(row.loss_pct),
+    rx_kbps: row.rx_kbps === null || row.rx_kbps === undefined ? null : Number(row.rx_kbps),
+    tx_kbps: row.tx_kbps === null || row.tx_kbps === undefined ? null : Number(row.tx_kbps),
+    interfaces: Array.isArray(row.interfaces) ? row.interfaces : []
+  }));
+}
+
+const ALERT_EVENT_TYPES = ["edge_offline", "edge_online", "link_down", "quota_warning"];
+
+export async function listAlerts({ tenantCode = null, vesselCode = null, unreadOnly = false, limit = 100, offset = 0 }) {
+  ensurePool();
+
+  const safeLimit = Math.min(Math.max(toInt(limit, 100), 1), 500);
+  const safeOffset = Math.max(0, toInt(offset, 0));
+
+  const baseConditions = ["e.event_type = ANY($1::text[])"];
+  const baseParams = [ALERT_EVENT_TYPES];
+
+  if (String(tenantCode ?? "").trim()) {
+    baseParams.push(String(tenantCode).trim());
+    baseConditions.push(`t.code = $${baseParams.length}`);
+  }
+
+  if (String(vesselCode ?? "").trim()) {
+    baseParams.push(String(vesselCode).trim());
+    baseConditions.push(`v.code = $${baseParams.length}`);
+  }
+
+  if (unreadOnly) {
+    baseConditions.push("e.read_at is null");
+  }
+
+  const listParams = [...baseParams, safeOffset, safeLimit];
+
+  const result = await pool.query(
+    `
+      select
+        e.id,
+        t.code as tenant_code,
+        v.code as vessel_code,
+        eb.edge_code,
+        e.event_type as alert_type,
+        e.severity,
+        e.payload,
+        e.observed_at,
+        e.created_at,
+        e.read_at,
+        case
+          when e.event_type = 'edge_offline' then coalesce(e.payload->'details'->>'reason', 'Edge offline')
+          when e.event_type = 'edge_online' then 'Edge online'
+          when e.event_type = 'link_down' then coalesce(e.payload->'details'->>'reason', 'Link down')
+          when e.event_type = 'quota_warning' then coalesce(e.payload->'details'->>'message', 'Quota warning')
+          else coalesce(e.payload->>'message', e.event_type)
+        end as message
+      from events e
+      join tenants t on t.id = e.tenant_id
+      join vessels v on v.id = e.vessel_id
+      left join edge_boxes eb on eb.id = e.edge_box_id
+      where ${baseConditions.join(" and ")}
+      order by e.observed_at desc, e.created_at desc
+      offset $${listParams.length - 1}
+      limit $${listParams.length}
+    `,
+    listParams
+  );
+
+  const countResult = await pool.query(
+    `
+      select count(*)::int as total
+      from events e
+      join tenants t on t.id = e.tenant_id
+      join vessels v on v.id = e.vessel_id
+      where ${baseConditions.join(" and ")}
+    `,
+    baseParams
+  );
+
+  return {
+    total: countResult.rows[0]?.total ?? result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    items: result.rows
+  };
+}
+
+export async function markAlertRead({ alertId, readAt = new Date().toISOString() }) {
+  ensurePool();
+  const result = await pool.query(
+    `
+      update events
+      set read_at = coalesce(read_at, $2::timestamptz)
+      where id = $1::uuid
+      returning id
+    `,
+    [alertId, readAt]
+  );
+
+  return result.rowCount > 0;
+}
+
+export async function getLatestHeartbeat({ edgeCode, vesselCode = null, tenantCode = null }) {
+  ensurePool();
+
+  const normalizedEdgeCode = String(edgeCode ?? "").trim();
+  if (!normalizedEdgeCode) {
+    const error = new Error("edge_code is required");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const where = ["e.edge_code = $1"];
+  const params = [normalizedEdgeCode];
+
+  if (String(vesselCode ?? "").trim()) {
+    params.push(String(vesselCode).trim());
+    where.push(`v.code = $${params.length}`);
+  }
+
+  if (String(tenantCode ?? "").trim()) {
+    params.push(String(tenantCode).trim());
+    where.push(`t.code = $${params.length}`);
+  }
+
+  const query = `
+    select
+      hb.observed_at,
+      hb.status,
+      hb.firmware_version,
+      hb.cpu_usage_pct,
+      hb.ram_usage_pct,
+      hb.tenant_code,
+      hb.vessel_code,
+      hb.edge_code,
+      e.public_wan_ip,
+      v.code as vessel_lookup_code,
+      t.code as tenant_lookup_code
+    from edge_heartbeats hb
+    join edge_boxes e on e.edge_code = hb.edge_code
+    join vessels v on v.id = e.vessel_id
+    join tenants t on t.id = v.tenant_id
+    where ${where.join(" and ")}
+    order by hb.observed_at desc
+    limit 1
+  `;
+
+  const result = await pool.query(query, params);
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  return {
+    observed_at: row.observed_at,
+    status: row.status,
+    firmware_version: row.firmware_version,
+    cpu_usage_pct: row.cpu_usage_pct === null || row.cpu_usage_pct === undefined ? null : Number(row.cpu_usage_pct),
+    ram_usage_pct: row.ram_usage_pct === null || row.ram_usage_pct === undefined ? null : Number(row.ram_usage_pct),
+    tenant_code: row.tenant_code ?? row.tenant_lookup_code ?? null,
+    vessel_code: row.vessel_code ?? row.vessel_lookup_code ?? null,
+    edge_code: row.edge_code ?? normalizedEdgeCode,
+    public_wan_ip: row.public_wan_ip ? String(row.public_wan_ip) : null
+  };
 }
 
 export async function streamMcuTelemetry(req, res, { tenantCode, vesselCode, edgeCode }) {

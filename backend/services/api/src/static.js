@@ -170,6 +170,24 @@ export async function maybeServeStatic(req, res, url) {
     return true;
   }
 
+  if (url.pathname === "/policy" || url.pathname === "/policy/" || url.pathname === "/policy/index.html") {
+    res.writeHead(302, { location: "/marine-portal#policy-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/traffic" || url.pathname === "/traffic/" || url.pathname === "/traffic/index.html") {
+    res.writeHead(302, { location: "/marine-portal#traffic-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/settings" || url.pathname === "/settings/" || url.pathname === "/settings/index.html") {
+    res.writeHead(302, { location: "/marine-portal#settings-section" });
+    res.end();
+    return true;
+  }
+
   if (url.pathname === "/commands" || url.pathname === "/commands/" || url.pathname === "/commands/index.html") {
     res.writeHead(302, { location: "/marine-portal#commands-section" });
     res.end();
@@ -178,6 +196,24 @@ export async function maybeServeStatic(req, res, url) {
 
   if (url.pathname === "/marine-portal/alerts" || url.pathname === "/marine-portal/alerts/" || url.pathname === "/marine-portal/alerts/index.html") {
     res.writeHead(302, { location: "/marine-portal#alerts-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/policy" || url.pathname === "/marine-portal/policy/" || url.pathname === "/marine-portal/policy/index.html") {
+    res.writeHead(302, { location: "/marine-portal#policy-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/traffic" || url.pathname === "/marine-portal/traffic/" || url.pathname === "/marine-portal/traffic/index.html") {
+    res.writeHead(302, { location: "/marine-portal#traffic-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/settings" || url.pathname === "/marine-portal/settings/" || url.pathname === "/marine-portal/settings/index.html") {
+    res.writeHead(302, { location: "/marine-portal#settings-section" });
     res.end();
     return true;
   }

@@ -14,13 +14,24 @@ import {
   getMcuEdgeDetailByWanIp,
   getMcuEdgeTraffic,
   getMcuEdgeTrafficByWanIp,
+  getLatestHeartbeat,
   getCommandJob,
   listMcuEdges,
   listCommandJobs,
+  listAlerts,
+  listTelemetry,
   markCommandJobStatus,
+  markAlertRead,
   registerMcuEdge,
   streamMcuTelemetry
 } from "./mcu.js";
+import {
+  ensureTrafficHourlyCron,
+  getQuotaRemaining,
+  getTrafficSummary,
+  syncPackageQuotaForAssignment
+} from "./traffic.js";
+import { attachRealtimeServer } from "./realtime.js";
 import { maybeServeStatic } from "./static.js";
 
 const console = createLogger("api");
@@ -569,6 +580,189 @@ function parseDateInput(value, { endOfDay = false } = {}) {
   }
 
   return parsed.toISOString();
+}
+
+function parseTimestampInput(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
+function normalizePolicyAddress(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return null;
+  }
+
+  const parts = text.split("/");
+  if (parts.length === 2) {
+    const [ipPartRaw, prefixRaw] = parts;
+    const ipPart = String(ipPartRaw ?? "").trim();
+    const prefixText = String(prefixRaw ?? "").trim();
+    const version = isIP(ipPart);
+    if (!version) {
+      return null;
+    }
+
+    const prefix = Number.parseInt(prefixText, 10);
+    if (!Number.isInteger(prefix)) {
+      return null;
+    }
+
+    if ((version === 4 && (prefix < 0 || prefix > 32)) || (version === 6 && (prefix < 0 || prefix > 128))) {
+      return null;
+    }
+
+    return `${ipPart}/${prefix}`;
+  }
+
+  return normalizeIpCandidate(text);
+}
+
+function normalizePolicyGroups(groups) {
+  if (!Array.isArray(groups) || groups.length === 0) {
+    const error = new Error("groups must be a non-empty array");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  return groups.map((group, index) => {
+    if (!group || typeof group !== "object" || Array.isArray(group)) {
+      const error = new Error(`groups[${index}] must be an object`);
+      error.code = "bad_request";
+      throw error;
+    }
+
+    const name = String(group.name ?? "").trim();
+    if (!name) {
+      const error = new Error(`groups[${index}].name is required`);
+      error.code = "bad_request";
+      throw error;
+    }
+
+    const preferredUplink = String(group.preferred_uplink ?? "").trim().toLowerCase();
+    if (!preferredUplink || !["vsat", "starlink", "automatic"].includes(preferredUplink)) {
+      const error = new Error(`groups[${index}].preferred_uplink must be vsat, starlink, or automatic`);
+      error.code = "bad_request";
+      throw error;
+    }
+
+    const gateway = normalizeIpCandidate(group.gateway);
+    if (!gateway) {
+      const error = new Error(`groups[${index}].gateway must be a valid IP address`);
+      error.code = "bad_request";
+      throw error;
+    }
+
+    const sourceAddressesRaw = Array.isArray(group.source_addresses) ? group.source_addresses : [];
+    if (sourceAddressesRaw.length === 0) {
+      const error = new Error(`groups[${index}].source_addresses must be a non-empty array`);
+      error.code = "bad_request";
+      throw error;
+    }
+
+    const sourceAddresses = [];
+    for (const [addressIndex, address] of sourceAddressesRaw.entries()) {
+      const normalized = normalizePolicyAddress(address);
+      if (!normalized) {
+        const error = new Error(`groups[${index}].source_addresses[${addressIndex}] must be a valid CIDR or IP address`);
+        error.code = "bad_request";
+        throw error;
+      }
+      sourceAddresses.push(normalized);
+    }
+
+    return {
+      name,
+      preferred_uplink: preferredUplink,
+      source_addresses: [...new Set(sourceAddresses)],
+      gateway
+    };
+  });
+}
+
+async function resolvePolicyTarget({ tenantCode = null, vesselCode = null, edgeCode = null, requireEdge = true } = {}) {
+  if (!pool) {
+    const error = new Error("database_unavailable");
+    error.code = "database_unavailable";
+    throw error;
+  }
+
+  const normalizedVesselCode = String(vesselCode ?? "").trim();
+  if (!normalizedVesselCode) {
+    const error = new Error("vessel_code is required");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const normalizedTenantCode = String(tenantCode ?? "").trim() || null;
+  const normalizedEdgeCode = String(edgeCode ?? "").trim() || null;
+  const params = [normalizedVesselCode];
+  const filters = ["v.code = $1"];
+  const edgeParamPlaceholder = normalizedEdgeCode ? `$${params.length + (normalizedTenantCode ? 2 : 1)}` : null;
+
+  if (normalizedTenantCode) {
+    params.push(normalizedTenantCode);
+    filters.push(`t.code = $${params.length}`);
+  }
+
+  const query = `
+    select
+      t.id as tenant_id,
+      t.code as tenant_code,
+      v.id as vessel_id,
+      v.code as vessel_code,
+      e.id as edge_box_id,
+      e.edge_code
+    from vessels v
+    join tenants t on t.id = v.tenant_id
+    left join lateral (
+      select e.id, e.edge_code
+      from edge_boxes e
+      where e.vessel_id = v.id
+        ${normalizedEdgeCode ? `and e.edge_code = ${edgeParamPlaceholder}` : ""}
+      order by coalesce(e.last_seen_at, e.created_at) desc
+      limit 1
+    ) e on true
+    where ${filters.join(" and ")}
+    order by t.code asc, v.code asc
+    limit 2
+  `;
+
+  if (normalizedEdgeCode) {
+    params.push(normalizedEdgeCode);
+  }
+
+  const result = await pool.query(query, params);
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  if (result.rowCount > 1 && !normalizedTenantCode) {
+    const error = new Error("tenant_code is required for ambiguous vessel_code");
+    error.code = "bad_request";
+    throw error;
+  }
+
+  const target = result.rows[0];
+  if (requireEdge && !target.edge_box_id) {
+    const error = new Error("edge_not_found");
+    error.code = "not_found";
+    throw error;
+  }
+
+  return target;
 }
 
 function escapeCsvValue(value) {
@@ -1137,6 +1331,234 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/policies" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const vesselCode = String(url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? principal.vessel_code ?? "").trim();
+      const tenantCode = String(url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? principal.tenant_code ?? "").trim() || null;
+      if (!vesselCode) {
+        sendJson(res, 400, { error: "vessel_code is required" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const scope = await resolvePolicyTarget({
+        tenantCode,
+        vesselCode,
+        requireEdge: false
+      });
+
+      if (!scope) {
+        sendJson(res, 404, { error: "vessel_not_found" });
+        return;
+      }
+
+      const limit = Math.max(1, Math.min(200, toInt(url.searchParams.get("limit"), 50)));
+      const offset = Math.max(0, toInt(url.searchParams.get("offset"), 0));
+      const result = await pool.query(
+        `
+          select
+            p.id,
+            t.code as tenant_code,
+            t.name as tenant_name,
+            v.code as vessel_code,
+            v.name as vessel_name,
+            p.groups,
+            p.command_job_id,
+            p.created_at,
+            p.applied_at,
+            case when p.applied_at is not null then true else false end as applied,
+            case
+              when p.applied_at is not null then 'applied'
+              when p.command_job_id is null then 'pending'
+              when cj.status = 'failed' then 'failed'
+              when cj.status in ('queued', 'sent', 'ack', 'success') then 'pending'
+              else coalesce(cj.status, 'pending')
+            end as applied_state,
+            cj.status as command_status,
+            cj.ack_at as command_ack_at,
+            cj.result_at as command_result_at,
+            cj.result_payload as command_result_payload,
+            e.edge_code
+          from policies p
+          join tenants t on t.id = p.tenant_id
+          join vessels v on v.id = p.vessel_id
+          left join command_jobs cj on cj.id = p.command_job_id
+          left join lateral (
+            select e.edge_code
+            from edge_boxes e
+            where e.vessel_id = v.id
+            order by coalesce(e.last_seen_at, e.created_at) desc
+            limit 1
+          ) e on true
+          where p.vessel_id = $1::uuid
+          order by p.created_at desc
+          offset $2
+          limit $3
+        `,
+        [scope.vessel_id, offset, limit]
+      );
+
+      sendJson(res, 200, {
+        total: result.rowCount,
+        limit,
+        offset,
+        next_after: result.rows.at(-1)?.created_at ?? null,
+        items: result.rows
+      });
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/policies GET] failed:", error);
+      sendJson(res, 500, { error: "policies_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/policies" && req.method === "POST") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const tenantCode = String(body.tenant_code ?? body.tenant ?? "").trim() || null;
+      const vesselCode = String(body.vessel_code ?? body.vessel ?? "").trim();
+      const edgeCode = String(body.edge_code ?? body.edge ?? "").trim() || null;
+
+      if (!vesselCode) {
+        sendJson(res, 400, { error: "vessel_code is required" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const groups = normalizePolicyGroups(body.groups);
+      const scope = await resolvePolicyTarget({
+        tenantCode,
+        vesselCode,
+        edgeCode,
+        requireEdge: true
+      });
+
+      if (!assertScopedAccess(principal, { tenantCode: scope.tenant_code, vesselCode: scope.vessel_code })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const policyInsert = await pool.query(
+        `
+          insert into policies (tenant_id, vessel_id, groups)
+          values ($1::uuid, $2::uuid, $3::jsonb)
+          returning id, tenant_id, vessel_id, groups, command_job_id, created_at, applied_at
+        `,
+        [scope.tenant_id, scope.vessel_id, JSON.stringify(groups)]
+      );
+      const policy = policyInsert.rows[0];
+
+      const job = await createCommandJob({
+        tenantCode: scope.tenant_code,
+        vesselCode: scope.vessel_code,
+        edgeCode: scope.edge_code,
+        commandType: "policy_sync",
+        commandPayload: { groups },
+        createdBy: principal.user_id ?? null
+      });
+
+      if (!job) {
+        await pool.query("delete from policies where id = $1::uuid", [policy.id]).catch(() => {});
+        sendJson(res, 404, { error: "edge_not_found" });
+        return;
+      }
+
+      await pool.query(
+        `
+          update policies
+          set command_job_id = $2::uuid
+          where id = $1::uuid
+        `,
+        [policy.id, job.id]
+      );
+
+      const mqttTopic = `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`;
+      const envelope = buildCommandEnvelope(job);
+
+      try {
+        await publishMqtt(mqttTopic, JSON.stringify(envelope), { qos: 1, retain: false }, { attempts: 3, timeoutMs: 7_000 });
+        const sentJob = await markCommandJobStatus(job.id, { status: "sent" });
+        await pool.query(
+          `
+            update policies
+            set applied_at = now()
+            where id = $1::uuid
+          `,
+          [policy.id]
+        );
+
+        sendJson(res, 201, {
+          ok: true,
+          mqtt_topic: mqttTopic,
+          policy: {
+            ...policy,
+            command_job_id: job.id,
+            applied_at: new Date().toISOString()
+          },
+          command: sentJob ?? job,
+          envelope
+        });
+      } catch (publishError) {
+        await markCommandJobStatus(job.id, {
+          status: "failed",
+          resultAt: new Date().toISOString(),
+          resultPayload: {
+            error: publishError?.message || String(publishError),
+            stage: "publish"
+          }
+        }).catch(() => {});
+        console.error("[api/policies] publish failed:", publishError);
+        sendJson(res, 503, {
+          error: "policy_publish_failed",
+          policy_id: policy.id,
+          command_id: job.id
+        });
+      }
+    } catch (error) {
+      if (error?.code === "invalid_json") {
+        sendJson(res, 400, { error: "invalid_json" });
+        return;
+      }
+      if (error?.code === "payload_too_large") {
+        sendJson(res, 413, { error: "payload_too_large" });
+        return;
+      }
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      if (error?.code === "not_found") {
+        sendJson(res, 404, { error: error.message });
+        return;
+      }
+      console.error("[api/policies POST] failed:", error);
+      sendJson(res, 500, { error: "policy_create_failed" });
+    }
+    return;
+  }
+
   if (url.pathname.startsWith("/api/commands/") && req.method === "GET") {
     const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
     if (!principal) {
@@ -1278,6 +1700,233 @@ const server = createServer(async (req, res) => {
       }
       console.error("[api/mcu/traffic/by-wan] failed:", error);
       sendJson(res, 500, { error: "mcu_edge_traffic_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/telemetry" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const vesselCode = url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? principal.vessel_code ?? "";
+      const edgeCode = url.searchParams.get("edge_code") ?? url.searchParams.get("edge");
+      const limit = url.searchParams.get("limit");
+      const from = parseTimestampInput(url.searchParams.get("from"));
+      const to = parseTimestampInput(url.searchParams.get("to"));
+
+      if (!assertScopedAccess(principal, {
+        tenantCode: principal.tenant_code ?? null,
+        vesselCode
+      })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const data = await listTelemetry({ vesselCode, edgeCode, limit, from, to });
+
+      sendJson(res, 200, data);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/telemetry] failed:", error);
+      sendJson(res, 500, { error: "telemetry_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/heartbeat/latest" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const edgeCode = url.searchParams.get("edge_code") ?? url.searchParams.get("edge");
+      const vesselCode = url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel");
+      const tenantCode = url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant");
+
+      const heartbeat = await getLatestHeartbeat({ edgeCode, vesselCode, tenantCode });
+      if (!heartbeat) {
+        sendJson(res, 404, { error: "heartbeat_not_found" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode: heartbeat.tenant_code, vesselCode: heartbeat.vessel_code })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      sendJson(res, 200, heartbeat);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/heartbeat/latest] failed:", error);
+      sendJson(res, 500, { error: "heartbeat_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/alerts" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const tenantCode = String(url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? principal.tenant_code ?? "").trim() || null;
+      const vesselCode = String(url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? principal.vessel_code ?? "").trim() || null;
+      const unreadOnly = parseBoolean(url.searchParams.get("unread"), false);
+      const limit = Math.max(1, Math.min(500, toInt(url.searchParams.get("limit"), 100)));
+      const offset = Math.max(0, toInt(url.searchParams.get("offset"), 0));
+
+      if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const alerts = await listAlerts({ tenantCode, vesselCode, unreadOnly, limit, offset });
+      sendJson(res, 200, alerts);
+    } catch (error) {
+      console.error("[api/alerts GET] failed:", error);
+      sendJson(res, 500, { error: "alerts_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/alerts/") && url.pathname.endsWith("/read") && req.method === "POST") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const match = url.pathname.match(/^\/api\/alerts\/([^/]+)\/read$/);
+      const alertId = match?.[1] ? decodeURIComponent(match[1]) : "";
+      if (!alertId) {
+        sendJson(res, 400, { error: "alert_id is required" });
+        return;
+      }
+
+      const rowResult = await pool.query(
+        `
+          select
+            e.id,
+            t.code as tenant_code,
+            v.code as vessel_code
+          from events e
+          join tenants t on t.id = e.tenant_id
+          join vessels v on v.id = e.vessel_id
+          where e.id = $1::uuid
+          limit 1
+        `,
+        [alertId]
+      );
+
+      const target = rowResult.rows[0] ?? null;
+      if (!target) {
+        sendJson(res, 404, { error: "alert_not_found" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode: target.tenant_code, vesselCode: target.vessel_code })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const updated = await markAlertRead({ alertId });
+      if (!updated) {
+        sendJson(res, 404, { error: "alert_not_found" });
+        return;
+      }
+
+      sendJson(res, 200, { id: alertId, read: true });
+    } catch (error) {
+      console.error("[api/alerts/:id/read POST] failed:", error);
+      sendJson(res, 500, { error: "alert_mark_read_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/traffic/summary" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const tenantCode = String(url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? principal.tenant_code ?? "").trim() || null;
+      const vesselCode = String(url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? principal.vessel_code ?? "").trim();
+      const month = String(url.searchParams.get("month") ?? "").trim() || null;
+
+      if (!vesselCode) {
+        sendJson(res, 400, { error: "vessel_code is required" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const summary = await getTrafficSummary({ tenantCode, vesselCode, month });
+      if (!summary) {
+        sendJson(res, 404, { error: "traffic_summary_not_found" });
+        return;
+      }
+
+      sendJson(res, 200, summary);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/traffic/summary] failed:", error);
+      sendJson(res, 500, { error: "traffic_summary_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/quota/remaining" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+
+    try {
+      const tenantCode = String(url.searchParams.get("tenant_code") ?? url.searchParams.get("tenant") ?? principal.tenant_code ?? "").trim() || null;
+      const vesselCode = String(url.searchParams.get("vessel_code") ?? url.searchParams.get("vessel") ?? principal.vessel_code ?? "").trim();
+
+      if (!vesselCode) {
+        sendJson(res, 400, { error: "vessel_code is required" });
+        return;
+      }
+
+      if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
+        sendJson(res, 403, { error: "forbidden" });
+        return;
+      }
+
+      const quota = await getQuotaRemaining({ tenantCode, vesselCode });
+      if (!quota) {
+        sendJson(res, 404, { error: "quota_not_found" });
+        return;
+      }
+
+      sendJson(res, 200, quota);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/quota/remaining] failed:", error);
+      sendJson(res, 500, { error: "quota_remaining_failed" });
     }
     return;
   }
@@ -1567,8 +2216,9 @@ const server = createServer(async (req, res) => {
 
       const packageResult = await pool.query(
         `
-          select p.id, p.tenant_id, p.quota_mb, coalesce(p.validity_days, p.duration_days) as validity_days
+          select p.id, p.tenant_id, t.code as tenant_code, p.quota_mb, coalesce(p.validity_days, p.duration_days) as validity_days
           from packages p
+          join tenants t on t.id = p.tenant_id
           where p.id = $1
             and p.is_active = true
           limit 1
@@ -1621,6 +2271,15 @@ const server = createServer(async (req, res) => {
         `,
         [resolvedUserId, packageRow.id, vesselCode, packageRow.quota_mb, String(packageRow.validity_days || 30)]
       );
+
+      await syncPackageQuotaForAssignment({
+        tenantCode: packageRow.tenant_code ?? null,
+        vesselCode,
+        packageId: packageRow.id,
+        quotaGb: Number(packageRow.quota_mb ?? 0) / 1024,
+        resetDayOfMonth: 1
+      });
+
       await insertPackageAuditEvent({
         tenantCode: packageResult.rows[0]?.tenant_code ?? null,
         packageId: packageRow.id,
@@ -2321,6 +2980,10 @@ server.headersTimeout = apiConfig.serverHeadersTimeoutMs;
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
+attachRealtimeServer(server);
+ensureTrafficHourlyCron().catch((error) => {
+  console.error("[api] failed to start traffic hourly cron:", error);
+});
 server.listen(port, host, () => {
   console.log(`[api] listening on http://${host}:${port}`);
 });

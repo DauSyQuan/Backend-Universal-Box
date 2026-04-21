@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import mqtt from "mqtt";
 import { loadWorkerRuntimeConfig } from "../../../shared/config.js";
+import { realtimeBus } from "../../../shared/realtime-bus.js";
 import { createLogger } from "../../../shared/logger.js";
 import {
   insertEvent,
@@ -15,6 +16,9 @@ import {
   markCommandJobAck,
   markCommandJobResult,
   markEdgeLastSeen,
+  maybeCreateQuotaWarning,
+  getEdgeLastSeenSnapshot,
+  listStaleEdges,
   recordUsageWithQuota,
   pool,
   resolveEdgeContext,
@@ -58,6 +62,7 @@ const mqttAutoProvision = workerConfig.mqttAutoProvision;
 const mqttReconnectBaseMs = workerConfig.mqttReconnectBaseMs;
 const mqttReconnectMaxMs = workerConfig.mqttReconnectMaxMs;
 let mqttReconnectAttempts = 0;
+let edgeSweepRunning = false;
 
 const client = mqtt.connect(mqttUrl, {
   username: mqttUsername,
@@ -94,6 +99,65 @@ async function resolveRequiredEdgeContext(parsedTopic) {
 
   return hasResolvedEdgeContext(context) ? context : null;
 }
+
+async function sweepOfflineEdges() {
+  if (edgeSweepRunning) {
+    return;
+  }
+
+  edgeSweepRunning = true;
+  try {
+    const staleEdges = await listStaleEdges({ olderThanMinutes: 2, limit: 500 });
+    for (const edge of staleEdges) {
+      const hasRecentOffline = await hasRecentEvent({
+        vesselId: edge.vessel_id,
+        edgeBoxId: edge.edge_box_id,
+        eventType: "edge_offline",
+        withinSeconds: 600
+      });
+      if (hasRecentOffline) {
+        continue;
+      }
+
+      await insertEvent({
+        context: {
+          tenant_id: edge.tenant_id,
+          vessel_id: edge.vessel_id,
+          edge_box_id: edge.edge_box_id
+        },
+        payload: {
+          event_type: "edge_offline",
+          severity: "warning",
+          details: {
+            edge_code: edge.edge_code,
+            last_seen_at: edge.last_seen_at,
+            created_at: edge.created_at,
+            reason: "last_seen_timeout"
+          }
+        },
+        observedAt: new Date().toISOString()
+      });
+      console.log(
+        `[worker] edge_offline event created vessel=${edge.vessel_code} edge=${edge.edge_code} last_seen=${edge.last_seen_at ?? edge.created_at}`
+      );
+    }
+  } catch (error) {
+    console.error("[worker] edge offline sweep failed:", error);
+  } finally {
+    edgeSweepRunning = false;
+  }
+}
+
+const edgeSweepInterval = setInterval(() => {
+  sweepOfflineEdges().catch((error) => {
+    console.error("[worker] edge offline sweep error:", error);
+  });
+}, 60_000);
+edgeSweepInterval.unref?.();
+
+sweepOfflineEdges().catch((error) => {
+  console.error("[worker] initial edge offline sweep failed:", error);
+});
 
 client.on("connect", () => {
   console.log(`[worker] connected to broker ${mqttUrl}`);
@@ -213,6 +277,7 @@ client.on("message", async (topic, payloadBuffer) => {
         return;
       }
 
+      const previousSnapshot = await getEdgeLastSeenSnapshot({ edgeBoxId: context.edge_box_id });
       await insertHeartbeat({
         tenantCode: parsedTopic.tenantCode,
         vesselCode: parsedTopic.vesselCode,
@@ -229,6 +294,44 @@ client.on("message", async (topic, payloadBuffer) => {
         edgeCode: parsedTopic.edgeCode,
         observedAt
       });
+
+      const previousSeenAt = previousSnapshot?.last_seen_at ?? null;
+      const offlineObservedAt = previousSeenAt ? new Date(previousSeenAt).getTime() : null;
+      const wasOffline =
+        (offlineObservedAt !== null && Date.now() - offlineObservedAt > 2 * 60 * 1000) ||
+        (await hasRecentEvent({
+          vesselId: context.vessel_id,
+          edgeBoxId: context.edge_box_id,
+          eventType: "edge_offline",
+          withinSeconds: 600
+        }));
+
+      if (wasOffline) {
+        const hasRecentOnline = await hasRecentEvent({
+          vesselId: context.vessel_id,
+          edgeBoxId: context.edge_box_id,
+          eventType: "edge_online",
+          withinSeconds: 600
+        });
+
+        if (!hasRecentOnline) {
+          await insertEvent({
+            context,
+            payload: {
+              event_type: "edge_online",
+              severity: "info",
+              details: {
+                edge_code: parsedTopic.edgeCode,
+                previous_last_seen_at: previousSeenAt,
+                observed_at: observedAt
+              }
+            },
+            observedAt
+          });
+          console.log(`[worker] edge_online event created topic=${topic} edge=${parsedTopic.edgeCode}`);
+        }
+      }
+
       await updateEdgePublicWanIp({
         edgeBoxId: context.edge_box_id,
         publicWanIp: payload.public_wan_ip
@@ -253,6 +356,26 @@ client.on("message", async (topic, payloadBuffer) => {
       }
 
       await insertTelemetry({ context, payload, observedAt });
+      const quotaWarning = await maybeCreateQuotaWarning({ context, observedAt });
+      if (quotaWarning?.triggered) {
+        console.log(
+          `[worker] quota warning created vessel=${parsedTopic.vesselCode} used_gb=${quotaWarning.used_gb} quota_gb=${quotaWarning.quota_gb}`
+        );
+      }
+
+      realtimeBus.emit("telemetry", {
+        tenant_code: parsedTopic.tenantCode,
+        vessel_code: parsedTopic.vesselCode,
+        edge_code: parsedTopic.edgeCode,
+        active_uplink: payload.active_uplink ?? payload.active_interface ?? null,
+        latency_ms: payload.latency_ms ?? null,
+        loss_pct: payload.loss_pct ?? null,
+        rx_kbps: payload.rx_kbps ?? null,
+        tx_kbps: payload.tx_kbps ?? null,
+        throughput_kbps: payload.throughput_kbps ?? null,
+        interfaces: Array.isArray(payload.interfaces) ? payload.interfaces : [],
+        observed_at: observedAt
+      });
 
       const linkDown = detectLinkDownEvent(payload);
       if (linkDown) {

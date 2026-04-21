@@ -413,14 +413,64 @@ create table if not exists events (
   severity text not null,
   payload jsonb not null default '{}'::jsonb,
   observed_at timestamptz not null,
+  read_at timestamptz,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_events_vessel_observed
   on events(vessel_id, observed_at desc);
 
+create index if not exists idx_events_vessel_read_created
+  on events(vessel_id, read_at, created_at desc);
+
+create index if not exists idx_events_unread_created
+  on events(read_at, created_at desc);
+
 create index if not exists idx_vms_positions_vessel_observed
   on vms_positions(vessel_id, observed_at desc);
+
+create table if not exists traffic_hourly (
+  vessel_id uuid not null references vessels(id) on delete cascade,
+  edge_box_id uuid not null references edge_boxes(id) on delete cascade,
+  hour_bucket timestamptz not null,
+  rx_gb numeric(14,3) not null default 0,
+  tx_gb numeric(14,3) not null default 0,
+  total_gb numeric(14,3) not null default 0,
+  primary key (vessel_id, edge_box_id, hour_bucket)
+);
+
+create index if not exists idx_traffic_hourly_vessel_hour
+  on traffic_hourly(vessel_id, hour_bucket desc);
+
+create index if not exists idx_traffic_hourly_edge_hour
+  on traffic_hourly(edge_box_id, hour_bucket desc);
+
+create table if not exists package_quotas (
+  vessel_id uuid not null references vessels(id) on delete cascade,
+  package_id uuid not null references packages(id) on delete cascade,
+  quota_gb numeric(14,3) not null default 0,
+  reset_day_of_month integer not null default 1 check (reset_day_of_month between 1 and 31),
+  primary key (vessel_id, package_id)
+);
+
+create index if not exists idx_package_quotas_vessel
+  on package_quotas(vessel_id);
+
+create table if not exists policies (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  vessel_id uuid not null references vessels(id) on delete cascade,
+  groups jsonb not null default '[]'::jsonb,
+  command_job_id uuid references command_jobs(id) on delete set null,
+  created_at timestamptz not null default now(),
+  applied_at timestamptz
+);
+
+create index if not exists idx_policies_tenant_vessel_created
+  on policies(tenant_id, vessel_id, created_at desc);
+
+create index if not exists idx_policies_applied_at
+  on policies(applied_at desc);
 
 create table if not exists command_jobs (
   id uuid primary key default gen_random_uuid(),
