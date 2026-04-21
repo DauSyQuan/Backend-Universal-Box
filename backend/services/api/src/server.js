@@ -1,10 +1,13 @@
 import "dotenv/config";
-import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { isIP } from "node:net";
 import mqtt from "mqtt";
-import { getHealth, getReady } from "./health.js";
+import { getHealth, getReady, getMemoryHealth } from "./health.js";
 import { pingDb, pool } from "./db.js";
+import { loadApiRuntimeConfig } from "../../../shared/config.js";
+import { createLogger } from "../../../shared/logger.js";
+import { normalizeSecret, parseBoolean, safeEqual } from "../../../shared/utils.js";
 import {
   createCommandJob,
   getMcuEdgeDetail,
@@ -20,54 +23,32 @@ import {
 } from "./mcu.js";
 import { maybeServeStatic } from "./static.js";
 
-const mqttUrl = process.env.MQTT_URL || "mqtt://localhost:1883";
+const console = createLogger("api");
+const apiConfig = loadApiRuntimeConfig(process.env);
+
+const mqttUrl = apiConfig.mqttUrl;
 const mqttClient = mqtt.connect(mqttUrl, {
-  username: process.env.MQTT_USERNAME || undefined,
-  password: process.env.MQTT_PASSWORD || undefined
+  username: apiConfig.mqttUsername,
+  password: apiConfig.mqttPassword
 });
-
-const booleanTrueValues = new Set(["1", "true", "yes", "on"]);
-const booleanFalseValues = new Set(["0", "false", "no", "off"]);
-
-function parseBoolean(value, fallback = false) {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  if (booleanTrueValues.has(normalized)) {
-    return true;
-  }
-  if (booleanFalseValues.has(normalized)) {
-    return false;
-  }
-  return fallback;
-}
 
 function toInt(value, fallback) {
   const parsed = Number.parseInt(String(value), 10);
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
-function normalizeSecret(value) {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value).trim();
-}
-
-const basicAuthEnabled = parseBoolean(process.env.BASIC_AUTH_ENABLED, true);
-const basicAuthUsername = normalizeSecret(process.env.BASIC_AUTH_USERNAME) || "demo";
-const generatedBasicAuthPassword = basicAuthEnabled && !normalizeSecret(process.env.BASIC_AUTH_PASSWORD)
+const basicAuthEnabled = apiConfig.basicAuthEnabled;
+const basicAuthUsername = apiConfig.basicAuthUsername;
+const generatedBasicAuthPassword = basicAuthEnabled && !normalizeSecret(apiConfig.basicAuthPassword)
   ? randomBytes(18).toString("base64url")
   : null;
-const basicAuthPassword = generatedBasicAuthPassword ?? normalizeSecret(process.env.BASIC_AUTH_PASSWORD);
-const basicAuthRole = normalizeSecret(process.env.BASIC_AUTH_ROLE) || "admin";
-const authTokenSecret = normalizeSecret(process.env.AUTH_TOKEN_SECRET || process.env.JWT_SECRET || basicAuthPassword || "mcu-dev-auth-secret");
-const authTokenTtlSeconds = Math.max(300, Number(process.env.AUTH_TOKEN_TTL_SECONDS || "3600"));
-const trustProxyHeaders = parseBoolean(process.env.TRUST_PROXY_HEADERS, false);
-const mcuRegisterEnabled = parseBoolean(process.env.MCU_REGISTER_ENABLED, false);
-const mcuRegisterToken = normalizeSecret(process.env.MCU_REGISTER_TOKEN);
+const basicAuthPassword = generatedBasicAuthPassword ?? normalizeSecret(apiConfig.basicAuthPassword);
+const basicAuthRole = apiConfig.basicAuthRole;
+const authTokenSecret = normalizeSecret(apiConfig.authTokenSecret || basicAuthPassword || "mcu-dev-auth-secret");
+const authTokenTtlSeconds = apiConfig.authTokenTtlSeconds;
+const trustProxyHeaders = apiConfig.trustProxyHeaders;
+const mcuRegisterEnabled = apiConfig.mcuRegisterEnabled;
+const mcuRegisterToken = normalizeSecret(apiConfig.mcuRegisterToken);
 
 if (basicAuthEnabled && !basicAuthPassword) {
   throw new Error("BASIC_AUTH_PASSWORD is required when BASIC_AUTH_ENABLED=true");
@@ -463,6 +444,114 @@ const getRequestIp = (req) => {
   return isPublicIpCandidate(remoteCandidate) ? remoteCandidate : null;
 };
 
+const rateLimitWindows = new Map();
+const metrics = {
+  requestsTotal: new Map(),
+  requestDurationBuckets: [0.05, 0.1, 0.2, 0.5, 1, 2, 5],
+  requestDurationCounts: new Map(),
+  inFlight: 0
+};
+
+function metricKey(labels) {
+  return `${labels.method}|${labels.route}|${labels.status}`;
+}
+
+function recordRequestMetric({ method, route, status, durationSeconds }) {
+  const key = metricKey({ method, route, status });
+  metrics.requestsTotal.set(key, (metrics.requestsTotal.get(key) ?? 0) + 1);
+
+  const durationKey = `${method}|${route}`;
+  const existing = metrics.requestDurationCounts.get(durationKey) ?? {
+    count: 0,
+    sum: 0,
+    buckets: new Map(metrics.requestDurationBuckets.map((bucket) => [bucket, 0]))
+  };
+
+  existing.count += 1;
+  existing.sum += durationSeconds;
+  for (const bucket of metrics.requestDurationBuckets) {
+    if (durationSeconds <= bucket) {
+      existing.buckets.set(bucket, (existing.buckets.get(bucket) ?? 0) + 1);
+    }
+  }
+  metrics.requestDurationCounts.set(durationKey, existing);
+}
+
+function renderMetrics() {
+  const lines = [
+    "# HELP http_requests_total Total number of HTTP requests",
+    "# TYPE http_requests_total counter"
+  ];
+
+  for (const [key, count] of metrics.requestsTotal) {
+    const [method, route, status] = key.split("|");
+    lines.push(`http_requests_total{method="${method}",route="${route}",status="${status}"} ${count}`);
+  }
+
+  lines.push("# HELP http_request_duration_seconds HTTP request duration in seconds");
+  lines.push("# TYPE http_request_duration_seconds histogram");
+  for (const [key, stats] of metrics.requestDurationCounts) {
+    const [method, route] = key.split("|");
+    let cumulative = 0;
+    for (const bucket of metrics.requestDurationBuckets) {
+      cumulative = stats.buckets.get(bucket) ?? cumulative;
+      lines.push(`http_request_duration_seconds_bucket{method="${method}",route="${route}",le="${bucket}"} ${cumulative}`);
+    }
+    lines.push(`http_request_duration_seconds_bucket{method="${method}",route="${route}",le="+Inf"} ${stats.count}`);
+    lines.push(`http_request_duration_seconds_sum{method="${method}",route="${route}"} ${stats.sum.toFixed(6)}`);
+    lines.push(`http_request_duration_seconds_count{method="${method}",route="${route}"} ${stats.count}`);
+  }
+
+  lines.push("# HELP http_requests_in_flight Active HTTP requests");
+  lines.push("# TYPE http_requests_in_flight gauge");
+  lines.push(`http_requests_in_flight ${metrics.inFlight}`);
+  return `${lines.join("\n")}\n`;
+}
+
+function getRateLimitConfig(pathname) {
+  if (pathname === "/api/auth/login") {
+    return { limit: 10, windowMs: 60_000 };
+  }
+  if (pathname === "/api/commands" || pathname.startsWith("/api/commands/")) {
+    return { limit: 30, windowMs: 60_000 };
+  }
+  if (pathname === "/api/mcu/register") {
+    return { limit: 20, windowMs: 60_000 };
+  }
+  return { limit: 120, windowMs: 60_000 };
+}
+
+function checkRateLimit(req, pathname) {
+  const requestIp = getRequestIp(req);
+  if (!requestIp) {
+    return { allowed: true, key: null };
+  }
+
+  const { limit, windowMs } = getRateLimitConfig(pathname);
+  const windowKey = Math.floor(Date.now() / windowMs);
+  const key = `${requestIp}:${pathname}:${windowKey}`;
+  const entry = rateLimitWindows.get(key) ?? { count: 0, expiresAt: (windowKey + 2) * windowMs };
+  entry.count += 1;
+  rateLimitWindows.set(key, entry);
+
+  if (rateLimitWindows.size > 5000) {
+    const now = Date.now();
+    for (const [entryKey, value] of rateLimitWindows) {
+      if (value.expiresAt <= now) {
+        rateLimitWindows.delete(entryKey);
+      }
+    }
+  }
+
+  return {
+    allowed: entry.count <= limit,
+    limit,
+    remaining: Math.max(0, limit - entry.count),
+    resetAt: entry.expiresAt,
+    key
+  };
+}
+
 function parseDateInput(value, { endOfDay = false } = {}) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -670,15 +759,6 @@ const buildCommandEnvelope = (job) => ({
   }
 });
 
-function safeEqual(left, right) {
-  const leftBuffer = Buffer.from(String(left ?? ""), "utf8");
-  const rightBuffer = Buffer.from(String(right ?? ""), "utf8");
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-  return timingSafeEqual(leftBuffer, rightBuffer);
-}
-
 function requiresBasicAuth(pathname) {
   if (!basicAuthEnabled) {
     return false;
@@ -687,6 +767,7 @@ function requiresBasicAuth(pathname) {
   return !(
     pathname === "/api/health" ||
     pathname === "/api/ready" ||
+    pathname === "/metrics" ||
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/refresh" ||
     pathname === "/api/auth/logout" ||
@@ -800,6 +881,64 @@ function validateRegisterAccess(req, res, body, url) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const startedAt = process.hrtime.bigint();
+  let metricsRecorded = false;
+  const shouldTimeoutRequest = !url.pathname.endsWith("/stream");
+  let requestTimeout = null;
+  metrics.inFlight += 1;
+  const recordMetricOnce = () => {
+    if (metricsRecorded) return;
+    metricsRecorded = true;
+    metrics.inFlight = Math.max(0, metrics.inFlight - 1);
+    const elapsedSeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
+    recordRequestMetric({
+      method: String(req.method || "GET").toUpperCase(),
+      route: url.pathname,
+      status: String(res.statusCode || 0),
+      durationSeconds: elapsedSeconds
+    });
+  };
+  res.on("finish", recordMetricOnce);
+  res.on("close", recordMetricOnce);
+
+  if (shouldTimeoutRequest) {
+    requestTimeout = setTimeout(() => {
+      if (res.writableEnded) {
+        return;
+      }
+
+      if (!res.headersSent) {
+        sendJson(res, 408, { error: "request_timeout" });
+        return;
+      }
+
+      res.destroy(new Error("request_timeout"));
+    }, apiConfig.requestTimeoutMs);
+  }
+
+  const clearRequestTimeout = () => {
+    if (requestTimeout) {
+      clearTimeout(requestTimeout);
+      requestTimeout = null;
+    }
+  };
+  res.once("finish", clearRequestTimeout);
+  res.once("close", clearRequestTimeout);
+
+  const rateLimitCheck = checkRateLimit(req, url.pathname);
+  if (!rateLimitCheck.allowed) {
+    sendJson(
+      res,
+      429,
+      { error: "rate_limited" },
+      {
+        "retry-after": "60",
+        "x-ratelimit-limit": String(rateLimitCheck.limit ?? 120),
+        "x-ratelimit-remaining": String(rateLimitCheck.remaining ?? 0)
+      }
+    );
+    return;
+  }
 
   if (requiresBasicAuth(url.pathname) && !getHeaderValue(req.headers, "authorization")) {
     sendBasicAuthChallenge(res);
@@ -811,7 +950,19 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/health" && req.method === "GET") {
-    sendJson(res, 200, getHealth());
+    try {
+      const database = await pingDb().catch(() => null);
+      sendJson(res, 200, getHealth({
+        database,
+        memory: getMemoryHealth()
+      }));
+    } catch (error) {
+      console.error("[api/health] failed:", error);
+      sendJson(res, 200, getHealth({
+        database: { status: "error", message: "database_unavailable" },
+        memory: getMemoryHealth()
+      }));
+    }
     return;
   }
 
@@ -819,10 +970,19 @@ const server = createServer(async (req, res) => {
     try {
       const database = await pingDb();
       const ready = getReady({ database });
-      sendJson(res, database ? 200 : 503, ready);
+      sendJson(res, database?.ok ? 200 : 503, ready);
     } catch {
-      sendJson(res, 503, getReady({ database: false }));
+      sendJson(res, 503, getReady({ database: { status: "error", message: "database_unavailable" } }));
     }
+    return;
+  }
+
+  if (url.pathname === "/metrics" && req.method === "GET") {
+    res.writeHead(200, {
+      "content-type": "text/plain; version=0.0.4; charset=utf-8",
+      "cache-control": "no-store"
+    });
+    res.end(renderMetrics());
     return;
   }
 
@@ -886,7 +1046,9 @@ const server = createServer(async (req, res) => {
         vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
         edgeCode: url.searchParams.get("edge") ?? url.searchParams.get("edge_code"),
         status: url.searchParams.get("status"),
-        limit: url.searchParams.get("limit")
+        limit: url.searchParams.get("limit"),
+        offset: url.searchParams.get("offset"),
+        after: url.searchParams.get("after")
       }, principal);
 
       const data = await listCommandJobs(query);
@@ -1018,6 +1180,8 @@ const server = createServer(async (req, res) => {
         url.searchParams.get("public_ip") ??
         url.searchParams.get("ip"),
       limit: url.searchParams.get("limit"),
+      offset: url.searchParams.get("offset"),
+      after: url.searchParams.get("after"),
       onlineSeconds: url.searchParams.get("online_seconds")
     };
 
@@ -1624,6 +1788,9 @@ const server = createServer(async (req, res) => {
       const status = url.searchParams.get("status") ?? null;
       const packageCode = url.searchParams.get("package_code") ?? null;
       const activeOnly = parseBoolean(url.searchParams.get("active_only"), true);
+      const limit = Math.max(1, Math.min(200, toInt(url.searchParams.get("limit"), 50)));
+      const offset = Math.max(0, toInt(url.searchParams.get("offset"), 0));
+      const after = url.searchParams.get("after") ?? null;
 
       const result = await pool.query(
         `
@@ -1652,15 +1819,20 @@ const server = createServer(async (req, res) => {
             and ($4::text is null or pa.status = $4)
             and ($5::text is null or p.code = $5)
             and ($6::boolean = false or pa.is_active = true)
+            and ($7::timestamptz is null or pa.assigned_at < $7::timestamptz)
           order by pa.assigned_at desc
-          limit 200
+          offset $8
+          limit $9
         `,
-        [tenantCode, vesselCode, username, status, packageCode, activeOnly]
+        [tenantCode, vesselCode, username, status, packageCode, activeOnly, after, offset, limit]
       );
 
       sendJson(res, 200, {
         items: result.rows,
-        total: result.rowCount
+        total: result.rowCount,
+        limit,
+        offset,
+        next_after: result.rows.at(-1)?.assigned_at ?? null
       });
     } catch (err) {
       console.error("[api/package-assignments GET] failed:", err);
@@ -1864,6 +2036,8 @@ const server = createServer(async (req, res) => {
       const dateFrom = parseDateInput(url.searchParams.get("date_from"));
       const dateTo = parseDateInput(url.searchParams.get("date_to"), { endOfDay: true });
       const limit = Math.max(1, Math.min(200, toInt(url.searchParams.get("limit"), 50)));
+      const offset = Math.max(0, toInt(url.searchParams.get("offset"), 0));
+      const after = parseDateInput(url.searchParams.get("after"));
 
       const conditions = [];
       const params = [];
@@ -1881,7 +2055,9 @@ const server = createServer(async (req, res) => {
       if (vesselCode) addCondition("vessel_code = $", vesselCode);
       if (username) addCondition("lower(username) = lower($)", username);
       if (actionType) addCondition("action_type = $", actionType);
+      if (after) addCondition("created_at < $::timestamptz", after);
 
+      params.push(offset);
       params.push(limit);
       const query = `
         select
@@ -1901,12 +2077,16 @@ const server = createServer(async (req, res) => {
         from package_audit_events
         ${conditions.length ? `where ${conditions.join(" and ")}` : ""}
         order by created_at desc
+        offset $${params.length - 1}
         limit $${params.length}
       `;
       const result = await pool.query(query, params);
       sendJson(res, 200, {
         total: result.rowCount,
-        items: result.rows
+        items: result.rows,
+        limit,
+        offset,
+        next_after: result.rows.at(-1)?.created_at ?? null
       });
     } catch (err) {
       console.error("[api/package-audit GET] failed:", err);
@@ -2134,6 +2314,10 @@ const server = createServer(async (req, res) => {
 
   sendJson(res, 404, { error: "not_found" });
 });
+
+server.requestTimeout = apiConfig.serverRequestTimeoutMs;
+server.keepAliveTimeout = apiConfig.serverKeepAliveTimeoutMs;
+server.headersTimeout = apiConfig.serverHeadersTimeoutMs;
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";

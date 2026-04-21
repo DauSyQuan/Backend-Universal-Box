@@ -2400,7 +2400,7 @@ function renderDetail() {
       <div class="card-header">
         <h3 class="card-title mb-0">Supporting detail</h3>
         <div class="card-tools">
-          <button type="button" class="btn btn-tool" data-lte-toggle="card-widget">
+          <button type="button" class="btn btn-tool" data-app-toggle-card>
             <i class="bi bi-plus-lg"></i>
           </button>
         </div>
@@ -2835,7 +2835,29 @@ async function refreshAll() {
 }
 
 function bindEvents() {
+  document.querySelectorAll("[data-app-toggle-sidebar]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      document.body.classList.toggle("sidebar-collapsed");
+    });
+  });
+
   elements.detailShell.addEventListener("click", (event) => {
+    const cardToggle = event.target.closest("[data-app-toggle-card]");
+    if (cardToggle) {
+      event.preventDefault();
+      const card = cardToggle.closest(".card");
+      if (card) {
+        card.classList.toggle("collapsed-card");
+        const icon = cardToggle.querySelector("i");
+        if (icon) {
+          icon.classList.toggle("bi-plus-lg");
+          icon.classList.toggle("bi-dash-lg");
+        }
+      }
+      return;
+    }
+
     const button = event.target.closest("[data-command-action]");
     if (!button) {
       const packageButton = event.target.closest("[data-package-assign]");

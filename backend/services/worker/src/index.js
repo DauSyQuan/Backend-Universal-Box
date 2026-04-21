@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 import path from "node:path";
 import process from "node:process";
 import mqtt from "mqtt";
+import { loadWorkerRuntimeConfig } from "../../../shared/config.js";
+import { createLogger } from "../../../shared/logger.js";
 import {
   insertEvent,
   insertHeartbeat,
@@ -34,11 +36,13 @@ import {
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/.env") });
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/env.example"), override: false });
 
-const mqttUrl = process.env.MQTT_URL || "mqtt://localhost:1883";
-const mqttUsername = process.env.MQTT_USERNAME || undefined;
-const mqttPassword = process.env.MQTT_PASSWORD || undefined;
-const qos = Number(process.env.MQTT_QOS ?? "1");
-const observedAtMaxSkewSeconds = Number(process.env.OBSERVED_AT_MAX_SKEW_SECONDS ?? "300");
+const console = createLogger("worker");
+const workerConfig = loadWorkerRuntimeConfig(process.env);
+const mqttUrl = workerConfig.mqttUrl;
+const mqttUsername = workerConfig.mqttUsername;
+const mqttPassword = workerConfig.mqttPassword;
+const qos = workerConfig.qos;
+const observedAtMaxSkewSeconds = workerConfig.observedAtMaxSkewSeconds;
 const inboundTopicFilters = [
   "mcu/+/+/+/heartbeat",
   "mcu/+/+/+/telemetry",
@@ -50,30 +54,16 @@ const inboundTopicFilters = [
   "mcu/+/+/+/result"
 ];
 
-const booleanTrueValues = new Set(["1", "true", "yes", "on"]);
-const booleanFalseValues = new Set(["0", "false", "no", "off"]);
-
-function parseBoolean(value, fallback = false) {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  if (booleanTrueValues.has(normalized)) {
-    return true;
-  }
-  if (booleanFalseValues.has(normalized)) {
-    return false;
-  }
-  return fallback;
-}
-
-const mqttAutoProvision = parseBoolean(process.env.MQTT_AUTO_PROVISION, false);
+const mqttAutoProvision = workerConfig.mqttAutoProvision;
+const mqttReconnectBaseMs = workerConfig.mqttReconnectBaseMs;
+const mqttReconnectMaxMs = workerConfig.mqttReconnectMaxMs;
+let mqttReconnectAttempts = 0;
 
 const client = mqtt.connect(mqttUrl, {
   username: mqttUsername,
   password: mqttPassword,
-  reconnectPeriod: 2_000
+  reconnectPeriod: mqttReconnectBaseMs,
+  connectTimeout: 30_000
 });
 
 async function saveIngestError(errorData) {
@@ -107,6 +97,8 @@ async function resolveRequiredEdgeContext(parsedTopic) {
 
 client.on("connect", () => {
   console.log(`[worker] connected to broker ${mqttUrl}`);
+  mqttReconnectAttempts = 0;
+  client.options.reconnectPeriod = mqttReconnectBaseMs;
   client.subscribe(inboundTopicFilters, { qos }, (error) => {
     if (error) {
       console.error("[worker] subscribe failed:", error.message);
@@ -117,7 +109,11 @@ client.on("connect", () => {
 });
 
 client.on("reconnect", () => {
-  console.log("[worker] reconnecting to broker...");
+  mqttReconnectAttempts += 1;
+  const jitter = Math.floor(Math.random() * 250);
+  const backoff = Math.min(mqttReconnectMaxMs, mqttReconnectBaseMs * 2 ** Math.min(mqttReconnectAttempts - 1, 5)) + jitter;
+  client.options.reconnectPeriod = backoff;
+  console.log(`[worker] reconnecting to broker attempt=${mqttReconnectAttempts} backoff=${backoff}ms`);
 });
 
 client.on("error", (error) => {

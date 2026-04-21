@@ -1,0 +1,196 @@
+openapi: 3.0.3
+info:
+  title: MCU Backend API
+  version: 0.1.0
+  description: MCU backend platform API for fleet monitoring, commands, packages, and usage analytics.
+servers:
+  - url: http://localhost:3000
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+        user:
+          type: object
+    CommandJob:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_code:
+          type: string
+        vessel_code:
+          type: string
+        edge_code:
+          type: string
+        command_type:
+          type: string
+        status:
+          type: string
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_code:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        quota_mb:
+          type: integer
+    UsageReport:
+      type: object
+      properties:
+        summary:
+          type: object
+        top_users:
+          type: array
+          items:
+            type: object
+        top_packages:
+          type: array
+          items:
+            type: object
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Ready
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Metrics
+  /api/auth/login:
+    post:
+      summary: Login and issue bearer token
+      requestBody:
+        required: true
+      responses:
+        "200":
+          description: Auth response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+  /api/commands:
+    get:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: List command jobs
+      responses:
+        "200":
+          description: Command list
+    post:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: Create a command job
+      responses:
+        "201":
+          description: Created
+  /api/commands/{id}:
+    get:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: Get command job by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Command job
+  /api/mcu/edges:
+    get:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: List MCU edges
+      responses:
+        "200":
+          description: Edge list
+  /api/packages:
+    get:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: List packages
+      responses:
+        "200":
+          description: Packages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Package"
+    post:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: Create package
+      responses:
+        "201":
+          description: Created
+  /api/reports/usage:
+    get:
+      security:
+        - basicAuth: []
+        - bearerAuth: []
+      summary: Usage aggregation report
+      responses:
+        "200":
+          description: Usage report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageReport"

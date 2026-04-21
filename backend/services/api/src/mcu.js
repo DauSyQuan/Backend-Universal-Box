@@ -2,9 +2,15 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { isIP } from "node:net";
 import { pool } from "./db.js";
+import { createLogger } from "../../../shared/logger.js";
 
+const console = createLogger("api:mcu");
 const sseEmitter = new EventEmitter();
+const sseMaxListeners = Number(process.env.SSE_MAX_LISTENERS || 100);
+sseEmitter.setMaxListeners(Number.isFinite(sseMaxListeners) && sseMaxListeners > 0 ? sseMaxListeners : 100);
 let sharedListenerClient = null;
+let sharedListenerReconnectAttempts = 0;
+let sharedListenerReconnectTimer = null;
 
 const ALLOWED_COMMAND_TYPES = new Set([
   "policy_sync",
@@ -53,39 +59,61 @@ async function ensureNotificationListener() {
   if (sharedListenerClient || !pool) return;
   sharedListenerClient = await pool.connect();
   await sharedListenerClient.query("LISTEN mcu_telemetry_stream");
+  sharedListenerReconnectAttempts = 0;
+  if (sharedListenerReconnectTimer) {
+    clearTimeout(sharedListenerReconnectTimer);
+    sharedListenerReconnectTimer = null;
+  }
   sharedListenerClient.on("notification", async (msg) => {
     if (msg.channel === "mcu_telemetry_stream") {
       try {
         const payload = JSON.parse(msg.payload);
-        const telemetryResult = await pool.query(
-          `
-            select
-              t.id,
-              t.edge_box_id,
-              t.active_uplink as active_interface,
-              t.rx_kbps,
-              t.tx_kbps,
-              t.throughput_kbps,
-              t.observed_at,
-              (
-                select json_agg(json_build_object(
-                  'name', ti.interface_name,
-                  'rx_kbps', ti.rx_kbps,
-                  'tx_kbps', ti.tx_kbps,
-                  'throughput_kbps', ti.throughput_kbps,
-                  'total_gb', ti.total_gb
-                ))
-                from telemetry_interfaces ti
-                where ti.telemetry_id = t.id
-              ) as interfaces
-            from telemetry t
-            where t.id = $1
-          `,
-          [payload.telemetry_id]
-        );
-        if (telemetryResult.rowCount > 0) {
-          const t = telemetryResult.rows[0];
-          sseEmitter.emit(`edge:${t.edge_box_id}`, t);
+        if (payload?.edge_box_id && payload?.telemetry_id) {
+          const telemetry = {
+            id: payload.telemetry_id,
+            edge_box_id: payload.edge_box_id,
+            active_interface: payload.active_interface ?? null,
+            rx_kbps: payload.rx_kbps ?? null,
+            tx_kbps: payload.tx_kbps ?? null,
+            throughput_kbps: payload.throughput_kbps ?? null,
+            observed_at: payload.observed_at ?? null,
+            interfaces: Array.isArray(payload.interfaces) ? payload.interfaces : []
+          };
+          sseEmitter.emit(`edge:${payload.edge_box_id}`, telemetry);
+          return;
+        }
+
+        if (payload?.telemetry_id) {
+          const telemetryResult = await pool.query(
+            `
+              select
+                t.id,
+                t.edge_box_id,
+                t.active_uplink as active_interface,
+                t.rx_kbps,
+                t.tx_kbps,
+                t.throughput_kbps,
+                t.observed_at,
+                (
+                  select json_agg(json_build_object(
+                    'name', ti.interface_name,
+                    'rx_kbps', ti.rx_kbps,
+                    'tx_kbps', ti.tx_kbps,
+                    'throughput_kbps', ti.throughput_kbps,
+                    'total_gb', ti.total_gb
+                  ))
+                  from telemetry_interfaces ti
+                  where ti.telemetry_id = t.id
+                ) as interfaces
+              from telemetry t
+              where t.id = $1
+            `,
+            [payload.telemetry_id]
+          );
+          if (telemetryResult.rowCount > 0) {
+            const t = telemetryResult.rows[0];
+            sseEmitter.emit(`edge:${t.edge_box_id}`, t);
+          }
         }
       } catch (err) {
         console.error("Failed to process notification", err);
@@ -96,7 +124,20 @@ async function ensureNotificationListener() {
     console.error("Shared listener client error", err);
     sharedListenerClient.release(true);
     sharedListenerClient = null;
-    setTimeout(ensureNotificationListener, 2000);
+    sharedListenerReconnectAttempts += 1;
+    const backoff = Math.min(30_000, 1_000 * 2 ** Math.min(sharedListenerReconnectAttempts, 5));
+    if (sharedListenerReconnectTimer) {
+      clearTimeout(sharedListenerReconnectTimer);
+    }
+    sharedListenerReconnectTimer = setTimeout(() => {
+      sharedListenerReconnectTimer = null;
+      ensureNotificationListener().catch((error) => {
+        console.error("Failed to re-establish notification listener", error);
+      });
+    }, backoff);
+  });
+  sharedListenerClient.on("end", () => {
+    sharedListenerClient = null;
   });
 }
 
@@ -406,13 +447,30 @@ export async function listMcuEdges({
   vesselCode = null,
   wanIp = null,
   limit = 50,
+  offset = 0,
+  after = null,
   onlineSeconds = 120
 }) {
   ensurePool();
 
   const safeLimit = Math.max(1, Math.min(500, toInt(limit, 50)));
+  const safeOffset = Math.max(0, toInt(offset, 0));
   const safeOnlineSeconds = Math.max(10, Math.min(3600, toInt(onlineSeconds, 120)));
   const normalizedWanIp = parseWanIpInput(wanIp);
+  const afterValue = after ? new Date(String(after)) : null;
+  const safeAfter = afterValue && !Number.isNaN(afterValue.getTime()) ? afterValue.toISOString() : null;
+
+  const filters = [
+    "($1::text is null or t.code = $1)",
+    "($2::text is null or v.code = $2)",
+    "($3::inet is null or e.public_wan_ip = $3::inet)"
+  ];
+  const params = [tenantCode, vesselCode, normalizedWanIp];
+
+  if (safeAfter) {
+    params.push(safeAfter);
+    filters.push(`coalesce(hb.observed_at, e.last_seen_at, e.created_at) < $${params.length}::timestamptz`);
+  }
 
   const result = await pool.query(
     `
@@ -477,17 +535,21 @@ export async function listMcuEdges({
         from ingest_errors ie
         where ie.topic like concat('mcu/', t.code, '/', v.code, '/', e.edge_code, '/%')
       ) err on true
-      where ($1::text is null or t.code = $1)
-        and ($2::text is null or v.code = $2)
-        and ($3::inet is null or e.public_wan_ip = $3::inet)
+      where ${filters.join(" and ")}
       order by coalesce(hb.observed_at, e.last_seen_at, e.created_at) desc
-      limit $4
+      offset $${params.length + 1}
+      limit $${params.length + 2}
     `,
-    [tenantCode, vesselCode, normalizedWanIp, safeLimit]
+    [...params, safeOffset, safeLimit]
   );
 
   return {
     total: result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    next_after: result.rows.at(-1)
+      ? latestObservedAt(result.rows.at(-1).heartbeat_at, result.rows.at(-1).telemetry_at, result.rows.at(-1).last_seen_at)
+      : null,
     online_seconds: safeOnlineSeconds,
     items: result.rows.map((row) => ({
       ...row,
@@ -889,11 +951,16 @@ export async function listCommandJobs({
   vesselCode,
   edgeCode,
   status,
-  limit = 50
+  limit = 50,
+  offset = 0,
+  after = null
 }) {
   ensurePool();
 
   const safeLimit = Math.max(1, Math.min(200, toInt(limit, 50)));
+  const safeOffset = Math.max(0, toInt(offset, 0));
+  const afterValue = after ? new Date(String(after)) : null;
+  const safeAfter = afterValue && !Number.isNaN(afterValue.getTime()) ? afterValue.toISOString() : null;
   const filters = [];
   const params = [];
 
@@ -917,6 +984,11 @@ export async function listCommandJobs({
     filters.push(`cj.status = $${params.length}`);
   }
 
+  if (safeAfter) {
+    params.push(safeAfter);
+    filters.push(`cj.created_at < $${params.length}::timestamptz`);
+  }
+
   const query = `
     select
       cj.id,
@@ -938,12 +1010,16 @@ export async function listCommandJobs({
     left join edge_boxes e on e.id = cj.edge_box_id
     ${filters.length ? `where ${filters.join(" and ")}` : ""}
     order by cj.created_at desc
-    limit $${params.length + 1}
+    offset $${params.length + 1}
+    limit $${params.length + 2}
   `;
 
-  const result = await pool.query(query, [...params, safeLimit]);
+  const result = await pool.query(query, [...params, safeOffset, safeLimit]);
   return {
     total: result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    next_after: result.rows.at(-1)?.created_at ?? null,
     items: result.rows.map(normalizeCommandJobRow)
   };
 }
@@ -1276,7 +1352,11 @@ export async function streamMcuTelemetry(req, res, { tenantCode, vesselCode, edg
   const topicStr = `edge:${edgeId}`;
   sseEmitter.on(topicStr, handleUpdate);
 
-  req.on("close", () => {
+  const cleanup = () => {
     sseEmitter.off(topicStr, handleUpdate);
-  });
+  };
+
+  req.on("close", cleanup);
+  req.on("aborted", cleanup);
+  req.on("error", cleanup);
 }

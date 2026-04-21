@@ -52,7 +52,13 @@ async function run() {
             'tenant_id', new.tenant_id,
             'vessel_id', new.vessel_id,
             'edge_box_id', new.edge_box_id,
-            'telemetry_id', new.id
+            'telemetry_id', new.id,
+            'active_uplink', new.active_uplink,
+            'rx_kbps', new.rx_kbps,
+            'tx_kbps', new.tx_kbps,
+            'throughput_kbps', new.throughput_kbps,
+            'observed_at', new.observed_at,
+            'interfaces', new.interfaces
           )::text
         );
         return new;

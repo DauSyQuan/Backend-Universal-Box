@@ -57,6 +57,9 @@ alter table edge_boxes
 create index if not exists idx_edge_boxes_public_wan_ip
   on edge_boxes(public_wan_ip);
 
+create index if not exists idx_edge_boxes_vessel_last_seen
+  on edge_boxes(vessel_id, last_seen_at desc);
+
 do $$
 begin
   create type user_role as enum ('admin', 'noc', 'captain', 'customer');
@@ -151,6 +154,15 @@ begin
   end if;
 end $$;
 
+create index if not exists idx_package_assignments_vessel_status_assigned
+  on package_assignments(vessel_code, status, assigned_at desc);
+
+create index if not exists idx_package_assignments_package_status_assigned
+  on package_assignments(package_id, status, assigned_at desc);
+
+create index if not exists idx_package_assignments_user_status_assigned
+  on package_assignments(user_id, status, assigned_at desc);
+
 create table if not exists telemetry (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -192,6 +204,9 @@ create index if not exists idx_telemetry_interfaces_lookup
 create index if not exists idx_telemetry_interfaces_name_observed
   on telemetry_interfaces(interface_name, observed_at desc);
 
+create index if not exists idx_telemetry_interfaces_telemetry_interface
+  on telemetry_interfaces(telemetry_id, interface_name);
+
 create or replace function fn_notify_telemetry()
 returns trigger as $$
 begin
@@ -201,7 +216,13 @@ begin
       'tenant_id', new.tenant_id,
       'vessel_id', new.vessel_id,
       'edge_box_id', new.edge_box_id,
-      'telemetry_id', new.id
+      'telemetry_id', new.id,
+      'active_uplink', new.active_uplink,
+      'rx_kbps', new.rx_kbps,
+      'tx_kbps', new.tx_kbps,
+      'throughput_kbps', new.throughput_kbps,
+      'observed_at', new.observed_at,
+      'interfaces', new.interfaces
     )::text
   );
   return new;
@@ -254,6 +275,9 @@ create index if not exists idx_ingest_errors_created
 
 create index if not exists idx_ingest_errors_topic
   on ingest_errors(topic text_pattern_ops);
+
+create index if not exists idx_ingest_errors_topic_created
+  on ingest_errors(topic text_pattern_ops, created_at desc);
 
 create table if not exists edge_heartbeats (
   id uuid primary key default gen_random_uuid(),
@@ -320,6 +344,9 @@ create index if not exists idx_user_usage_username_time
 create index if not exists idx_user_usage_vessel_code_time
   on user_usage(vessel_code, observed_at desc);
 
+create index if not exists idx_user_usage_package_assignment_observed
+  on user_usage(package_assignment_id, observed_at desc);
+
 create table if not exists alerts (
   id uuid primary key default gen_random_uuid(),
   tenant_code text,
@@ -333,6 +360,9 @@ create table if not exists alerts (
 
 create index if not exists idx_alerts_username
   on alerts(username, created_at desc);
+
+create index if not exists idx_alerts_scope_created
+  on alerts(tenant_code, vessel_code, username, created_at desc);
 
 create table if not exists package_audit_events (
   id uuid primary key default gen_random_uuid(),
@@ -409,3 +439,9 @@ create table if not exists command_jobs (
 
 create index if not exists idx_command_jobs_vessel_created
   on command_jobs(vessel_id, created_at desc);
+
+create index if not exists idx_command_jobs_status_created
+  on command_jobs(status, created_at desc);
+
+create index if not exists idx_command_jobs_tenant_status_created
+  on command_jobs(tenant_id, status, created_at desc);

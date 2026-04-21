@@ -1,0 +1,10 @@
+drop index if exists idx_command_jobs_tenant_status_created;
+drop index if exists idx_command_jobs_status_created;
+drop index if exists idx_alerts_scope_created;
+drop index if exists idx_user_usage_package_assignment_observed;
+drop index if exists idx_ingest_errors_topic_created;
+drop index if exists idx_telemetry_interfaces_telemetry_interface;
+drop index if exists idx_package_assignments_user_status_assigned;
+drop index if exists idx_package_assignments_package_status_assigned;
+drop index if exists idx_package_assignments_vessel_status_assigned;
+drop index if exists idx_edge_boxes_vessel_last_seen;

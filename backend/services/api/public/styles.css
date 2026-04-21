@@ -947,3 +947,716 @@ body.package-catalog-workspace #detail-section {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Marine portal style overlay --- */
+:root {
+  --marine-bg: #08111d;
+  --marine-surface: rgba(14, 23, 38, 0.7);
+  --marine-surface-strong: rgba(18, 28, 46, 0.92);
+  --marine-border: rgba(255, 255, 255, 0.08);
+  --marine-border-strong: rgba(104, 225, 253, 0.2);
+  --marine-text: #e4edf8;
+  --marine-muted: #93a7bd;
+  --marine-accent: #68e1fd;
+  --marine-accent-2: #4f8cff;
+  --marine-warm: #ffb17a;
+}
+
+html,
+body {
+  background: var(--marine-bg);
+}
+
+body {
+  color: var(--marine-text);
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(79, 140, 255, 0.20), transparent 26%),
+    radial-gradient(circle at 88% 18%, rgba(104, 225, 253, 0.14), transparent 28%),
+    radial-gradient(circle at 78% 78%, rgba(255, 177, 122, 0.09), transparent 22%),
+    linear-gradient(180deg, #0b1320 0%, #07101b 100%);
+  background-attachment: scroll;
+  overflow-x: hidden;
+}
+
+body::before {
+  background: linear-gradient(180deg, rgba(8, 16, 27, 0.28) 0%, rgba(8, 16, 27, 0.72) 100%);
+}
+
+.app-wrapper {
+  min-height: 100vh;
+}
+
+.app-header,
+.app-footer {
+  background: rgba(9, 17, 29, 0.72) !important;
+  backdrop-filter: blur(8px);
+  border-color: var(--marine-border) !important;
+}
+
+.app-sidebar {
+  background:
+    radial-gradient(circle at top left, rgba(104, 225, 253, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(13, 22, 36, 0.95), rgba(10, 18, 30, 0.88)) !important;
+  border-right: 1px solid var(--marine-border) !important;
+  backdrop-filter: blur(8px);
+}
+
+body.sidebar-collapsed .app-sidebar {
+  width: 88px;
+}
+
+body.sidebar-collapsed .app-main {
+  margin-left: 106px;
+}
+
+body.sidebar-collapsed .sidebar-brand .brand-text,
+body.sidebar-collapsed .sidebar-wrapper .user-panel .info,
+body.sidebar-collapsed .sidebar-menu p,
+body.sidebar-collapsed .sidebar-wrapper .card {
+  display: none !important;
+}
+
+body.sidebar-collapsed .sidebar-wrapper {
+  padding-top: 0.5rem;
+}
+
+body.sidebar-collapsed .sidebar-menu {
+  padding-inline: 0.35rem;
+}
+
+body.sidebar-collapsed .sidebar-menu .nav-link {
+  justify-content: center;
+  padding-inline: 0.35rem;
+}
+
+body.sidebar-collapsed .sidebar-menu .nav-link .nav-icon {
+  margin-right: 0;
+}
+
+.app-main {
+  background:
+    radial-gradient(circle at top right, rgba(79, 140, 255, 0.07), transparent 24%),
+    transparent;
+}
+
+.navbar-brand,
+.brand-link,
+.sidebar-brand .brand-text,
+.sidebar-brand .brand-link {
+  color: #fff !important;
+}
+
+.navbar-brand {
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.sidebar-brand {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-brand .brand-link {
+  padding: 1rem 1.1rem;
+}
+
+.sidebar-brand .brand-text {
+  font-weight: 700 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-wrapper .user-panel {
+  margin: 1rem 1rem 0.75rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-wrapper .user-panel .d-block {
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.sidebar-wrapper .user-panel .text-muted {
+  color: var(--marine-muted) !important;
+}
+
+.sidebar-menu .nav-link {
+  border-radius: 0.95rem;
+  margin: 0.2rem 0;
+  color: #bfd0e3 !important;
+  border: 1px solid transparent;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.sidebar-menu .nav-link:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.05);
+  transform: translateX(2px);
+}
+
+.sidebar-menu .nav-link.active {
+  background: linear-gradient(90deg, rgba(104, 225, 253, 0.14), rgba(79, 140, 255, 0.08));
+  color: #fff !important;
+  border-color: rgba(104, 225, 253, 0.16);
+  box-shadow: 0 0.65rem 1.5rem rgba(0, 0, 0, 0.18);
+}
+
+.sidebar-menu .nav-link.active .nav-icon {
+  color: var(--marine-accent);
+}
+
+.app-content-header {
+  padding-top: 1.1rem;
+  padding-bottom: 0.35rem;
+}
+
+.app-content-header h1 {
+  letter-spacing: -0.03em;
+}
+
+.app-content-header p,
+.breadcrumb,
+.text-muted,
+.muted-meta,
+.panel-kicker,
+.tiny-note,
+.package-description,
+.command-action-desc,
+.command-summary-chip,
+.live-subvalue,
+.chart-note,
+.empty-state p {
+  color: var(--marine-muted) !important;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.breadcrumb a {
+  color: #c8d8ea;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: #fff;
+}
+
+.card,
+.phase-card,
+.package-card,
+.detail-summary,
+.chart-card,
+.stack-card,
+.live-card,
+.metric-card,
+.policy-item,
+.comparison-metric,
+.port-chart-card,
+.endpoint-card,
+.technical-details,
+.command-action-panel,
+.command-history-panel,
+.usage-table,
+.user-glass-card,
+.small-box {
+  background: linear-gradient(180deg, rgba(18, 28, 46, 0.88), rgba(13, 21, 35, 0.86)) !important;
+  border: 1px solid var(--marine-border) !important;
+  backdrop-filter: none;
+  box-shadow: 0 0.55rem 1.1rem rgba(0, 0, 0, 0.16) !important;
+}
+
+.card-header,
+.card-footer,
+.phase-card-header {
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.collapsed-card > .card-body {
+  display: none;
+}
+
+.collapsed-card > .card-header .btn i {
+  transition: transform 0.15s ease;
+}
+
+.small-box {
+  overflow: hidden;
+  position: relative;
+}
+
+.small-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(104, 225, 253, 0.12), transparent 30%);
+  pointer-events: none;
+}
+
+.small-box .inner,
+.small-box .icon,
+.small-box .small-box-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.small-box .small-box-footer {
+  color: #d2dced !important;
+}
+
+.form-control,
+.form-select {
+  background-color: rgba(7, 13, 23, 0.75) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f4f8fd !important;
+  border-radius: 0.8rem !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: rgba(104, 225, 253, 0.45) !important;
+  box-shadow: 0 0 0 0.2rem rgba(104, 225, 253, 0.12) !important;
+}
+
+.form-check-input {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.form-check-input:checked {
+  background-color: var(--marine-accent);
+  border-color: var(--marine-accent);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--marine-accent-2), #3f6cff) !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0.4rem 1rem rgba(79, 140, 255, 0.24);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.04);
+}
+
+.btn-outline-light,
+.btn-outline-info {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #eaf2fb !important;
+}
+
+.btn-outline-light:hover,
+.btn-outline-info:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.badge.text-bg-secondary {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #eef5ff !important;
+}
+
+.table {
+  color: #edf4fc;
+}
+
+.table > :not(caption) > * > * {
+  background-color: transparent !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.table thead th {
+  color: #d6e3f3 !important;
+}
+
+.usage-table,
+.port-usage-table-wrap {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.usage-table thead th,
+.usage-table tbody td {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.package-code,
+.meta-chip,
+.command-summary-chip,
+.policy-status,
+.port-active-chip,
+.status-pill {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.package-code,
+.meta-chip,
+.command-summary-chip-muted {
+  background: rgba(104, 225, 253, 0.08);
+  color: #d8f6ff;
+}
+
+.status-pill {
+  background: rgba(255, 255, 255, 0.05);
+  color: #d8e4f1;
+}
+
+.status-good {
+  color: #4fe4a7;
+  background: rgba(79, 228, 167, 0.1);
+}
+
+.status-warn {
+  color: #f5c867;
+  background: rgba(245, 200, 103, 0.11);
+}
+
+.status-bad {
+  color: #ff7b97;
+  background: rgba(255, 123, 151, 0.11);
+}
+
+.package-card {
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.18);
+}
+
+.package-card::before,
+.phase-card::before,
+.detail-summary::before,
+.command-action-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at top right, rgba(104, 225, 253, 0.10), transparent 25%);
+  opacity: 0.8;
+}
+
+.package-card,
+.phase-card,
+.detail-summary,
+.command-action-panel,
+.command-history-panel,
+.stack-card,
+.live-card,
+.metric-card,
+.policy-item,
+.comparison-metric,
+.port-chart-card,
+.endpoint-card,
+.technical-details {
+  position: relative;
+  overflow: hidden;
+}
+
+.package-actions .btn,
+.command-action-btn,
+.package-form .btn,
+.package-admin-actions .btn {
+  border-radius: 0.75rem;
+}
+
+.endpoint-list .endpoint-card,
+.technical-details .endpoint-card {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.empty-state {
+  color: var(--marine-muted);
+}
+
+.app-footer {
+  color: #b8c9db;
+}
+
+/* Keep workspace routing behavior intact while giving the shell a cleaner split */
+body:not(.package-catalog-workspace) #packages-section,
+body:not(.package-catalog-workspace) #usage-section {
+  display: none !important;
+}
+
+body.package-catalog-workspace #summary-section,
+body.package-catalog-workspace #detail-section {
+  display: none !important;
+}
+
+body.package-catalog-workspace #usage-nav-item {
+  display: list-item !important;
+}
+
+/* Stronger visual pass to feel closer to a modern marine portal */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body .app-wrapper {
+  position: relative;
+  padding: 0.85rem;
+}
+
+body .app-header,
+body .app-footer {
+  margin: 0.85rem;
+  border-radius: 1.2rem;
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.18);
+}
+
+body .app-header {
+  min-height: 74px;
+}
+
+body .app-sidebar {
+  top: 0.85rem;
+  left: 0.85rem;
+  bottom: 0.85rem;
+  width: 286px;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  box-shadow: 0 1.2rem 2.6rem rgba(0, 0, 0, 0.28) !important;
+}
+
+body .app-main {
+  margin-left: 304px;
+  padding: 0.85rem 0.85rem 4.25rem;
+}
+
+body .app-content,
+body .app-content-header {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body .app-content-header .container-fluid,
+body .app-content .container-fluid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body .app-content-header h1 {
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+body .navbar-brand {
+  font-size: 0.95rem;
+}
+
+body .nav-link {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+body .nav-link:hover {
+  transform: translateY(-1px);
+}
+
+body .sidebar-menu {
+  padding-inline: 0.85rem;
+}
+
+body .sidebar-menu .nav-item {
+  margin-bottom: 0.1rem;
+}
+
+body .sidebar-menu .nav-link,
+body .sidebar-menu .nav-header {
+  border-radius: 0.95rem;
+}
+
+body .sidebar-menu .nav-header {
+  padding-inline: 0.45rem;
+  color: rgba(228, 237, 248, 0.45);
+}
+
+body .sidebar-menu .nav-link {
+  padding: 0.85rem 0.95rem;
+  min-height: 46px;
+}
+
+body .sidebar-menu .nav-link .nav-icon {
+  width: 1.25rem;
+  color: rgba(227, 238, 250, 0.84);
+}
+
+body .sidebar-menu .nav-link.active {
+  transform: translateX(3px);
+}
+
+body .user-panel {
+  margin-inline: 0.85rem !important;
+}
+
+body .card,
+body .small-box,
+body .phase-card,
+body .package-card,
+body .detail-summary,
+body .chart-card,
+body .stack-card,
+body .live-card,
+body .metric-card,
+body .policy-item,
+body .comparison-metric,
+body .port-chart-card,
+body .endpoint-card,
+body .technical-details,
+body .command-action-panel,
+body .command-history-panel {
+  border-radius: 1.15rem !important;
+}
+
+body .card-header,
+body .card-footer {
+  padding-top: 0.9rem;
+  padding-bottom: 0.9rem;
+}
+
+body .card-body {
+  padding: 1rem;
+}
+
+body .btn {
+  border-radius: 0.85rem;
+  font-weight: 600;
+}
+
+body .btn-sm {
+  border-radius: 0.75rem;
+}
+
+body .badge {
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+body .small-box .inner h3 {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+body .small-box .inner p {
+  color: #d9e4f0 !important;
+}
+
+body #summary-cards .small-box:nth-child(1) {
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.28), rgba(13, 23, 40, 0.88)) !important;
+}
+
+body #summary-cards .small-box:nth-child(2) {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.26), rgba(13, 23, 40, 0.88)) !important;
+}
+
+body #summary-cards .small-box:nth-child(3) {
+  background: linear-gradient(135deg, rgba(245, 200, 103, 0.24), rgba(13, 23, 40, 0.88)) !important;
+}
+
+body #summary-cards .small-box:nth-child(4) {
+  background: linear-gradient(135deg, rgba(255, 123, 151, 0.24), rgba(13, 23, 40, 0.88)) !important;
+}
+
+body #summary-cards .small-box:nth-child(5) {
+  background: linear-gradient(135deg, rgba(104, 225, 253, 0.24), rgba(13, 23, 40, 0.88)) !important;
+}
+
+body .package-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body .package-card {
+  min-height: 100%;
+}
+
+body .command-action-btn,
+body .package-card .btn,
+body .phase-card .btn {
+  box-shadow: none;
+}
+
+body .command-action-btn:hover,
+body .package-card .btn:hover,
+body .phase-card .btn:hover {
+  box-shadow: 0 0.6rem 1.4rem rgba(0, 0, 0, 0.18);
+}
+
+body .detail-shell .empty-state {
+  padding: 2rem 1rem;
+}
+
+body .content-header,
+body .app-content-header {
+  margin-bottom: 0.65rem;
+}
+
+body .breadcrumb {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+body .breadcrumb-item + .breadcrumb-item::before {
+  padding-inline: 0.45rem;
+}
+
+body .navbar-nav .nav-item .status-pill {
+  min-height: 34px;
+}
+
+body .small-box .icon {
+  top: 16px;
+  right: 16px;
+}
+
+body .small-box:hover {
+  transform: translateY(-1px);
+}
+
+body .card,
+body .small-box,
+body .package-card,
+body .phase-card,
+body .command-action-panel,
+body .command-history-panel {
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+body .card:hover,
+body .small-box:hover,
+body .package-card:hover,
+body .phase-card:hover {
+  border-color: rgba(104, 225, 253, 0.14) !important;
+}
+
+body .package-grid,
+body .command-center-grid,
+body .history-grid,
+body .detail-shell,
+body .live-grid,
+body .metric-grid,
+body .comparison-metrics,
+body .policy-grid,
+body .port-chart-grid {
+  contain: layout paint;
+}
+
+body .app-header .navbar-brand span,
+body .app-sidebar .brand-text {
+  letter-spacing: 0.05em;
+}
+
+body .package-card-header,
+body .phase-card-header,
+body .command-panel-head,
+body .detail-summary-header,
+body .stack-card-header,
+body .live-card-header,
+body .chart-header,
+body .policy-item-header,
+body .technical-summary,
+body .endpoint-summary {
+  gap: 1rem;
+}

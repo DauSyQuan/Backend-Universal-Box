@@ -202,6 +202,35 @@ journalctl -u mcu-worker.service -f
 journalctl -u mcu-api.service -f
 ```
 
+## Production containers
+
+For a production-style container stack, use the dedicated Dockerfiles and compose file:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The production stack includes:
+
+- PostgreSQL
+- Mosquitto
+- API container built from `Dockerfile.api`
+- Worker container built from `Dockerfile.worker`
+- Nginx reverse proxy on port `80`
+
+If you want more throughput on a single host, scale the stateless services:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --scale api=2 --scale worker=3
+```
+
+Before deploying, make sure `ops/.env` contains production secrets and not demo values.
+
+## API documentation
+
+- Human-readable docs: `docs/API.md`
+- OpenAPI starter spec: `docs/openapi.yaml`
+
 ## Expected smoke output
 
 - `/api/health` returns status `ok`.

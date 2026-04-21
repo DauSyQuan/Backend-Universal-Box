@@ -2,18 +2,21 @@ import dotenv from "dotenv";
 import path from "node:path";
 import process from "node:process";
 import { Pool } from "pg";
+import { loadDatabaseConfig } from "../../../shared/config.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/.env") });
 dotenv.config({ path: path.resolve(process.cwd(), "../../ops/env.example"), override: false });
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required for worker");
-}
+const databaseConfig = loadDatabaseConfig(process.env, { applicationName: "worker" });
 
 export const pool = new Pool({
-  connectionString: databaseUrl
+  connectionString: databaseConfig.databaseUrl,
+  application_name: databaseConfig.applicationName,
+  max: databaseConfig.poolMax,
+  idleTimeoutMillis: databaseConfig.idleTimeoutMillis,
+  connectionTimeoutMillis: databaseConfig.connectionTimeoutMillis,
+  statement_timeout: databaseConfig.statementTimeoutMillis,
+  query_timeout: databaseConfig.queryTimeoutMillis
 });
 
 const contextCache = new Map();

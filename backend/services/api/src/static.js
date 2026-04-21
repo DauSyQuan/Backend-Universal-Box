@@ -1,10 +1,13 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createLogger } from "../../../shared/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const console = createLogger("api:static");
 const publicDir = path.resolve(__dirname, "../public");
+const marinePortalDistDir = path.resolve(__dirname, "../../../../frontend/marine-portal-frontend/dist");
 
 const routes = new Map([
   ["/dashboard", "dashboard.html"],
@@ -16,7 +19,12 @@ const routes = new Map([
   ["/package-catalog/", "index.html"],
   ["/package-catalog/index.html", "index.html"],
   ["/package-catalog/app.js", "app.js"],
-  ["/package-catalog/styles.css", "styles.css"]
+  ["/package-catalog/styles.css", "styles.css"],
+  ["/marine-portal", "marine-portal/index.html"],
+  ["/marine-portal/", "marine-portal/index.html"],
+  ["/marine-portal/index.html", "marine-portal/index.html"],
+  ["/marine-portal/dashboard", "marine-portal/index.html"],
+  ["/marine-portal/package-catalog", "marine-portal/index.html"]
 ]);
 
 const vendorPrefix = "/dashboard/vendor/";
@@ -28,6 +36,10 @@ const contentTypes = {
   ".js": "application/javascript; charset=utf-8"
 };
 
+function buildEtag(stats) {
+  return `"${stats.size}-${Number(stats.mtimeMs)}"`;
+}
+
 async function sendFile(res, filename) {
   const filePath = path.resolve(publicDir, filename);
   if (!filePath.startsWith(publicDir)) {
@@ -37,10 +49,22 @@ async function sendFile(res, filename) {
   }
 
   try {
+    const stats = await stat(filePath);
+    const etag = buildEtag(stats);
+    if (res.req?.headers?.["if-none-match"] === etag) {
+      res.writeHead(304, {
+        etag,
+        "cache-control": "no-cache"
+      });
+      res.end();
+      return;
+    }
+
     const body = await readFile(filePath);
     const ext = path.extname(filePath);
     res.writeHead(200, {
-      "cache-control": "no-store",
+      etag,
+      "cache-control": ext === ".html" ? "no-cache" : "public, max-age=300",
       "content-type": contentTypes[ext] || "application/octet-stream"
     });
     res.end(body);
@@ -57,6 +81,47 @@ async function sendFile(res, filename) {
   }
 }
 
+async function sendMarinePortalFile(res, filename) {
+  const filePath = path.resolve(marinePortalDistDir, filename);
+  if (!filePath.startsWith(marinePortalDistDir)) {
+    res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
+    res.end("forbidden");
+    return;
+  }
+
+  try {
+    const stats = await stat(filePath);
+    const etag = buildEtag(stats);
+    if (res.req?.headers?.["if-none-match"] === etag) {
+      res.writeHead(304, {
+        etag,
+        "cache-control": "no-cache"
+      });
+      res.end();
+      return;
+    }
+
+    const body = await readFile(filePath);
+    const ext = path.extname(filePath);
+    res.writeHead(200, {
+      etag,
+      "cache-control": ext === ".html" ? "no-cache" : "public, max-age=300",
+      "content-type": contentTypes[ext] || "application/octet-stream"
+    });
+    res.end(body);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end("not_found");
+      return;
+    }
+
+    console.error("[marine-portal/static] failed:", error);
+    res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+    res.end("static_file_failed");
+  }
+}
+
 export async function maybeServeStatic(req, res, url) {
   if (req.method !== "GET" && req.method !== "HEAD") {
     return false;
@@ -64,6 +129,12 @@ export async function maybeServeStatic(req, res, url) {
 
   if (url.pathname === "/") {
     res.writeHead(302, { location: "/dashboard" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+    res.writeHead(302, { location: "/marine-portal" });
     res.end();
     return true;
   }
@@ -78,6 +149,22 @@ export async function maybeServeStatic(req, res, url) {
     const next = `/package-catalog${url.search || ""}${url.hash || ""}`;
     res.writeHead(302, { location: next });
     res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal" || url.pathname === "/marine-portal/" || url.pathname === "/marine-portal/index.html") {
+    await sendMarinePortalFile(res, "index.html");
+    return true;
+  }
+
+  if (url.pathname.startsWith("/marine-portal/assets/")) {
+    const filename = url.pathname.slice("/marine-portal/".length);
+    await sendMarinePortalFile(res, filename);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/marine-portal/")) {
+    await sendMarinePortalFile(res, "index.html");
     return true;
   }
 
