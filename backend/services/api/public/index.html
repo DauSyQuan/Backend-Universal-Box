@@ -6,7 +6,7 @@
     <title>Package Workspace</title>
     <link rel="stylesheet" href="/dashboard/vendor/bootstrap/bootstrap.min.css">
     <link rel="stylesheet" href="/dashboard/vendor/bootstrap-icons/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/dashboard/styles.css?v=20260416p">
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260422a">
   </head>
   <body class="marine-shell">
     <div class="app-wrapper">
@@ -25,6 +25,22 @@
             <li class="nav-item"><span id="health-pill" class="status-pill status-loading">Checking</span></li>
             <li class="nav-item"><span id="ready-pill" class="status-pill status-loading">Checking</span></li>
             <li class="nav-item"><span id="stream-pill" class="status-pill status-muted">Idle</span></li>
+            <li class="nav-item">
+              <div class="auth-user-chip">
+                <div class="auth-user-chip__avatar"><i class="bi bi-person-circle"></i></div>
+                <div class="auth-user-chip__body">
+                  <span class="auth-user-chip__label">Signed in</span>
+                  <strong id="auth-username">admin</strong>
+                  <span id="auth-role" class="auth-user-chip__role">admin</span>
+                </div>
+              </div>
+            </li>
+            <li class="nav-item">
+              <button id="logout-button" type="button" class="btn btn-outline-light btn-sm auth-logout-button">
+                <i class="bi bi-box-arrow-right me-1"></i>
+                Logout
+              </button>
+            </li>
           </ul>
         </div>
       </nav>
@@ -38,9 +54,13 @@
 
         <div class="sidebar-wrapper">
           <div class="user-panel mt-3 pb-3 mb-3 d-flex">
-            <div class="info">
-              <a href="#" class="d-block">Package workspace</a>
-              <small class="text-muted">Focused package operations for NOC</small>
+            <div class="auth-user-chip auth-user-chip--sidebar">
+              <div class="auth-user-chip__avatar"><i class="bi bi-person-badge"></i></div>
+              <div class="auth-user-chip__body">
+                <span class="auth-user-chip__label">Current session</span>
+                <span class="d-block" id="auth-sidebar-username">admin</span>
+                <small id="auth-sidebar-role" class="text-muted">admin</small>
+              </div>
             </div>
           </div>
 
@@ -338,6 +358,6 @@
     </div>
 
     <script src="/dashboard/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="/dashboard/app.js?v=20260416q" defer></script>
+    <script src="/dashboard/app.js?v=20260422a" defer></script>
   </body>
 </html>

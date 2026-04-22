@@ -14,6 +14,9 @@ const routes = new Map([
   ["/dashboard/index.html", "dashboard.html"],
   ["/dashboard/app.js", "app.js"],
   ["/dashboard/styles.css", "styles.css"],
+  ["/login", "login.html"],
+  ["/login/", "login.html"],
+  ["/login/index.html", "login.html"],
   ["/package-catalog", "index.html"],
   ["/package-catalog/", "index.html"],
   ["/package-catalog/index.html", "index.html"],
@@ -128,26 +131,32 @@ export async function maybeServeStatic(req, res, url) {
   }
 
   if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
-    res.writeHead(302, { location: "/marine-portal#summary-section" });
-    res.end();
+    await sendFile(res, "dashboard.html");
     return true;
   }
 
   if (url.pathname === "/dashboard/index.html") {
-    res.writeHead(302, { location: "/marine-portal#summary-section" });
-    res.end();
+    await sendFile(res, "dashboard.html");
     return true;
   }
 
   if (url.pathname === "/package-catalog" || url.pathname === "/package-catalog/") {
-    res.writeHead(302, { location: "/marine-portal#packages-section" });
-    res.end();
+    await sendFile(res, "index.html");
     return true;
   }
 
   if (url.pathname === "/package-catalog/index.html") {
-    res.writeHead(302, { location: "/marine-portal#packages-section" });
-    res.end();
+    await sendFile(res, "index.html");
+    return true;
+  }
+
+  if (url.pathname === "/login" || url.pathname === "/login/") {
+    await sendFile(res, "login.html");
+    return true;
+  }
+
+  if (url.pathname === "/login/index.html") {
+    await sendFile(res, "login.html");
     return true;
   }
 

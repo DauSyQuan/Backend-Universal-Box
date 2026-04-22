@@ -1013,7 +1013,24 @@ function requiresBasicAuth(pathname) {
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/refresh" ||
     pathname === "/api/auth/logout" ||
-    pathname === "/api/mcu/register"
+    pathname === "/api/mcu/register" ||
+    pathname === "/" ||
+    pathname === "/dashboard" ||
+    pathname === "/dashboard/" ||
+    pathname === "/dashboard/index.html" ||
+    pathname === "/login" ||
+    pathname === "/login/" ||
+    pathname === "/login/index.html" ||
+    pathname === "/package-catalog" ||
+    pathname === "/package-catalog/" ||
+    pathname === "/package-catalog/index.html" ||
+    pathname === "/marine-portal" ||
+    pathname === "/marine-portal/" ||
+    pathname === "/marine-portal/index.html" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname.startsWith("/login/") ||
+    pathname.startsWith("/package-catalog/") ||
+    pathname.startsWith("/marine-portal/")
   );
 }
 

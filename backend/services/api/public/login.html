@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Marine Ops Login</title>
+    <link rel="stylesheet" href="/dashboard/vendor/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/dashboard/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/dashboard/styles.css?v=20260422a">
+  </head>
+  <body class="login-page">
+    <main class="auth-shell">
+      <section class="auth-hero">
+        <div class="auth-brand">
+          <div class="auth-brand-mark">
+            <i class="bi bi-hexagon-half"></i>
+          </div>
+          <div>
+            <span class="auth-brand-kicker">Marine Ops Monitor</span>
+            <h1>Fleet command center</h1>
+            <p>Secure token-based access for operators who need real-time telemetry, commands, and package control.</p>
+          </div>
+        </div>
+
+        <div class="auth-highlights">
+          <article class="auth-highlight-card">
+            <i class="bi bi-broadcast-pin"></i>
+            <div>
+              <strong>Realtime telemetry</strong>
+              <span>Watch uplink state, throughput, and command jobs live.</span>
+            </div>
+          </article>
+          <article class="auth-highlight-card">
+            <i class="bi bi-shield-lock"></i>
+            <div>
+              <strong>Token session</strong>
+              <span>Local storage keeps your signed-in session ready across refreshes.</span>
+            </div>
+          </article>
+          <article class="auth-highlight-card">
+            <i class="bi bi-phone"></i>
+            <div>
+              <strong>Mobile friendly</strong>
+              <span>Clean layout that keeps focus on the fleet, even on small screens.</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="auth-panel">
+        <div class="auth-card glass-card">
+          <div class="auth-card-header">
+            <span class="panel-kicker">Sign in</span>
+            <h2>Welcome back</h2>
+            <p>Use the default demo credentials or your own valid operator account.</p>
+          </div>
+
+          <form id="login-form" class="auth-form" novalidate>
+            <label class="auth-field">
+              <span>Username</span>
+              <input
+                id="login-username"
+                name="username"
+                type="text"
+                class="form-control form-control-lg"
+                value="admin"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                autofocus
+                required
+              >
+            </label>
+
+            <label class="auth-field">
+              <span>Password</span>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                class="form-control form-control-lg"
+                placeholder="123"
+                autocomplete="current-password"
+                required
+              >
+            </label>
+
+            <div class="auth-shortcuts">
+              <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> submit</span>
+              <span><kbd>Ctrl</kbd> + <kbd>K</kbd> focus username</span>
+              <span><kbd>Esc</kbd> clear password</span>
+            </div>
+
+            <div class="auth-defaults">
+              <span class="status-pill status-good">Username: admin</span>
+              <span class="status-pill status-warn">Password: 123</span>
+            </div>
+
+            <div id="login-feedback" class="auth-feedback" aria-live="polite"></div>
+
+            <button id="login-submit" type="submit" class="btn btn-primary btn-lg auth-submit">
+              <i class="bi bi-box-arrow-in-right me-2"></i>
+              Sign in
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script src="/dashboard/app.js?v=20260422a" defer></script>
+  </body>
+</html>

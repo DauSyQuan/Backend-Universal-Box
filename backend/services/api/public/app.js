@@ -1,4 +1,9 @@
 const state = {
+  auth: {
+    redirecting: false,
+    token: "",
+    user: null
+  },
   autoRefreshSeconds: 15,
   detail: null,
   edges: [],
@@ -34,12 +39,31 @@ const state = {
   traffic: null
 };
 
-const appRoute = window.location.pathname.startsWith("/package-catalog")
-  ? "/package-catalog"
-  : "/dashboard";
+const isLoginPage = ["/login", "/login/", "/login/index.html"].includes(window.location.pathname);
+const appRoute = isLoginPage
+  ? "/dashboard"
+  : window.location.pathname.startsWith("/package-catalog")
+    ? "/package-catalog"
+    : "/dashboard";
 const isPackageCatalogWorkspace = appRoute === "/package-catalog";
+const authStorageKeys = {
+  token: "marine_ops_auth_token",
+  user: "marine_ops_auth_user"
+};
+const loginRedirectStorageKey = "marine_ops_login_redirect";
 
 const elements = {
+  authLogoutButton: document.querySelector("#logout-button"),
+  authRole: document.querySelector("#auth-role"),
+  authSidebarRole: document.querySelector("#auth-sidebar-role"),
+  authSidebarUsername: document.querySelector("#auth-sidebar-username"),
+  authUsername: document.querySelector("#auth-username"),
+  loginFeedback: document.querySelector("#login-feedback"),
+  loginForm: document.querySelector("#login-form"),
+  loginPassword: document.querySelector("#login-password"),
+  loginSubmit: document.querySelector("#login-submit"),
+  loginUsername: document.querySelector("#login-username"),
+
   clearFiltersButton: document.querySelector("#clear-filters-button"),
   detailMeta: document.querySelector("#detail-meta"),
   detailShell: document.querySelector("#detail-shell"),
@@ -93,6 +117,200 @@ const elements = {
   tenantInput: document.querySelector("#tenant-input"),
   vesselInput: document.querySelector("#vessel-input")
 };
+
+function readStoredAuthUser() {
+  const raw = window.localStorage.getItem(authStorageKeys.user);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredAuthToken() {
+  return String(window.localStorage.getItem(authStorageKeys.token) || "").trim();
+}
+
+function setLoginRedirectTarget(target) {
+  const normalized = String(target || "").trim();
+  if (!normalized || !normalized.startsWith("/")) {
+    window.localStorage.removeItem(loginRedirectStorageKey);
+    return;
+  }
+  window.localStorage.setItem(loginRedirectStorageKey, normalized);
+}
+
+function resolveLoginRedirectTarget() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = String(params.get("redirect") || "").trim();
+  if (fromQuery && fromQuery.startsWith("/")) {
+    return fromQuery;
+  }
+
+  const fromStorage = String(window.localStorage.getItem(loginRedirectStorageKey) || "").trim();
+  if (fromStorage && fromStorage.startsWith("/")) {
+    return fromStorage;
+  }
+
+  return appRoute;
+}
+
+function clearAuthSession() {
+  state.auth.token = "";
+  state.auth.user = null;
+  window.localStorage.removeItem(authStorageKeys.token);
+  window.localStorage.removeItem(authStorageKeys.user);
+  window.localStorage.removeItem(loginRedirectStorageKey);
+  renderAuthUser();
+}
+
+function storeAuthSession(payload) {
+  const token = String(payload?.access_token || "").trim();
+  const user = payload?.user && typeof payload.user === "object" ? payload.user : null;
+  if (!token) {
+    throw new Error("missing_access_token");
+  }
+
+  state.auth.token = token;
+  state.auth.user = user;
+  window.localStorage.setItem(authStorageKeys.token, token);
+  if (user) {
+    window.localStorage.setItem(authStorageKeys.user, JSON.stringify(user));
+  } else {
+    window.localStorage.removeItem(authStorageKeys.user);
+  }
+
+  renderAuthUser();
+  return { token, user };
+}
+
+function renderAuthUser() {
+  const user = state.auth.user || readStoredAuthUser();
+  const username = String(user?.username || "guest").trim() || "guest";
+  const role = String(user?.role || "operator").trim() || "operator";
+
+  setTextContent(elements.authUsername, username);
+  setTextContent(elements.authRole, role);
+  setTextContent(elements.authSidebarUsername, username);
+  setTextContent(elements.authSidebarRole, role);
+}
+
+function setLoginFeedback(message, kind = "danger") {
+  if (!elements.loginFeedback) {
+    return;
+  }
+
+  if (!message) {
+    elements.loginFeedback.textContent = "";
+    elements.loginFeedback.className = "auth-feedback";
+    return;
+  }
+
+  elements.loginFeedback.textContent = message;
+  elements.loginFeedback.className = `auth-feedback auth-feedback-${kind}`;
+}
+
+function getCurrentLocationTarget() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function redirectToLogin() {
+  if (isLoginPage) {
+    return;
+  }
+
+  state.auth.redirecting = true;
+  setLoginRedirectTarget(getCurrentLocationTarget());
+  const loginUrl = new URL("/login", window.location.origin);
+  loginUrl.searchParams.set("redirect", getCurrentLocationTarget());
+  window.location.replace(loginUrl.toString());
+}
+
+function redirectAfterLogin() {
+  const target = resolveLoginRedirectTarget();
+  window.localStorage.removeItem(loginRedirectStorageKey);
+  state.auth.redirecting = true;
+  window.location.replace(target);
+}
+
+async function refreshAuthSession() {
+  const response = await apiFetch("/api/auth/refresh", {
+    method: "POST"
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthSession();
+      if (!isLoginPage) {
+        redirectToLogin();
+      }
+      throw new Error("session_expired");
+    }
+
+    throw new Error(payload?.error || response.statusText || "auth_refresh_failed");
+  }
+
+  storeAuthSession(payload);
+  return payload;
+}
+
+async function ensureAuthenticated() {
+  const token = readStoredAuthToken();
+  const user = readStoredAuthUser();
+
+  if (token) {
+    state.auth.token = token;
+    state.auth.user = user;
+  }
+  renderAuthUser();
+
+  if (isLoginPage) {
+    if (token) {
+      try {
+        await refreshAuthSession();
+        redirectAfterLogin();
+        return false;
+      } catch (error) {
+        if (String(error?.message || "") !== "session_expired") {
+          clearAuthSession();
+        }
+      }
+    }
+    return true;
+  }
+
+  if (!token) {
+    redirectToLogin();
+    return false;
+  }
+
+  try {
+    await refreshAuthSession();
+    return true;
+  } catch (error) {
+    if (String(error?.message || "") !== "session_expired") {
+      console.warn("[auth] session validation failed:", error);
+    }
+    clearAuthSession();
+    redirectToLogin();
+    return false;
+  }
+}
+
+function handleAuthFailureResponse(response) {
+  if (response?.status === 401 && !isLoginPage) {
+    clearAuthSession();
+    redirectToLogin();
+    return true;
+  }
+
+  return false;
+}
 
 function setTextContent(element, value) {
   if (!element) {
@@ -520,19 +738,32 @@ function syncWorkspaceLinks() {
 }
 
 async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("accept")) {
+    headers.set("accept", "application/json");
+  }
+
+  const token = state.auth.token || readStoredAuthToken();
+  if (token && !headers.has("authorization")) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+
   return fetch(path, {
     cache: "no-store",
     credentials: "same-origin",
     ...options,
-    headers: {
-      accept: "application/json",
-      ...(options.headers || {})
-    }
+    headers
   });
 }
 
-async function fetchJson(path) {
-  const response = await apiFetch(path);
+async function fetchJson(path, options = {}) {
+  const response = await apiFetch(path, options);
+
+  if (response.status === 401 && !isLoginPage) {
+    clearAuthSession();
+    redirectToLogin();
+    throw new Error("session_expired");
+  }
 
   if (!response.ok) {
     const payload = await response.text();
@@ -939,6 +1170,9 @@ async function assignPackage(packageId) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (handleAuthFailureResponse(response)) {
+        throw new Error("session_expired");
+      }
       throw new Error(payload?.error || response.statusText || "package_assign_failed");
     }
 
@@ -1034,6 +1268,9 @@ async function savePackageFromForm() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (handleAuthFailureResponse(response)) {
+        throw new Error("session_expired");
+      }
       throw new Error(result?.error || response.statusText || "package_save_failed");
     }
 
@@ -1083,6 +1320,9 @@ async function archivePackage(packageId) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (handleAuthFailureResponse(response)) {
+        throw new Error("session_expired");
+      }
       throw new Error(result?.error || response.statusText || "package_delete_failed");
     }
 
@@ -1123,6 +1363,9 @@ async function unassignAssignment(assignmentId) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (handleAuthFailureResponse(response)) {
+        throw new Error("session_expired");
+      }
       throw new Error(result?.error || response.statusText || "package_unassign_failed");
     }
 
@@ -2699,8 +2942,8 @@ async function sendCommand(action) {
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Session expired or unauthorized. Please sign in again.");
+      if (handleAuthFailureResponse(response)) {
+        throw new Error("session_expired");
       }
       if (response.status === 403) {
         throw new Error("You do not have permission to send this command.");
@@ -2746,6 +2989,10 @@ function setCommandPollTimer() {
 }
 
 function renderErrorState(error) {
+  if (state.auth.redirecting || isLoginPage) {
+    return;
+  }
+
   console.error("[dashboard] failed:", error);
   elements.detailShell.innerHTML = `
     <div class="empty-state">
@@ -2822,6 +3069,124 @@ function setRefreshTimer() {
   }, state.autoRefreshSeconds * 1000);
 }
 
+function setLoginLoading(isLoading) {
+  if (!elements.loginSubmit) {
+    return;
+  }
+
+  elements.loginSubmit.disabled = isLoading;
+  elements.loginSubmit.innerHTML = isLoading
+    ? '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Signing in...'
+    : '<i class="bi bi-box-arrow-in-right me-2"></i>Sign in';
+}
+
+async function submitLogin() {
+  const username = elements.loginUsername?.value.trim() || "";
+  const password = elements.loginPassword?.value || "";
+
+  if (!username || !password) {
+    setLoginFeedback("Please enter both username and password.", "warn");
+    return;
+  }
+
+  setLoginFeedback("");
+  setLoginLoading(true);
+
+  try {
+    const response = await apiFetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) {
+        setLoginFeedback("Invalid username or password. Try admin / 123.", "danger");
+        return;
+      }
+
+      throw new Error(payload?.error || response.statusText || "login_failed");
+    }
+
+    storeAuthSession(payload);
+    setLoginFeedback("Sign in successful. Redirecting...", "success");
+    window.setTimeout(redirectAfterLogin, 150);
+  } catch (error) {
+    if (String(error?.message || "") === "session_expired") {
+      return;
+    }
+    setLoginFeedback(error.message || "Unable to sign in. Please try again.", "danger");
+  } finally {
+    setLoginLoading(false);
+  }
+}
+
+function bindLoginEvents() {
+  if (!elements.loginForm) {
+    return;
+  }
+
+  elements.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitLogin().catch((error) => {
+      console.error("[auth/login] failed:", error);
+      setLoginFeedback("Unable to sign in. Please try again.", "danger");
+    });
+  });
+
+  elements.loginForm.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      elements.loginUsername?.focus();
+      elements.loginUsername?.select?.();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "enter") {
+      event.preventDefault();
+      submitLogin().catch((error) => {
+        console.error("[auth/login] failed:", error);
+        setLoginFeedback("Unable to sign in. Please try again.", "danger");
+      });
+      return;
+    }
+
+    if (event.key === "Escape" && elements.loginPassword) {
+      elements.loginPassword.value = "";
+    }
+  });
+
+  elements.loginUsername?.focus?.();
+  elements.loginUsername?.select?.();
+}
+
+async function logout() {
+  if (state.auth.redirecting) {
+    return;
+  }
+
+  state.auth.redirecting = true;
+  try {
+    await apiFetch("/api/auth/logout", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      }
+    });
+  } catch (error) {
+    console.warn("[auth/logout] request failed:", error);
+  } finally {
+    clearAuthSession();
+    redirectToLogin();
+  }
+}
+
 async function refreshAll() {
   await Promise.all([
     loadHealth(),
@@ -2835,6 +3200,15 @@ async function refreshAll() {
 }
 
 function bindEvents() {
+  elements.authLogoutButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    logout().catch((error) => {
+      console.error("[auth/logout] failed:", error);
+      clearAuthSession();
+      redirectToLogin();
+    });
+  });
+
   document.querySelectorAll("[data-app-toggle-sidebar]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -2978,10 +3352,24 @@ function bindEvents() {
 }
 
 async function bootstrap() {
+  const authenticated = await ensureAuthenticated();
+  if (!authenticated) {
+    return;
+  }
+
+  renderAuthUser();
+
+  if (isLoginPage) {
+    bindLoginEvents();
+    setLoginFeedback("");
+    return;
+  }
+
   applyQueryFiltersFromLocation();
   syncUsageFilterInputs();
   applyWorkspaceMode();
   bindEvents();
+  renderAuthUser();
   setStatusPill(elements.healthPill, "Checking", "loading");
   setStatusPill(elements.readyPill, "Checking", "loading");
   setStatusPill(elements.streamPill, "Idle", "muted");
