@@ -9,23 +9,13 @@ const console = createLogger("api:static");
 const publicDir = path.resolve(__dirname, "../public");
 
 const routes = new Map([
-  ["/dashboard", "dashboard.html"],
-  ["/dashboard/", "dashboard.html"],
-  ["/dashboard/index.html", "dashboard.html"],
-  ["/dashboard/app.js", "app.js"],
-  ["/dashboard/styles.css", "styles.css"],
-  ["/login", "login.html"],
-  ["/login/", "login.html"],
-  ["/login/index.html", "login.html"],
-  ["/package-catalog", "index.html"],
-  ["/package-catalog/", "index.html"],
-  ["/package-catalog/index.html", "index.html"],
-  ["/package-catalog/app.js", "app.js"],
-  ["/package-catalog/styles.css", "styles.css"]
+  ["/marine-portal", "marine-portal.html"],
+  ["/marine-portal/", "marine-portal.html"],
+  ["/marine-portal/index.html", "marine-portal.html"],
+  ["/marine-portal/dashboard", "marine-portal.html"],
+  ["/marine-portal/dashboard/", "marine-portal.html"],
+  ["/marine-portal/dashboard/index.html", "marine-portal.html"]
 ]);
-
-const vendorPrefix = "/dashboard/vendor/";
-const packageVendorPrefix = "/package-catalog/vendor/";
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -125,38 +115,8 @@ export async function maybeServeStatic(req, res, url) {
   }
 
   if (url.pathname === "/") {
-    res.writeHead(302, { location: "/dashboard" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#summary-section" });
     res.end();
-    return true;
-  }
-
-  if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
-    await sendFile(res, "dashboard.html");
-    return true;
-  }
-
-  if (url.pathname === "/dashboard/index.html") {
-    await sendFile(res, "dashboard.html");
-    return true;
-  }
-
-  if (url.pathname === "/package-catalog" || url.pathname === "/package-catalog/") {
-    await sendFile(res, "index.html");
-    return true;
-  }
-
-  if (url.pathname === "/package-catalog/index.html") {
-    await sendFile(res, "index.html");
-    return true;
-  }
-
-  if (url.pathname === "/login" || url.pathname === "/login/") {
-    await sendFile(res, "login.html");
-    return true;
-  }
-
-  if (url.pathname === "/login/index.html") {
-    await sendFile(res, "login.html");
     return true;
   }
 
@@ -166,92 +126,73 @@ export async function maybeServeStatic(req, res, url) {
     return true;
   }
 
-  if (url.pathname === "/phase3" || url.pathname === "/phase3/" || url.pathname === "/phase3/index.html") {
-    const next = `/marine-portal#packages-section`;
-    res.writeHead(302, { location: next });
-    res.end();
-    return true;
-  }
-
   if (url.pathname === "/alerts" || url.pathname === "/alerts/" || url.pathname === "/alerts/index.html") {
-    res.writeHead(302, { location: "/marine-portal#alerts-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#alerts-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/policy" || url.pathname === "/policy/" || url.pathname === "/policy/index.html") {
-    res.writeHead(302, { location: "/marine-portal#policy-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#policy-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/traffic" || url.pathname === "/traffic/" || url.pathname === "/traffic/index.html") {
-    res.writeHead(302, { location: "/marine-portal#traffic-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#traffic-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/settings" || url.pathname === "/settings/" || url.pathname === "/settings/index.html") {
-    res.writeHead(302, { location: "/marine-portal#settings-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#settings-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/commands" || url.pathname === "/commands/" || url.pathname === "/commands/index.html") {
-    res.writeHead(302, { location: "/marine-portal#commands-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#commands-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/marine-portal/alerts" || url.pathname === "/marine-portal/alerts/" || url.pathname === "/marine-portal/alerts/index.html") {
-    res.writeHead(302, { location: "/marine-portal#alerts-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#alerts-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/marine-portal/policy" || url.pathname === "/marine-portal/policy/" || url.pathname === "/marine-portal/policy/index.html") {
-    res.writeHead(302, { location: "/marine-portal#policy-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#policy-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/marine-portal/traffic" || url.pathname === "/marine-portal/traffic/" || url.pathname === "/marine-portal/traffic/index.html") {
-    res.writeHead(302, { location: "/marine-portal#traffic-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#traffic-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/marine-portal/settings" || url.pathname === "/marine-portal/settings/" || url.pathname === "/marine-portal/settings/index.html") {
-    res.writeHead(302, { location: "/marine-portal#settings-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#settings-section" });
     res.end();
     return true;
   }
 
   if (url.pathname === "/marine-portal/commands" || url.pathname === "/marine-portal/commands/" || url.pathname === "/marine-portal/commands/index.html") {
-    res.writeHead(302, { location: "/marine-portal#commands-section" });
+    res.writeHead(302, { location: "/marine-portal/dashboard#commands-section" });
     res.end();
     return true;
   }
 
-  if (url.pathname === "/marine-portal" || url.pathname === "/marine-portal/" || url.pathname === "/marine-portal/index.html") {
+  if (url.pathname === "/marine-portal" || url.pathname === "/marine-portal/" || url.pathname === "/marine-portal/index.html" || url.pathname === "/marine-portal/dashboard" || url.pathname === "/marine-portal/dashboard/") {
     await sendMarinePortalFile(res, "marine-portal.html");
     return true;
   }
 
   if (url.pathname.startsWith("/marine-portal/")) {
     await sendMarinePortalFile(res, "marine-portal.html");
-    return true;
-  }
-
-  if (url.pathname.startsWith(vendorPrefix)) {
-    const filename = url.pathname.slice("/dashboard/".length);
-    await sendFile(res, filename);
-    return true;
-  }
-
-  if (url.pathname.startsWith(packageVendorPrefix)) {
-    const filename = url.pathname.slice("/package-catalog/".length);
-    await sendFile(res, filename);
     return true;
   }
 
