@@ -36,8 +36,8 @@ DEFAULT_WATCH_PORTS = {
     "ether1-Starlink": "P1-STARLINK",
     "ether2-VSAT": "P2-VSAT",
     "ether3-LTE": "P3-LTE",
-    "ether4-MCU": "P4-MCU",
-    "ether5-USER": "P5-USER",
+    "ether4-USER": "P4-USER",
+    "ether5-MCU": "P5-MCU",
 }
 DEFAULT_WAN_PRIORITY = ["ether1-Starlink", "ether2-VSAT", "ether3-LTE"]
 
