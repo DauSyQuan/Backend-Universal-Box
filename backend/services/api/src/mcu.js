@@ -1639,6 +1639,55 @@ export async function streamMcuTelemetry(req, res, { tenantCode, vesselCode, edg
   // Send initial connected message
   res.write('data: {"type":"connected"}\n\n');
 
+  const latestTelemetry = await pool.query(
+    `
+      select
+        t.id,
+        t.observed_at,
+        t.active_uplink,
+        t.latency_ms,
+        t.loss_pct,
+        t.rx_kbps,
+        t.tx_kbps,
+        t.throughput_kbps,
+        t.interfaces,
+        te.code as tenant_code,
+        v.code as vessel_code,
+        e.edge_code
+      from telemetry t
+      join vessels v on v.id = t.vessel_id
+      join tenants te on te.id = t.tenant_id
+      left join edge_boxes e on e.id = t.edge_box_id
+      where t.edge_box_id = $1
+      order by t.observed_at desc
+      limit 1
+    `,
+    [edgeId]
+  );
+
+  if (latestTelemetry.rowCount > 0) {
+    const row = latestTelemetry.rows[0];
+    res.write(
+      `data: ${JSON.stringify({
+        type: "telemetry",
+        data: {
+          id: row.id,
+          observed_at: row.observed_at,
+          active_uplink: row.active_uplink ?? null,
+          latency_ms: row.latency_ms ?? null,
+          loss_pct: row.loss_pct ?? null,
+          rx_kbps: row.rx_kbps ?? null,
+          tx_kbps: row.tx_kbps ?? null,
+          throughput_kbps: row.throughput_kbps ?? null,
+          tenant_code: row.tenant_code ?? null,
+          vessel_code: row.vessel_code ?? null,
+          edge_code: row.edge_code ?? null,
+          interfaces: Array.isArray(row.interfaces) ? row.interfaces : []
+        }
+      })}\n\n`
+    );
+  }
+
   await ensureNotificationListener();
 
   const handleUpdate = (data) => {

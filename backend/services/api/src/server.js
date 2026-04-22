@@ -630,6 +630,42 @@ function normalizePolicyAddress(value) {
   return normalizeIpCandidate(text);
 }
 
+function envCsvList(name) {
+  const raw = String(process.env[name] ?? "").trim();
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getPolicyGroupDefaults(name, preferredUplink) {
+  const normalizedName = String(name ?? "").trim().toLowerCase();
+  const normalizedPreferred = String(preferredUplink ?? "").trim().toLowerCase();
+
+  const defaultSourceAddresses =
+    normalizedName === "work"
+      ? envCsvList("WORK_SOURCE_ADDRESSES")
+      : normalizedName === "entertainment"
+        ? envCsvList("ENTERTAINMENT_SOURCE_ADDRESSES")
+        : [];
+
+  const defaultGateway =
+    normalizedPreferred === "vsat"
+      ? normalizeIpCandidate(process.env.VSAT_GATEWAY)
+      : normalizedPreferred === "starlink"
+        ? normalizeIpCandidate(process.env.STARLINK_GATEWAY)
+        : normalizeIpCandidate(process.env.POLICY_GATEWAY);
+
+  return {
+    sourceAddresses: defaultSourceAddresses,
+    gateway: defaultGateway
+  };
+}
+
 function normalizePolicyGroups(groups) {
   if (!Array.isArray(groups) || groups.length === 0) {
     const error = new Error("groups must be a non-empty array");
@@ -651,21 +687,33 @@ function normalizePolicyGroups(groups) {
       throw error;
     }
 
-    const preferredUplink = String(group.preferred_uplink ?? "").trim().toLowerCase();
+    const preferredUplink = String(
+      group.preferred_uplink ??
+        (name.toLowerCase() === "work"
+          ? "vsat"
+          : name.toLowerCase() === "entertainment"
+            ? "starlink"
+            : "")
+    )
+      .trim()
+      .toLowerCase();
     if (!preferredUplink || !["vsat", "starlink", "automatic"].includes(preferredUplink)) {
       const error = new Error(`groups[${index}].preferred_uplink must be vsat, starlink, or automatic`);
       error.code = "bad_request";
       throw error;
     }
 
-    const gateway = normalizeIpCandidate(group.gateway);
+    const defaults = getPolicyGroupDefaults(name, preferredUplink);
+    const gateway = normalizeIpCandidate(group.gateway) ?? defaults.gateway;
     if (!gateway) {
       const error = new Error(`groups[${index}].gateway must be a valid IP address`);
       error.code = "bad_request";
       throw error;
     }
 
-    const sourceAddressesRaw = Array.isArray(group.source_addresses) ? group.source_addresses : [];
+    const sourceAddressesRaw = Array.isArray(group.source_addresses) && group.source_addresses.length > 0
+      ? group.source_addresses
+      : defaults.sourceAddresses;
     if (sourceAddressesRaw.length === 0) {
       const error = new Error(`groups[${index}].source_addresses must be a non-empty array`);
       error.code = "bad_request";

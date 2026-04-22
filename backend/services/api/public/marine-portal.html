@@ -1384,6 +1384,19 @@ function showLoginErr(msg) {
 // ─── ROUTING ──────────────────────────────────────────────────────────────────
 let currentPage = 'dashboard';
 let initialPage = 'dashboard';
+let dashRefreshTimer = null;
+let trafficRefreshTimer = null;
+let trafficStreamSocket = null;
+let trafficStreamReconnectTimer = null;
+let trafficStreamVessel = '';
+let trafficRows = [];
+let trafficSummary = null;
+let trafficQuota = null;
+let trafficWindow = {
+  vessel: 'vsl-001',
+  period: 'day',
+  month: new Date().toISOString().slice(0, 7)
+};
 
 function showPage(name) {
   if (name === 'login' && document.getElementById('login-page').style.display !== 'none') return;
@@ -1405,6 +1418,10 @@ function showPage(name) {
   }
   if (name !== 'commands') {
     stopCommandDetailPoll();
+  }
+  if (name !== 'traffic') {
+    stopTrafficRefresh();
+    stopTrafficStream();
   }
   if (name === 'dashboard') loadDashboard();
   if (name === 'alerts') loadAlertsCenter();
@@ -1474,7 +1491,6 @@ async function apiFetch(path, opts = {}) {
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let connStatus = { status: 'idle', label: 'Idle', tone: 'idle' };
 let rateLimit = null;
-let dashRefreshTimer = null;
 let cmdOffset = 0;
 const CMD_PAGE = 5;
 let pkgList = [];
@@ -1485,6 +1501,7 @@ let alertList = [];
 let selectedCommandJob = null;
 let edgeStreamSocket = null;
 let edgeStreamReconnectTimer = null;
+let edgeStreamKey = '';
 let edgeStreamContext = null;
 let liveEdgeState = null;
 let liveEdgeHistory = [];
@@ -1513,6 +1530,7 @@ function stopEdgeStream() {
     } catch {}
     edgeStreamSocket = null;
   }
+  edgeStreamKey = '';
   edgeStreamContext = null;
 }
 
@@ -1538,6 +1556,232 @@ function loadJsonStorage(key, fallback) {
     return parsed ?? fallback;
   } catch {
     return fallback;
+  }
+}
+
+function stopTrafficStream() {
+  if (trafficStreamReconnectTimer) {
+    clearTimeout(trafficStreamReconnectTimer);
+    trafficStreamReconnectTimer = null;
+  }
+  if (trafficStreamSocket) {
+    try {
+      trafficStreamSocket.close();
+    } catch {}
+    trafficStreamSocket = null;
+  }
+  trafficStreamVessel = '';
+}
+
+function queueTrafficStreamReconnect(vesselCode) {
+  if (!vesselCode || currentPage !== 'traffic') return;
+  if (trafficStreamReconnectTimer) {
+    clearTimeout(trafficStreamReconnectTimer);
+  }
+  trafficStreamReconnectTimer = setTimeout(() => {
+    trafficStreamReconnectTimer = null;
+    startTrafficStream(vesselCode).catch(() => {});
+  }, 3000);
+}
+
+function normalizeTrafficSample(sample) {
+  if (!sample || typeof sample !== 'object') {
+    return null;
+  }
+
+  const observedAt = sample.observed_at || sample.observedAt || null;
+  if (!observedAt) {
+    return null;
+  }
+
+  return {
+    observed_at: observedAt,
+    tenant_code: sample.tenant_code ?? null,
+    vessel_code: sample.vessel_code ?? null,
+    edge_code: sample.edge_code ?? null,
+    active_uplink: sample.active_uplink ?? sample.active_interface ?? null,
+    latency_ms: sample.latency_ms ?? null,
+    loss_pct: sample.loss_pct ?? null,
+    jitter_ms: sample.jitter_ms ?? null,
+    rx_kbps: Number(sample.rx_kbps ?? 0),
+    tx_kbps: Number(sample.tx_kbps ?? 0),
+    throughput_kbps: Number(sample.throughput_kbps ?? (Number(sample.rx_kbps ?? 0) + Number(sample.tx_kbps ?? 0))),
+    interfaces: Array.isArray(sample.interfaces) ? sample.interfaces : []
+  };
+}
+
+function trafficRowKey(sample) {
+  return [
+    sample.observed_at,
+    sample.edge_code || '',
+    sample.active_uplink || '',
+    sample.rx_kbps ?? '',
+    sample.tx_kbps ?? ''
+  ].join('|');
+}
+
+function setTrafficRows(rows) {
+  trafficRows = Array.isArray(rows)
+    ? rows
+        .map((row) => normalizeTrafficSample(row))
+        .filter(Boolean)
+        .sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime())
+    : [];
+}
+
+function appendTrafficRow(sample) {
+  const normalized = normalizeTrafficSample(sample);
+  if (!normalized) {
+    return;
+  }
+
+  if (trafficWindow.vessel && normalized.vessel_code && normalized.vessel_code !== trafficWindow.vessel) {
+    return;
+  }
+
+  const existing = new Map(trafficRows.map((row) => [trafficRowKey(row), row]));
+  existing.set(trafficRowKey(normalized), normalized);
+  trafficRows = Array.from(existing.values()).sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime()).slice(-1000);
+  renderTrafficView();
+}
+
+function renderTrafficView() {
+  const modeBadge = document.getElementById('traffic-mode-badge');
+  const source = document.getElementById('traffic-source');
+  const rows = Array.isArray(trafficRows) ? trafficRows : [];
+  const period = trafficWindow.period || 'day';
+  const month = trafficWindow.month || new Date().toISOString().slice(0, 7);
+  const vessel = trafficWindow.vessel || 'vsl-001';
+
+  const buckets = aggregateTelemetryBuckets(rows, period);
+  const daily = aggregateTelemetryBuckets(rows, 'day');
+  const monthly = aggregateTelemetryBuckets(rows, 'month');
+  const avgRx = rows.length ? rows.reduce((sum, row) => sum + Number(row.rx_kbps || 0), 0) / rows.length : 0;
+  const avgTx = rows.length ? rows.reduce((sum, row) => sum + Number(row.tx_kbps || 0), 0) / rows.length : 0;
+
+  document.getElementById('traffic-avg-rx').textContent = formatKbps(avgRx);
+  document.getElementById('traffic-avg-tx').textContent = formatKbps(avgTx);
+  document.getElementById('traffic-quota-remaining').textContent = trafficQuota?.remaining_gb !== undefined && trafficQuota?.remaining_gb !== null
+    ? `${Number(trafficQuota.remaining_gb).toFixed(2)} GB`
+    : '—';
+  document.getElementById('traffic-month-total').textContent = trafficSummary?.total_gb !== undefined && trafficSummary?.total_gb !== null
+    ? `${Number(trafficSummary.total_gb).toFixed(2)} GB`
+    : '—';
+  document.getElementById('traffic-month-rx').textContent = trafficSummary?.rx_gb !== undefined && trafficSummary?.rx_gb !== null
+    ? `${Number(trafficSummary.rx_gb).toFixed(2)} GB`
+    : '—';
+  document.getElementById('traffic-month-tx').textContent = trafficSummary?.tx_gb !== undefined && trafficSummary?.tx_gb !== null
+    ? `${Number(trafficSummary.tx_gb).toFixed(2)} GB`
+    : '—';
+  if (source) {
+    const liveSuffix = trafficStreamSocket && trafficStreamSocket.readyState === WebSocket.OPEN ? ' · live stream' : '';
+    source.textContent = `${rows.length} telemetry samples for ${vessel}${liveSuffix} · month ${month}`;
+  }
+
+  renderTrafficCanvas(buckets);
+  renderTrafficTables(daily, monthly);
+
+  if (modeBadge) {
+    const live = trafficStreamSocket && trafficStreamSocket.readyState === WebSocket.OPEN;
+    modeBadge.textContent = live ? 'live' : 'ready';
+    modeBadge.className = live ? 'pill pill-green' : 'pill pill-gray';
+  }
+}
+
+async function startTrafficStream(vesselCode) {
+  if (!vesselCode || currentPage !== 'traffic') return;
+
+  const normalizedVessel = String(vesselCode).trim();
+  if (!normalizedVessel) return;
+
+  if (trafficStreamSocket && trafficStreamVessel === normalizedVessel && (
+    trafficStreamSocket.readyState === WebSocket.OPEN ||
+    trafficStreamSocket.readyState === WebSocket.CONNECTING
+  )) {
+    return;
+  }
+
+  stopTrafficStream();
+  trafficStreamVessel = normalizedVessel;
+
+  const httpBase = (API_BASE || location.origin).replace(/\/$/, '');
+  const wsBase = httpBase.replace(/^http(s?):\/\//, 'ws$1://');
+  const wsUrl = `${wsBase}/ws`;
+
+  try {
+    const socket = new WebSocket(wsUrl);
+    trafficStreamSocket = socket;
+
+    socket.onopen = () => {
+      updateConnStatus(200);
+      if (currentPage !== 'traffic') return;
+      const modeBadge = document.getElementById('traffic-mode-badge');
+      if (modeBadge) {
+        modeBadge.textContent = 'connecting';
+        modeBadge.className = 'pill pill-amber';
+      }
+      socket.send(JSON.stringify({ subscribe: normalizedVessel }));
+    };
+
+    socket.onmessage = (event) => {
+      if (currentPage !== 'traffic' || trafficStreamSocket !== socket) {
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (payload?.type === 'connected') {
+        const modeBadge = document.getElementById('traffic-mode-badge');
+        if (modeBadge) {
+          modeBadge.textContent = 'connecting';
+          modeBadge.className = 'pill pill-amber';
+        }
+        return;
+      }
+
+      if (payload?.type === 'subscribed') {
+        const modeBadge = document.getElementById('traffic-mode-badge');
+        if (modeBadge) {
+          modeBadge.textContent = 'live';
+          modeBadge.className = 'pill pill-green';
+        }
+        return;
+      }
+
+      if (payload?.type === 'telemetry') {
+        appendTrafficRow(payload);
+      }
+    };
+
+    socket.onclose = () => {
+      if (trafficStreamSocket === socket) {
+        trafficStreamSocket = null;
+      }
+      if (currentPage === 'traffic' && trafficStreamVessel === normalizedVessel) {
+        queueTrafficStreamReconnect(normalizedVessel);
+      }
+      renderTrafficView();
+    };
+
+    socket.onerror = () => {
+      const modeBadge = document.getElementById('traffic-mode-badge');
+      if (modeBadge && currentPage === 'traffic') {
+        modeBadge.textContent = 'retrying';
+        modeBadge.className = 'pill pill-amber';
+      }
+    };
+  } catch (err) {
+    const modeBadge = document.getElementById('traffic-mode-badge');
+    if (modeBadge && currentPage === 'traffic') {
+      modeBadge.textContent = 'error';
+      modeBadge.className = 'pill pill-red';
+    }
+    queueTrafficStreamReconnect(normalizedVessel);
   }
 }
 
@@ -1894,6 +2138,7 @@ function renderLiveEdgeSample(sample, meta = {}) {
   renderLiveEdgeInterfaces(sample);
   renderLiveEdgeTrend();
   renderLiveEdgeTrail();
+  renderDashboardLivePills();
 }
 
 function queueEdgeStreamReconnect(edge) {
@@ -1907,8 +2152,19 @@ function queueEdgeStreamReconnect(edge) {
 
 async function startEdgeStream(edge) {
   if (!edge || currentPage !== 'dashboard') return;
+  const nextKey = `${edge.tenant_code || ''}/${edge.vessel_code || ''}/${edge.edge_code || ''}`;
+  if (
+    edgeStreamSocket &&
+    edgeStreamKey === nextKey &&
+    (edgeStreamSocket.readyState === WebSocket.OPEN || edgeStreamSocket.readyState === WebSocket.CONNECTING)
+  ) {
+    edgeStreamContext = edge;
+    return;
+  }
+
   stopEdgeStream();
   edgeStreamContext = edge;
+  edgeStreamKey = nextKey;
 
   setEdgeStreamStatus('connecting', 'gray');
   setEdgeStreamField('edge-stream-last', 'waiting');
@@ -2083,6 +2339,20 @@ async function loadDashboard(silent = false) {
     renderDashboard();
     updateConnStatus(dashData.health ? 200 : 0);
 
+    const dashboardEdge = getDashboardLiveEdge(dashData.edges);
+    if (currentPage === 'dashboard' && dashboardEdge) {
+      const sameSelected = selectedEdgeContext &&
+        selectedEdgeContext.tenant_code === dashboardEdge.tenant_code &&
+        selectedEdgeContext.vessel_code === dashboardEdge.vessel_code &&
+        selectedEdgeContext.edge_code === dashboardEdge.edge_code;
+
+      if (!sameSelected) {
+        await selectEdge(JSON.stringify(dashboardEdge), { scroll: false });
+      } else {
+        startEdgeStream(dashboardEdge).catch(() => {});
+      }
+    }
+
     // Try metrics
     try {
       const m = await apiFetch('/metrics');
@@ -2207,11 +2477,54 @@ function renderHealthPills() {
 
   const mEl = document.getElementById('dash-metrics-pills');
   if (mEl) {
-    mEl.innerHTML = [
+    renderDashboardLivePills();
+  }
+}
+
+function getDashboardLiveEdge(edges = []) {
+  const list = Array.isArray(edges) ? edges : [];
+  if (!list.length) {
+    return null;
+  }
+
+  if (selectedEdgeContext) {
+    const selected = list.find((edge) =>
+      edge.tenant_code === selectedEdgeContext.tenant_code &&
+      edge.vessel_code === selectedEdgeContext.vessel_code &&
+      edge.edge_code === selectedEdgeContext.edge_code
+    );
+    if (selected) {
+      return selected;
+    }
+  }
+
+  return list.find((edge) => edge.online) || list[0] || null;
+}
+
+function renderDashboardLivePills() {
+  const el = document.getElementById('dash-metrics-pills');
+  if (!el) {
+    return;
+  }
+
+  if (!liveEdgeState) {
+    el.innerHTML = [
       '<span class="pill pill-gray">metrics live</span>',
       '<span class="pill pill-gray">route metrics ready</span>'
     ].join('');
+    return;
   }
+
+  const edgeLabel = [liveEdgeState.tenant_code, liveEdgeState.vessel_code, liveEdgeState.edge_code].filter(Boolean).join('/');
+  const live = edgeStreamSocket && edgeStreamSocket.readyState === WebSocket.OPEN;
+  el.innerHTML = [
+    `<span class="pill ${live ? 'pill-green' : 'pill-amber'}">${live ? 'live' : 'standby'}</span>`,
+    `<span class="pill pill-gray">${escapeHtml(edgeLabel || 'live edge')}</span>`,
+    `<span class="pill pill-blue">RX ${formatKbps(liveEdgeState.rx_kbps)}</span>`,
+    `<span class="pill pill-green">TX ${formatKbps(liveEdgeState.tx_kbps)}</span>`,
+    `<span class="pill pill-amber">THR ${formatKbps(liveEdgeState.throughput_kbps)}</span>`,
+    liveEdgeState.observed_at ? `<span class="pill pill-gray">${escapeHtml(fmtTime(liveEdgeState.observed_at))}</span>` : ''
+  ].join('');
 }
 
 async function prevCmdPage() {
@@ -2560,8 +2873,8 @@ async function nextHistoryCmdPage() {
 }
 
 // ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
-async function selectEdge(edgeJson) {
-  const edge = JSON.parse(edgeJson);
+async function selectEdge(edgeJson, options = {}) {
+  const edge = typeof edgeJson === 'string' ? JSON.parse(edgeJson) : edgeJson;
   selectedEdgeContext = edge;
   const card = document.getElementById('edge-detail-card');
   const body = document.getElementById('edge-detail-body');
@@ -2573,7 +2886,9 @@ async function selectEdge(edgeJson) {
   subtitle.textContent = 'Loading detail…';
   body.innerHTML = '<div class="empty"><span class="spinner"></span> Loading edge detail…</div>';
   resetLiveEdgeHistory();
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (options.scroll !== false) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   try {
     const [detail, traffic] = await Promise.allSettled([
@@ -3219,6 +3534,8 @@ async function loadTrafficView() {
   const days = Math.max(1, Math.min(365, Number(document.getElementById('traffic-days')?.value || 30)));
   const month = document.getElementById('traffic-month')?.value || new Date().toISOString().slice(0, 7);
 
+  trafficWindow = { vessel, period, month };
+
   if (source) source.textContent = `Loading telemetry for ${vessel}…`;
   if (modeBadge) {
     modeBadge.textContent = 'loading';
@@ -3230,40 +3547,16 @@ async function loadTrafficView() {
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     const data = await apiFetch(`/api/telemetry?vessel_code=${encodeURIComponent(vessel)}&limit=1000&from=${encodeURIComponent(from)}`);
     const rows = Array.isArray(data) ? data : data?.items || data?.data || [];
-    const buckets = aggregateTelemetryBuckets(rows, period);
-    const daily = aggregateTelemetryBuckets(rows, 'day');
-    const monthly = aggregateTelemetryBuckets(rows, 'month');
     const [summaryRes, quotaRes] = await Promise.allSettled([
       apiFetch(`/api/traffic/summary?vessel_code=${encodeURIComponent(vessel)}&month=${encodeURIComponent(month)}`),
       apiFetch(`/api/quota/remaining?vessel_code=${encodeURIComponent(vessel)}`)
     ]);
-    const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : null;
-    const quota = quotaRes.status === 'fulfilled' ? quotaRes.value : null;
-
-    const avgRx = rows.length ? rows.reduce((sum, row) => sum + Number(row.rx_kbps || 0), 0) / rows.length : 0;
-    const avgTx = rows.length ? rows.reduce((sum, row) => sum + Number(row.tx_kbps || 0), 0) / rows.length : 0;
-    document.getElementById('traffic-avg-rx').textContent = formatKbps(avgRx);
-    document.getElementById('traffic-avg-tx').textContent = formatKbps(avgTx);
-
-    document.getElementById('traffic-quota-remaining').textContent = quota?.remaining_gb !== undefined && quota?.remaining_gb !== null
-      ? `${Number(quota.remaining_gb).toFixed(2)} GB`
-      : '—';
-    document.getElementById('traffic-month-total').textContent = summary?.total_gb !== undefined && summary?.total_gb !== null
-      ? `${Number(summary.total_gb).toFixed(2)} GB`
-      : '—';
-    document.getElementById('traffic-month-rx').textContent = summary?.rx_gb !== undefined && summary?.rx_gb !== null
-      ? `${Number(summary.rx_gb).toFixed(2)} GB`
-      : '—';
-    document.getElementById('traffic-month-tx').textContent = summary?.tx_gb !== undefined && summary?.tx_gb !== null
-      ? `${Number(summary.tx_gb).toFixed(2)} GB`
-      : '—';
-    document.getElementById('traffic-source').textContent = `${rows.length} telemetry samples for ${vessel} · month ${month}`;
-    renderTrafficCanvas(buckets);
-    renderTrafficTables(daily, monthly);
-    if (modeBadge) {
-      modeBadge.textContent = 'live';
-      modeBadge.className = 'pill pill-green';
-    }
+    trafficSummary = summaryRes.status === 'fulfilled' ? summaryRes.value : trafficSummary;
+    trafficQuota = quotaRes.status === 'fulfilled' ? quotaRes.value : trafficQuota;
+    setTrafficRows(rows);
+    renderTrafficView();
+    startTrafficStream(vessel);
+    startTrafficRefresh();
   } catch (err) {
     if (modeBadge) {
       modeBadge.textContent = 'fallback';
@@ -3272,6 +3565,25 @@ async function loadTrafficView() {
     showNotice('traffic-error', `Failed to load traffic view: ${err.message}`, 'alert-danger');
     document.getElementById('traffic-error').style.display = 'flex';
   }
+}
+
+function stopTrafficRefresh() {
+  if (trafficRefreshTimer) {
+    clearInterval(trafficRefreshTimer);
+    trafficRefreshTimer = null;
+  }
+}
+
+function startTrafficRefresh() {
+  if (trafficRefreshTimer || currentPage !== 'traffic') {
+    return;
+  }
+
+  trafficRefreshTimer = setInterval(() => {
+    if (currentPage === 'traffic') {
+      loadTrafficView();
+    }
+  }, 60000);
 }
 
 function loadTenantSettings() {
@@ -3374,6 +3686,7 @@ function startAutoRefresh() {
   dashRefreshTimer = setInterval(() => {
     if (currentPage === 'dashboard') loadDashboard(true);
   }, 60000);
+  startTrafficRefresh();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
@@ -3443,6 +3756,7 @@ window.addEventListener('hashchange', () => {
 });
 window.addEventListener('beforeunload', stopEdgeStream);
 window.addEventListener('beforeunload', stopCommandDetailPoll);
+window.addEventListener('beforeunload', stopTrafficStream);
 </script>
 </body>
 </html>

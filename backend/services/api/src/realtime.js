@@ -10,7 +10,56 @@ let bridgeClient = null;
 
 function normalizeSubscription(value) {
   const text = String(value ?? "").trim();
-  return text || null;
+  if (!text) {
+    return null;
+  }
+
+  const parts = text.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 3) {
+    return {
+      tenantCode: parts[0] || null,
+      vesselCode: parts[1] || null,
+      edgeCode: parts[2] || null
+    };
+  }
+
+  return {
+    tenantCode: null,
+    vesselCode: text,
+    edgeCode: null
+  };
+}
+
+function normalizeSubscriptionObject(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const tenantCode = String(value.tenantCode ?? value.tenant_code ?? "").trim() || null;
+  const vesselCode = String(value.vesselCode ?? value.vessel_code ?? value.vessel ?? value.subscribe ?? "").trim() || null;
+  const edgeCode = String(value.edgeCode ?? value.edge_code ?? value.edge ?? "").trim() || null;
+
+  if (!tenantCode && !vesselCode && !edgeCode) {
+    return null;
+  }
+
+  return { tenantCode, vesselCode, edgeCode };
+}
+
+function normalizeSubscriptionValue(value) {
+  return typeof value === "string" ? normalizeSubscription(value) : normalizeSubscriptionObject(value);
+}
+
+function matchesSubscription(subscription, payload) {
+  if (!subscription || !payload) {
+    return false;
+  }
+
+  const tenantMatch = subscription.tenantCode && payload.tenant_code && subscription.tenantCode === payload.tenant_code;
+  const vesselMatch = subscription.vesselCode && payload.vessel_code && subscription.vesselCode === payload.vessel_code;
+  const edgeMatch = subscription.edgeCode && payload.edge_code && subscription.edgeCode === payload.edge_code;
+
+  return Boolean(edgeMatch || vesselMatch || tenantMatch);
 }
 
 function sendJson(ws, payload) {
@@ -19,14 +68,12 @@ function sendJson(ws, payload) {
 }
 
 function broadcastTelemetry(payload) {
-  const vesselCode = normalizeSubscription(payload?.vessel_code);
-  if (!vesselCode) return;
-
   for (const [ws, state] of clients.entries()) {
-    if (state?.vesselCode !== vesselCode) continue;
+    if (!matchesSubscription(state, payload)) continue;
     sendJson(ws, {
       type: "telemetry",
-      vessel_code: vesselCode,
+      tenant_code: payload.tenant_code ?? null,
+      vessel_code: payload.vessel_code ?? null,
       edge_code: payload.edge_code ?? null,
       observed_at: payload.observed_at ?? null,
       active_uplink: payload.active_uplink ?? payload.active_interface ?? null,
@@ -42,6 +89,80 @@ function broadcastTelemetry(payload) {
 
 function handleRealtimeTelemetry(payload) {
   broadcastTelemetry(payload);
+}
+
+async function sendLatestTelemetrySnapshot(ws, subscription) {
+  if (ws.readyState !== WebSocket.OPEN || !pool || !subscription) {
+    return;
+  }
+
+  const params = [];
+  const filters = [];
+
+  if (subscription.tenantCode) {
+    params.push(subscription.tenantCode);
+    filters.push(`t.code = $${params.length}`);
+  }
+
+  if (subscription.vesselCode) {
+    params.push(subscription.vesselCode);
+    filters.push(`v.code = $${params.length}`);
+  }
+
+  if (subscription.edgeCode) {
+    params.push(subscription.edgeCode);
+    filters.push(`e.edge_code = $${params.length}`);
+  }
+
+  if (filters.length === 0) {
+    return;
+  }
+
+  const result = await pool.query(
+    `
+      select
+        t.id,
+        t.observed_at,
+        t.active_uplink,
+        t.latency_ms,
+        t.loss_pct,
+        t.rx_kbps,
+        t.tx_kbps,
+        t.throughput_kbps,
+        t.interfaces,
+        te.code as tenant_code,
+        v.code as vessel_code,
+        e.edge_code
+      from telemetry t
+      join vessels v on v.id = t.vessel_id
+      join tenants te on te.id = t.tenant_id
+      left join edge_boxes e on e.id = t.edge_box_id
+      where ${filters.join(" and ")}
+      order by t.observed_at desc
+      limit 1
+    `,
+    params
+  );
+
+  if (result.rowCount === 0) {
+    return;
+  }
+
+  const row = result.rows[0];
+  sendJson(ws, {
+    type: "telemetry",
+    tenant_code: row.tenant_code ?? null,
+    vessel_code: row.vessel_code ?? null,
+    edge_code: row.edge_code ?? null,
+    observed_at: row.observed_at ?? null,
+    active_uplink: row.active_uplink ?? null,
+    latency_ms: row.latency_ms ?? null,
+    loss_pct: row.loss_pct ?? null,
+    rx_kbps: row.rx_kbps ?? null,
+    tx_kbps: row.tx_kbps ?? null,
+    throughput_kbps: row.throughput_kbps ?? null,
+    interfaces: Array.isArray(row.interfaces) ? row.interfaces : []
+  });
 }
 
 async function ensureTelemetryBridge() {
@@ -143,8 +264,8 @@ export function attachRealtimeServer(server) {
   });
 
   wss.on("connection", (ws, request) => {
-    clients.set(ws, { vesselCode: null, subscribedAt: null });
-    sendJson(ws, { type: "connected", message: "send {\"subscribe\":\"vsl-001\"} to start" });
+    clients.set(ws, { tenantCode: null, vesselCode: null, edgeCode: null, subscribedAt: null });
+    sendJson(ws, { type: "connected", message: "send {\"subscribe\":\"vsl-001\"} or {\"subscribe\":\"tnr/vsl/edge\"} to start" });
     console.log(`[ws] client connected from ${request.socket.remoteAddress || "unknown"}`);
 
     const heartbeat = setInterval(() => {
@@ -162,22 +283,30 @@ export function attachRealtimeServer(server) {
         return;
       }
 
-      const vesselCode = normalizeSubscription(message?.subscribe);
-      if (!vesselCode) {
+      const subscription = normalizeSubscriptionValue(message?.subscribe);
+      if (!subscription) {
         sendJson(ws, { type: "error", error: "subscribe_required" });
         return;
       }
 
       clients.set(ws, {
-        vesselCode,
+        ...subscription,
         subscribedAt: new Date().toISOString()
       });
 
       sendJson(ws, {
         type: "subscribed",
-        vessel_code: vesselCode
+        tenant_code: subscription.tenantCode ?? null,
+        vessel_code: subscription.vesselCode ?? null,
+        edge_code: subscription.edgeCode ?? null
       });
-      console.log(`[ws] client subscribed vessel=${vesselCode}`);
+      console.log(
+        `[ws] client subscribed tenant=${subscription.tenantCode || "*"} vessel=${subscription.vesselCode || "*"} edge=${subscription.edgeCode || "*"}`
+      );
+
+      sendLatestTelemetrySnapshot(ws, subscription).catch((error) => {
+        console.error("[ws] initial telemetry snapshot failed:", error?.message || error);
+      });
     });
 
     ws.on("close", () => {

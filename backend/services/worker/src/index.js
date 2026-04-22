@@ -71,6 +71,27 @@ const client = mqtt.connect(mqttUrl, {
   connectTimeout: 30_000
 });
 
+function normalizeTopicCode(value, aliases = {}) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return text;
+  }
+  return aliases[text] || text;
+}
+
+function normalizeParsedTopic(parsedTopic) {
+  if (!parsedTopic) {
+    return null;
+  }
+
+  return {
+    ...parsedTopic,
+    tenantCode: normalizeTopicCode(parsedTopic.tenantCode, workerConfig.topicAliases?.tenant),
+    vesselCode: normalizeTopicCode(parsedTopic.vesselCode, workerConfig.topicAliases?.vessel),
+    edgeCode: normalizeTopicCode(parsedTopic.edgeCode, workerConfig.topicAliases?.edge)
+  };
+}
+
 async function saveIngestError(errorData) {
   try {
     await insertIngestError(errorData);
@@ -186,7 +207,7 @@ client.on("error", (error) => {
 });
 
 client.on("message", async (topic, payloadBuffer) => {
-  const parsedTopic = parseTopic(topic);
+  const parsedTopic = normalizeParsedTopic(parseTopic(topic));
   if (!parsedTopic) {
     console.warn(`[worker] ignore invalid topic: ${topic}`);
     await saveIngestError({
@@ -262,7 +283,7 @@ client.on("message", async (topic, payloadBuffer) => {
   const payload = payloadValidation.payload;
 
   try {
-    if (parsedTopic.channel === "heartbeat") {
+  if (parsedTopic.channel === "heartbeat") {
       const context = await resolveRequiredEdgeContext(parsedTopic);
       if (!context) {
         await saveIngestError({
@@ -340,7 +361,7 @@ client.on("message", async (topic, payloadBuffer) => {
       return;
     }
 
-    if (parsedTopic.channel === "telemetry") {
+  if (parsedTopic.channel === "telemetry") {
       const context = await resolveRequiredEdgeContext(parsedTopic);
       if (!context) {
         await saveIngestError({

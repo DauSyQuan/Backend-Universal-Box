@@ -50,6 +50,19 @@ export function loadApiRuntimeConfig(env = process.env) {
 }
 
 export function loadWorkerRuntimeConfig(env = process.env) {
+  const parseAliasMap = (value) => {
+    const entries = String(value || "")
+      .split(/[,;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const [from, to] = item.split("=").map((part) => part.trim());
+        return from && to ? [from, to] : null;
+      })
+      .filter(Boolean);
+    return Object.fromEntries(entries);
+  };
+
   return {
     mqttUrl: normalizeSecret(env.MQTT_URL) || "mqtt://localhost:1883",
     mqttUsername: normalizeSecret(env.MQTT_USERNAME) || undefined,
@@ -57,6 +70,11 @@ export function loadWorkerRuntimeConfig(env = process.env) {
     qos: parseIntEnv(env.MQTT_QOS ?? 1, 1, { min: 0, max: 2 }),
     observedAtMaxSkewSeconds: parseIntEnv(env.OBSERVED_AT_MAX_SKEW_SECONDS ?? 300, 300, { min: 1, max: 3_600 }),
     mqttAutoProvision: parseBoolean(env.MQTT_AUTO_PROVISION, false),
+    topicAliases: {
+      tenant: parseAliasMap(env.MQTT_TOPIC_TENANT_ALIASES || "tenant-01=tnr13"),
+      vessel: parseAliasMap(env.MQTT_TOPIC_VESSEL_ALIASES || "vessel-01=vsl-001"),
+      edge: parseAliasMap(env.MQTT_TOPIC_EDGE_ALIASES || "remote_01=edge-001")
+    },
     mqttReconnectBaseMs: parseIntEnv(env.MQTT_RECONNECT_BASE_MS ?? 1_000, 1_000, { min: 500, max: 30_000 }),
     mqttReconnectMaxMs: parseIntEnv(env.MQTT_RECONNECT_MAX_MS ?? 30_000, 30_000, { min: 500, max: 120_000 })
   };
