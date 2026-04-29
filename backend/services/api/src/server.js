@@ -18,6 +18,9 @@ import {
   getCommandJob,
   listMcuEdges,
   listCommandJobs,
+  listHotspotAccounts,
+  listHotspotActiveUsers,
+  listHotspotUserDirectory,
   listAlerts,
   listTelemetry,
   markCommandJobStatus,
@@ -33,6 +36,7 @@ import {
 } from "./traffic.js";
 import { attachRealtimeServer } from "./realtime.js";
 import { maybeServeStatic } from "./static.js";
+import { realtimeBus } from "../../../shared/realtime-bus.js";
 
 const console = createLogger("api");
 const apiConfig = loadApiRuntimeConfig(process.env);
@@ -987,6 +991,71 @@ async function publishMqtt(topic, payload, options = {}, { attempts = 3, timeout
   throw lastError ?? new Error("mqtt_publish_failed");
 }
 
+const HOTSPOT_COMMAND_TOPIC = "tram1/cmd/hotspot";
+
+const HOTSPOT_PROVISION_ACTIONS = new Set([
+  "create_dhcp_pool",
+  "create_dhcp_server",
+  "create_server_profile",
+  "create_hotspot_server",
+  "create_user_profile",
+  "create_account"
+]);
+
+const HOTSPOT_MONITOR_ACTIONS = new Set([
+  "get_all_users",
+  "get_active_users"
+]);
+
+const HOTSPOT_ACTIONS = new Set([
+  ...HOTSPOT_PROVISION_ACTIONS,
+  ...HOTSPOT_MONITOR_ACTIONS
+]);
+
+const HOTSPOT_ACTION_ALIASES = new Map([
+  ["hotspot_create_account", "create_account"],
+  ["create_user", "create_account"],
+  ["setup_server", "create_hotspot_server"]
+]);
+
+const HOTSPOT_METHODS = new Set(["add", "set", "remove", "get"]);
+
+function isHotspotCommandType(commandType) {
+  return String(commandType ?? "").trim() === "hotspot" || String(commandType ?? "").trim() === "hotspot_create_account";
+}
+
+function normalizeHotspotAction(action) {
+  const text = String(action ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  return HOTSPOT_ACTION_ALIASES.get(text) || text;
+}
+
+function getHotspotParamsObject(commandPayload = {}) {
+  const params = commandPayload.params;
+  if (params && typeof params === "object" && !Array.isArray(params)) {
+    return params;
+  }
+  return {};
+}
+
+function isBridgeHotspotPayload(commandPayload = {}) {
+  return Object.prototype.hasOwnProperty.call(commandPayload, "path") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "method") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "params") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "reference_id") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "referenceId");
+}
+
+function deriveHotspotReferenceId(action, payload = {}) {
+  const normalized = normalizeHotspotAction(action);
+  if (normalized === "create_account") {
+    return String(payload.username ?? payload.reference_id ?? payload.referenceId ?? payload.name ?? "").trim();
+  }
+  return String(payload.name ?? payload.reference_id ?? payload.referenceId ?? payload.username ?? payload.pool ?? payload.pool_name ?? payload.interface ?? "").trim();
+}
+
 const buildCommandEnvelope = (job) => ({
   msg_id: job.id,
   timestamp: new Date().toISOString(),
@@ -1000,6 +1069,139 @@ const buildCommandEnvelope = (job) => ({
     command_payload: job.command_payload ?? {}
   }
 });
+
+const buildHotspotCommandPayload = (job) => {
+  const payload = { ...(job.command_payload ?? {}) };
+  const bridgeParams = getHotspotParamsObject(payload);
+
+  if (isBridgeHotspotPayload(payload)) {
+    const method = String(payload.method ?? "").trim().toLowerCase();
+    const referenceId = String(
+      payload.reference_id ??
+        payload.referenceId ??
+        bridgeParams.reference_id ??
+        bridgeParams.referenceId ??
+        bridgeParams.name ??
+        bridgeParams.username ??
+        payload.name ??
+        payload.username ??
+        job.id
+    ).trim();
+    return {
+      path: String(payload.path ?? "").trim(),
+      method: method || "get",
+      params: bridgeParams,
+      reference_id: referenceId || job.id
+    };
+  }
+
+  const action = normalizeHotspotAction(payload.action || (job.command_type === "hotspot_create_account" ? "create_account" : ""));
+  const referenceId = deriveHotspotReferenceId(action, payload);
+  if (action === "create_dhcp_pool") {
+    return {
+      path: "/ip/pool",
+      method: "add",
+      params: {
+        name: String(payload.name ?? "").trim(),
+        ranges: String(payload.range ?? "").trim()
+      },
+      reference_id: referenceId || String(payload.name ?? "").trim() || job.id
+    };
+  }
+  if (action === "create_dhcp_server") {
+    return {
+      path: "/ip/dhcp-server",
+      method: "add",
+      params: {
+        name: String(payload.name ?? "").trim(),
+        interface: String(payload.interface ?? "").trim(),
+        "address-pool": String(payload.pool ?? payload.pool_name ?? "").trim(),
+        "address_pool": String(payload.pool ?? payload.pool_name ?? "").trim(),
+        network: String(payload.network ?? "").trim()
+      },
+      reference_id: referenceId || String(payload.name ?? "").trim() || job.id
+    };
+  }
+  if (action === "create_server_profile") {
+    return {
+      path: "/ip/hotspot/profile",
+      method: "add",
+      params: {
+        name: String(payload.name ?? "").trim(),
+        "hotspot-address": String(payload.ip ?? "").trim(),
+        "hotspot_address": String(payload.ip ?? "").trim(),
+        "dns-name": String(payload.dns ?? payload.dns_name ?? "").trim(),
+        "dns_name": String(payload.dns ?? payload.dns_name ?? "").trim()
+      },
+      reference_id: referenceId || String(payload.name ?? "").trim() || job.id
+    };
+  }
+  if (action === "create_hotspot_server") {
+    return {
+      path: "/ip/hotspot",
+      method: "add",
+      params: {
+        name: String(payload.name ?? "").trim(),
+        interface: String(payload.interface ?? "").trim(),
+        "address-pool": String(payload.pool ?? payload.pool_name ?? "").trim(),
+        "address_pool": String(payload.pool ?? payload.pool_name ?? "").trim(),
+        profile: String(payload.profile ?? "").trim()
+      },
+      reference_id: referenceId || String(payload.name ?? "").trim() || job.id
+    };
+  }
+  if (action === "create_user_profile") {
+    return {
+      path: "/ip/hotspot/user/profile",
+      method: "add",
+      params: {
+        name: String(payload.name ?? "").trim(),
+        "rate-limit": String(payload.qos ?? "").trim(),
+        rate_limit: String(payload.qos ?? "").trim()
+      },
+      reference_id: referenceId || String(payload.name ?? "").trim() || job.id
+    };
+  }
+  if (action === "create_account") {
+    const username = String(payload.username ?? "").trim();
+    return {
+      path: "/ip/hotspot/user",
+      method: "add",
+      params: {
+        name: username,
+        password: String(payload.password ?? ""),
+        profile: String(payload.profile ?? "").trim(),
+        "rate-limit": String(payload.qos ?? "").trim(),
+        rate_limit: String(payload.qos ?? "").trim()
+      },
+      reference_id: referenceId || username || job.id
+    };
+  }
+  return {
+    path: String(payload.path ?? "").trim() || "/ip/hotspot/user",
+    method: String(payload.method ?? "").trim().toLowerCase() || "get",
+    params: bridgeParams,
+    reference_id: referenceId || job.id
+  };
+};
+
+const resolveCommandDispatch = (job) => {
+  if (isHotspotCommandType(job.command_type)) {
+    const envelope = buildHotspotCommandPayload(job);
+    return {
+      topic: HOTSPOT_COMMAND_TOPIC,
+      payload: JSON.stringify(envelope),
+      envelope
+    };
+  }
+
+  const envelope = buildCommandEnvelope(job);
+  return {
+    topic: `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`,
+    payload: JSON.stringify(envelope),
+    envelope
+  };
+};
 
 function requiresBasicAuth(pathname) {
   if (!basicAuthEnabled) {
@@ -1345,17 +1547,16 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      const mqttTopic = `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`;
-      const envelope = buildCommandEnvelope(job);
+      const dispatch = resolveCommandDispatch(job);
 
       try {
-        await publishMqtt(mqttTopic, JSON.stringify(envelope), { qos: 1, retain: false }, { attempts: 3, timeoutMs: 7_000 });
+        await publishMqtt(dispatch.topic, dispatch.payload, { qos: 1, retain: false }, { attempts: 3, timeoutMs: 7_000 });
         const sentJob = await markCommandJobStatus(job.id, { status: "sent" });
         sendJson(res, 201, {
           ok: true,
-          mqtt_topic: mqttTopic,
+          mqtt_topic: dispatch.topic,
           command: sentJob ?? job,
-          envelope
+          envelope: dispatch.envelope
         });
       } catch (publishError) {
         await markCommandJobStatus(job.id, {
@@ -1384,6 +1585,93 @@ const server = createServer(async (req, res) => {
       }
       console.error("[api/commands] create failed:", error);
       sendJson(res, 500, { error: "command_create_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/hotspot/accounts" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+    try {
+      const query = scopeQueryByPrincipal({
+        tenantCode: url.searchParams.get("tenant") ?? url.searchParams.get("tenant_code"),
+        vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
+        edgeCode: url.searchParams.get("edge") ?? url.searchParams.get("edge_code"),
+        status: url.searchParams.get("status"),
+        limit: url.searchParams.get("limit"),
+        offset: url.searchParams.get("offset"),
+        after: url.searchParams.get("after")
+      }, principal);
+
+      const data = await listHotspotAccounts(query);
+      sendJson(res, 200, data);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/hotspot/accounts] failed:", error);
+      sendJson(res, 500, { error: "hotspot_accounts_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/hotspot/users" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+    try {
+      const query = scopeQueryByPrincipal({
+        tenantCode: url.searchParams.get("tenant") ?? url.searchParams.get("tenant_code"),
+        vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
+        edgeCode: url.searchParams.get("edge") ?? url.searchParams.get("edge_code"),
+        username: url.searchParams.get("username"),
+        limit: url.searchParams.get("limit"),
+        offset: url.searchParams.get("offset"),
+        after: url.searchParams.get("after")
+      }, principal);
+
+      const data = await listHotspotUserDirectory(query);
+      sendJson(res, 200, data);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/hotspot/users] failed:", error);
+      sendJson(res, 500, { error: "hotspot_users_query_failed" });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/hotspot/active-users" && req.method === "GET") {
+    const principal = await authenticateRequest(req, res, { allowRoles: ["admin", "noc", "captain", "customer"] });
+    if (!principal) {
+      return;
+    }
+    try {
+      const query = scopeQueryByPrincipal({
+        tenantCode: url.searchParams.get("tenant") ?? url.searchParams.get("tenant_code"),
+        vesselCode: url.searchParams.get("vessel") ?? url.searchParams.get("vessel_code"),
+        edgeCode: url.searchParams.get("edge") ?? url.searchParams.get("edge_code"),
+        username: url.searchParams.get("username"),
+        limit: url.searchParams.get("limit"),
+        offset: url.searchParams.get("offset"),
+        after: url.searchParams.get("after")
+      }, principal);
+
+      const data = await listHotspotActiveUsers(query);
+      sendJson(res, 200, data);
+    } catch (error) {
+      if (error?.code === "bad_request") {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+      console.error("[api/hotspot/active-users] failed:", error);
+      sendJson(res, 500, { error: "hotspot_active_users_query_failed" });
     }
     return;
   }
@@ -1551,11 +1839,10 @@ const server = createServer(async (req, res) => {
         [policy.id, job.id]
       );
 
-      const mqttTopic = `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`;
-      const envelope = buildCommandEnvelope(job);
+      const dispatch = resolveCommandDispatch(job);
 
       try {
-        await publishMqtt(mqttTopic, JSON.stringify(envelope), { qos: 1, retain: false }, { attempts: 3, timeoutMs: 7_000 });
+        await publishMqtt(dispatch.topic, dispatch.payload, { qos: 1, retain: false }, { attempts: 3, timeoutMs: 7_000 });
         const sentJob = await markCommandJobStatus(job.id, { status: "sent" });
         await pool.query(
           `
@@ -1568,14 +1855,14 @@ const server = createServer(async (req, res) => {
 
         sendJson(res, 201, {
           ok: true,
-          mqtt_topic: mqttTopic,
+          mqtt_topic: dispatch.topic,
           policy: {
             ...policy,
             command_job_id: job.id,
             applied_at: new Date().toISOString()
           },
           command: sentJob ?? job,
-          envelope
+          envelope: dispatch.envelope
         });
       } catch (publishError) {
         await markCommandJobStatus(job.id, {
@@ -2249,6 +2536,11 @@ const server = createServer(async (req, res) => {
         actor: principal,
         afterPayload: result.rows[0] ?? null
       });
+      realtimeBus.emit("package", {
+        action: "upsert",
+        tenant_code: tenant.code,
+        package: result.rows[0] ?? null
+      });
       sendJson(res, 201, result.rows[0]);
     } catch (err) {
       console.error("[api/packages POST] failed:", err);
@@ -2346,6 +2638,13 @@ const server = createServer(async (req, res) => {
         actionType: "package_assign",
         actor: principal,
         afterPayload: result.rows[0] ?? null
+      });
+      realtimeBus.emit("package_assignment", {
+        action: "assigned",
+        tenant_code: packageRow.tenant_code ?? null,
+        vessel_code: vesselCode,
+        package_id: packageRow.id,
+        assignment: result.rows[0] ?? null
       });
       sendJson(res, 201, result.rows[0]);
     } catch (err) {
@@ -2482,6 +2781,11 @@ const server = createServer(async (req, res) => {
         );
       }
 
+      realtimeBus.emit("package", {
+        action: nextIsActive ? "upsert" : "archive",
+        tenant_code: existing.tenant_code ?? null,
+        package: result.rows[0] ?? null
+      });
       sendJson(res, 200, result.rows[0]);
     } catch (err) {
       if (err?.code === "23505") {
@@ -2614,6 +2918,13 @@ const server = createServer(async (req, res) => {
         }
       });
 
+      realtimeBus.emit("package_assignment", {
+        action: "unassigned",
+        tenant_code: result.rows[0]?.tenant_code ?? null,
+        vessel_code: result.rows[0]?.vessel_code ?? null,
+        package_id: result.rows[0]?.package_id ?? null,
+        assignment: result.rows[0]
+      });
       sendJson(res, 200, result.rows[0]);
     } catch (err) {
       console.error("[api/package-assignments DELETE] failed:", err);

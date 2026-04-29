@@ -1,5 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
-import { pool } from "./db.js";
+import { pool, pingDb } from "./db.js";
+import { getHealth, getReady, getMemoryHealth } from "./health.js";
+import { getCommandJob, listMcuEdges } from "./mcu.js";
 import { realtimeBus } from "../../../shared/realtime-bus.js";
 import { createLogger } from "../../../shared/logger.js";
 
@@ -7,6 +9,8 @@ const console = createLogger("api:realtime");
 const clients = new Map();
 let attached = false;
 let bridgeClient = null;
+let healthBroadcastTimer = null;
+let healthBroadcastInFlight = false;
 
 function normalizeSubscription(value) {
   const text = String(value ?? "").trim();
@@ -65,6 +69,140 @@ function matchesSubscription(subscription, payload) {
 function sendJson(ws, payload) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(payload));
+}
+
+function broadcastToClients(payload, matcher = null) {
+  for (const [ws, state] of clients.entries()) {
+    if (matcher && !matcher(state, payload)) continue;
+    sendJson(ws, payload);
+  }
+}
+
+function sendCommandEvent(payload) {
+  const command = payload?.command && typeof payload.command === "object" ? payload.command : payload;
+  if (!command) {
+    return;
+  }
+
+  broadcastToClients(
+    {
+      type: "command",
+      action: payload?.action ?? null,
+      tenant_code: command.tenant_code ?? payload?.tenant_code ?? null,
+      vessel_code: command.vessel_code ?? payload?.vessel_code ?? null,
+      edge_code: command.edge_code ?? payload?.edge_code ?? null,
+      command
+    },
+    (state, event) => matchesSubscription(state, event)
+  );
+}
+
+function sendPackageEvent(payload) {
+  const pkg = payload?.package && typeof payload.package === "object" ? payload.package : payload;
+  if (!pkg) {
+    return;
+  }
+
+  broadcastToClients(
+    {
+      type: "package",
+      action: payload?.action ?? null,
+      tenant_code: pkg.tenant_code ?? payload?.tenant_code ?? null,
+      vessel_code: pkg.vessel_code ?? payload?.vessel_code ?? null,
+      package: pkg
+    },
+    (state, event) => {
+      const statePayload = {
+        tenant_code: event.tenant_code ?? null,
+        vessel_code: event.vessel_code ?? null,
+        edge_code: null
+      };
+      return matchesSubscription(state, statePayload);
+    }
+  );
+}
+
+function sendHotspotAccountEvent(payload) {
+  const account = payload?.account && typeof payload.account === "object" ? payload.account : null;
+  if (!account) {
+    return;
+  }
+
+  broadcastToClients(
+    {
+      type: "hotspot_account",
+      action: payload?.action ?? null,
+      tenant_code: account.tenant_code ?? payload?.tenant_code ?? null,
+      vessel_code: account.vessel_code ?? payload?.vessel_code ?? null,
+      edge_code: account.edge_code ?? payload?.edge_code ?? null,
+      status: payload?.status ?? account.status ?? null,
+      observed_at: payload?.observed_at ?? account.updated_at ?? account.created_at ?? null,
+      account
+    },
+    (state, event) => matchesSubscription(state, event)
+  );
+}
+
+function sendHotspotDirectoryEvent(payload) {
+  broadcastToClients(
+    {
+      type: "hotspot_user_directory",
+      action: payload?.action ?? null,
+      tenant_code: payload?.tenant_code ?? null,
+      vessel_code: payload?.vessel_code ?? null,
+      edge_code: payload?.edge_code ?? null,
+      observed_at: payload?.observed_at ?? null,
+      count: payload?.count ?? null
+    },
+    (state, event) => matchesSubscription(state, event)
+  );
+}
+
+function sendHotspotActiveEvent(payload) {
+  broadcastToClients(
+    {
+      type: "hotspot_active_users",
+      action: payload?.action ?? null,
+      tenant_code: payload?.tenant_code ?? null,
+      vessel_code: payload?.vessel_code ?? null,
+      edge_code: payload?.edge_code ?? null,
+      observed_at: payload?.observed_at ?? null,
+      count: payload?.count ?? null
+    },
+    (state, event) => matchesSubscription(state, event)
+  );
+}
+
+async function broadcastHealthSnapshot() {
+  if (healthBroadcastInFlight || !clients.size) {
+    return;
+  }
+
+  healthBroadcastInFlight = true;
+  try {
+    const [database, edges] = await Promise.all([
+      pingDb().catch(() => null),
+      listMcuEdges({ limit: 20, onlineSeconds: 120 }).catch(() => null)
+    ]);
+    const health = getHealth({
+      database,
+      memory: getMemoryHealth()
+    });
+    const ready = getReady({
+      database: database?.ok ? database : { status: "error", message: "database_unavailable" }
+    });
+    const payload = {
+      type: "health",
+      health,
+      ready,
+      edges: edges ?? { total: 0, limit: 20, offset: 0, online_seconds: 120, items: [] }
+    };
+    broadcastToClients(payload);
+  } catch (error) {
+    console.error("[ws] health broadcast failed:", error?.message || error);
+  } finally {
+    healthBroadcastInFlight = false;
+  }
 }
 
 function broadcastTelemetry(payload) {
@@ -170,56 +308,148 @@ async function ensureTelemetryBridge() {
 
   bridgeClient = await pool.connect();
   await bridgeClient.query("LISTEN mcu_telemetry_stream");
+  await bridgeClient.query("LISTEN command_job_updates");
+  await bridgeClient.query("LISTEN hotspot_account_updates");
+  await bridgeClient.query("LISTEN hotspot_user_directory_updates");
+  await bridgeClient.query("LISTEN hotspot_active_user_updates");
 
   bridgeClient.on("notification", async (msg) => {
-    if (msg.channel !== "mcu_telemetry_stream") return;
     try {
-      const payload = JSON.parse(msg.payload || "{}");
-      if (!payload?.telemetry_id) return;
+      if (msg.channel === "mcu_telemetry_stream") {
+        const payload = JSON.parse(msg.payload || "{}");
+        if (!payload?.telemetry_id) return;
 
-      const result = await pool.query(
-        `
-          select
-            t.id,
-            t.observed_at,
-            t.active_uplink,
-            t.latency_ms,
-            t.loss_pct,
-            t.rx_kbps,
-            t.tx_kbps,
-            t.throughput_kbps,
-            t.interfaces,
-            te.code as tenant_code,
-            v.code as vessel_code,
-            e.edge_code
-          from telemetry t
-          join vessels v on v.id = t.vessel_id
-          join tenants te on te.id = t.tenant_id
-          left join edge_boxes e on e.id = t.edge_box_id
-          where t.id = $1
-          limit 1
-        `,
-        [payload.telemetry_id]
-      );
+        const result = await pool.query(
+          `
+            select
+              t.id,
+              t.observed_at,
+              t.active_uplink,
+              t.latency_ms,
+              t.loss_pct,
+              t.rx_kbps,
+              t.tx_kbps,
+              t.throughput_kbps,
+              t.interfaces,
+              te.code as tenant_code,
+              v.code as vessel_code,
+              e.edge_code
+            from telemetry t
+            join vessels v on v.id = t.vessel_id
+            join tenants te on te.id = t.tenant_id
+            left join edge_boxes e on e.id = t.edge_box_id
+            where t.id = $1
+            limit 1
+          `,
+          [payload.telemetry_id]
+        );
 
-      if (!result.rowCount) return;
-      const row = result.rows[0];
-      realtimeBus.emit("telemetry", {
-        id: row.id,
-        observed_at: row.observed_at,
-        active_uplink: row.active_uplink ?? null,
-        latency_ms: row.latency_ms ?? null,
-        loss_pct: row.loss_pct ?? null,
-        rx_kbps: row.rx_kbps ?? null,
-        tx_kbps: row.tx_kbps ?? null,
-        throughput_kbps: row.throughput_kbps ?? null,
-        interfaces: Array.isArray(row.interfaces) ? row.interfaces : [],
-        tenant_code: row.tenant_code ?? null,
-        vessel_code: row.vessel_code ?? null,
-        edge_code: row.edge_code ?? null
-      });
+        if (!result.rowCount) return;
+        const row = result.rows[0];
+        realtimeBus.emit("telemetry", {
+          id: row.id,
+          observed_at: row.observed_at,
+          active_uplink: row.active_uplink ?? null,
+          latency_ms: row.latency_ms ?? null,
+          loss_pct: row.loss_pct ?? null,
+          rx_kbps: row.rx_kbps ?? null,
+          tx_kbps: row.tx_kbps ?? null,
+          throughput_kbps: row.throughput_kbps ?? null,
+          interfaces: Array.isArray(row.interfaces) ? row.interfaces : [],
+          tenant_code: row.tenant_code ?? null,
+          vessel_code: row.vessel_code ?? null,
+          edge_code: row.edge_code ?? null
+        });
+        return;
+      }
+
+      if (msg.channel === "command_job_updates") {
+        const payload = JSON.parse(msg.payload || "{}");
+        const jobId = String(payload.job_id ?? payload.command_job_id ?? payload.msg_id ?? "").trim();
+        if (!jobId) {
+          return;
+        }
+
+        const job = await getCommandJob(jobId);
+        if (!job) {
+          return;
+        }
+
+        realtimeBus.emit("command", {
+          action: String(payload.action ?? "status").trim() || "status",
+          command: job,
+          tenant_code: job.tenant_code ?? null,
+          vessel_code: job.vessel_code ?? null,
+          edge_code: job.edge_code ?? null
+        });
+        return;
+      }
+
+      if (msg.channel === "hotspot_account_updates") {
+        const payload = JSON.parse(msg.payload || "{}");
+        const jobId = String(payload.job_id ?? payload.command_job_id ?? "").trim();
+        if (!jobId) {
+          return;
+        }
+
+        const result = await pool.query(
+          `
+            select
+              ha.id,
+              ha.command_job_id,
+              ha.tenant_code,
+              ha.vessel_code,
+              ha.edge_code,
+              ha.username,
+              ha.profile,
+              ha.qos,
+              ha.status,
+              ha.ack_at,
+              ha.result_at,
+              coalesce(
+                nullif(ha.result_payload->>'message', ''),
+                nullif(ha.result_payload->>'detail', ''),
+                nullif(ha.result_payload->>'status', '')
+              ) as result_message,
+              ha.result_payload,
+              ha.created_at,
+              ha.updated_at
+            from hotspot_accounts ha
+            where ha.command_job_id = $1
+            limit 1
+          `,
+          [jobId]
+        );
+
+        if (!result.rowCount) {
+          return;
+        }
+
+        const account = result.rows[0];
+        realtimeBus.emit("hotspot_account", {
+          action: String(payload.action ?? "upsert").trim() || "upsert",
+          tenant_code: account.tenant_code ?? payload.tenant_code ?? null,
+          vessel_code: account.vessel_code ?? payload.vessel_code ?? null,
+          edge_code: account.edge_code ?? payload.edge_code ?? null,
+          status: account.status ?? payload.status ?? null,
+          observed_at: payload.observed_at ?? account.updated_at ?? account.created_at ?? null,
+          account
+        });
+        return;
+      }
+
+      if (msg.channel === "hotspot_user_directory_updates") {
+        const payload = JSON.parse(msg.payload || "{}");
+        realtimeBus.emit("hotspot_user_directory", payload);
+        return;
+      }
+
+      if (msg.channel === "hotspot_active_user_updates") {
+        const payload = JSON.parse(msg.payload || "{}");
+        realtimeBus.emit("hotspot_active_users", payload);
+      }
     } catch (error) {
-      console.error("[ws] telemetry bridge failed:", error?.message || error);
+      console.error("[ws] realtime bridge failed:", error?.message || error);
     }
   });
 
@@ -240,7 +470,7 @@ async function ensureTelemetryBridge() {
     bridgeClient = null;
   });
 
-  console.log("[ws] telemetry bridge listening on mcu_telemetry_stream");
+  console.log("[ws] realtime bridge listening on mcu_telemetry_stream, command_job_updates, hotspot_account_updates, hotspot_user_directory_updates, hotspot_active_user_updates");
 }
 
 export function attachRealtimeServer(server) {
@@ -249,6 +479,22 @@ export function attachRealtimeServer(server) {
   ensureTelemetryBridge().catch((error) => {
     console.error("[ws] failed to start telemetry bridge:", error);
   });
+  if (!healthBroadcastTimer) {
+    healthBroadcastTimer = setInterval(() => {
+      broadcastHealthSnapshot().catch((error) => {
+        console.error("[ws] health broadcast timer failed:", error?.message || error);
+      });
+    }, 5000);
+    broadcastHealthSnapshot().catch((error) => {
+      console.error("[ws] initial health broadcast failed:", error?.message || error);
+    });
+  }
+
+  realtimeBus.on("command", sendCommandEvent);
+  realtimeBus.on("package", sendPackageEvent);
+  realtimeBus.on("hotspot_account", sendHotspotAccountEvent);
+  realtimeBus.on("hotspot_user_directory", sendHotspotDirectoryEvent);
+  realtimeBus.on("hotspot_active_users", sendHotspotActiveEvent);
 
   const wss = new WebSocketServer({ noServer: true, path: "/ws" });
 

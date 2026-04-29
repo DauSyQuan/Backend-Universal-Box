@@ -17,8 +17,117 @@ const ALLOWED_COMMAND_TYPES = new Set([
   "policy_sync",
   "failback_vsat",
   "failover_starlink",
-  "restore_automatic"
+  "restore_automatic",
+  "hotspot",
+  "hotspot_create_account"
 ]);
+
+const HOTSPOT_PROVISION_ACTIONS = new Set([
+  "create_dhcp_pool",
+  "create_dhcp_server",
+  "create_server_profile",
+  "create_hotspot_server",
+  "create_user_profile",
+  "create_account"
+]);
+
+const HOTSPOT_MONITOR_ACTIONS = new Set([
+  "get_all_users",
+  "get_active_users"
+]);
+
+const HOTSPOT_ACTIONS = new Set([
+  ...HOTSPOT_PROVISION_ACTIONS,
+  ...HOTSPOT_MONITOR_ACTIONS
+]);
+
+const HOTSPOT_ACTION_ALIASES = new Map([
+  ["hotspot_create_account", "create_account"],
+  ["create_user", "create_account"],
+  ["setup_server", "create_hotspot_server"]
+]);
+
+function isHotspotCommandType(commandType) {
+  return String(commandType ?? "").trim() === "hotspot" || String(commandType ?? "").trim() === "hotspot_create_account";
+}
+
+function normalizeHotspotAction(action) {
+  const text = String(action ?? "").trim().toLowerCase();
+  if (!text) {
+    return "";
+  }
+  return HOTSPOT_ACTION_ALIASES.get(text) || text;
+}
+
+function isHotspotAccountAction(action) {
+  return normalizeHotspotAction(action) === "create_account";
+}
+
+function deriveHotspotReferenceId(action, payload = {}) {
+  const normalized = normalizeHotspotAction(action);
+  if (normalized === "create_account") {
+    return firstPresentString(payload, ["username", "reference_id", "referenceId", "name"]);
+  }
+  return firstPresentString(payload, ["name", "reference_id", "referenceId", "username", "pool", "pool_name", "interface"]);
+}
+
+function getHotspotParamsObject(commandPayload = {}) {
+  const params = commandPayload.params;
+  if (params && typeof params === "object" && !Array.isArray(params)) {
+    return params;
+  }
+  return {};
+}
+
+function getHotspotParam(commandPayload = {}, keys = []) {
+  const nestedParams = getHotspotParamsObject(commandPayload);
+  const combined = [
+    commandPayload,
+    nestedParams
+  ];
+  for (const source of combined) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const value = source[key];
+        if (value !== null && value !== undefined && value !== "") {
+          return value;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function isBridgeHotspotPayload(commandPayload = {}) {
+  return Object.prototype.hasOwnProperty.call(commandPayload, "path") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "method") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "params") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "reference_id") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "referenceId");
+}
+
+function isValidCidr(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return false;
+  }
+  const [ip, prefix] = text.split("/");
+  const version = isIP(ip ?? "");
+  if (!version) {
+    return false;
+  }
+  const prefixNum = Number(prefix);
+  return Number.isInteger(prefixNum) && prefixNum >= 0 && prefixNum <= (version === 4 ? 32 : 128);
+}
+
+function isValidIpRange(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return false;
+  }
+  const [start, end] = text.split("-").map((part) => part.trim());
+  return Boolean(start && end && isIP(start) && isIP(end));
+}
 
 function safeEqual(left, right) {
   const leftBuffer = Buffer.from(String(left ?? ""), "utf8");
@@ -353,6 +462,115 @@ function validateCommandPayload(commandType, commandPayload) {
     errors.push("mode must be automatic or manual when provided");
   }
 
+  const inferredHotspotAction = normalizeHotspotAction(
+    commandPayload.action ?? (String(commandType ?? "").trim() === "hotspot_create_account" ? "create_account" : "")
+  );
+
+  if (isHotspotCommandType(commandType) || HOTSPOT_ACTIONS.has(inferredHotspotAction)) {
+    const action = inferredHotspotAction;
+    const qosPattern = /^\d+(?:\.\d+)?[KMG]\/\d+(?:\.\d+)?[KMG]$/i;
+
+    if (isBridgeHotspotPayload(commandPayload)) {
+      const path = String(commandPayload.path ?? "").trim();
+      const method = String(commandPayload.method ?? "").trim().toLowerCase();
+      const referenceId = String(commandPayload.reference_id ?? commandPayload.referenceId ?? "").trim();
+      const params = getHotspotParamsObject(commandPayload);
+
+      if (!path) {
+        errors.push("path is required for hotspot bridge commands");
+      } else if (!path.startsWith("/")) {
+        errors.push("path must start with /");
+      }
+
+      if (!method) {
+        errors.push("method is required for hotspot bridge commands");
+      } else if (!["add", "set", "remove", "get"].includes(method)) {
+        errors.push("method must be add, set, remove, or get");
+      }
+
+      if (!referenceId) {
+        errors.push("reference_id is required for hotspot bridge commands");
+      }
+
+      if (!params || typeof params !== "object" || Array.isArray(params)) {
+        errors.push("params must be an object");
+      }
+    } else {
+      const name = String(commandPayload.name ?? "").trim();
+      const username = String(commandPayload.username ?? "").trim();
+      const password = String(commandPayload.password ?? "").trim();
+      const profile = String(commandPayload.profile ?? "").trim();
+      const qos = String(commandPayload.qos ?? "").trim();
+      const interfaceName = String(commandPayload.interface ?? "").trim();
+      const poolName = String(commandPayload.pool ?? commandPayload.pool_name ?? "").trim();
+      const dnsName = String(commandPayload.dns ?? commandPayload.dns_name ?? "").trim();
+      const range = String(commandPayload.range ?? "").trim();
+      const network = String(commandPayload.network ?? "").trim();
+      const ip = String(commandPayload.ip ?? "").trim();
+
+      if (!action) {
+        errors.push("action is required for hotspot commands");
+      } else if (!HOTSPOT_ACTIONS.has(action)) {
+        errors.push(`unsupported hotspot action: ${action}`);
+      }
+
+      if (action === "create_dhcp_pool") {
+        if (!name) errors.push("name is required for create_dhcp_pool");
+        if (!range) {
+          errors.push("range is required for create_dhcp_pool");
+        } else if (!isValidIpRange(range)) {
+          errors.push("range must be a valid IP range like 192.168.50.10-192.168.50.254");
+        }
+      }
+
+      if (action === "create_dhcp_server") {
+        if (!name) errors.push("name is required for create_dhcp_server");
+        if (!interfaceName) errors.push("interface is required for create_dhcp_server");
+        if (!poolName) errors.push("pool is required for create_dhcp_server");
+        if (!network) {
+          errors.push("network is required for create_dhcp_server");
+        } else if (!isValidCidr(network)) {
+          errors.push("network must be a valid CIDR like 192.168.50.0/24");
+        }
+      }
+
+      if (action === "create_server_profile") {
+        if (!name) errors.push("name is required for create_server_profile");
+        if (!ip) {
+          errors.push("ip is required for create_server_profile");
+        } else if (!isIP(ip)) {
+          errors.push("ip must be a valid IPv4 or IPv6 address");
+        }
+        if (!dnsName) errors.push("dns is required for create_server_profile");
+      }
+
+      if (action === "create_hotspot_server") {
+        if (!name) errors.push("name is required for create_hotspot_server");
+        if (!interfaceName) errors.push("interface is required for create_hotspot_server");
+        if (!poolName) errors.push("pool is required for create_hotspot_server");
+        if (!profile) errors.push("profile is required for create_hotspot_server");
+      }
+
+      if (action === "create_user_profile") {
+        if (!name) errors.push("name is required for create_user_profile");
+        if (!qos) {
+          errors.push("qos is required for create_user_profile");
+        } else if (!qosPattern.test(qos.replace(/\s+/g, ""))) {
+          errors.push("qos must look like 5M/10M");
+        }
+      }
+
+      if (action === "create_account") {
+        if (!username) errors.push("username is required for create_account");
+        if (!password) errors.push("password is required for create_account");
+        if (!profile) errors.push("profile is required for create_account");
+        if (qos && !qosPattern.test(qos.replace(/\s+/g, ""))) {
+          errors.push("qos must look like 5M/10M");
+        }
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -376,6 +594,216 @@ function normalizeCommandJobRow(row) {
     created_by: row.created_by ?? null,
     created_at: row.created_at
   };
+}
+
+function normalizeHotspotAccountRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    command_job_id: row.command_job_id,
+    tenant_code: row.tenant_code,
+    vessel_code: row.vessel_code,
+    edge_code: row.edge_code,
+    command_type: row.command_type ?? null,
+    path: row.path ?? null,
+    method: row.method ?? null,
+    reference_id: row.reference_id ?? null,
+    action: row.action ?? null,
+    subject: row.subject ?? row.reference_id ?? row.username ?? null,
+    username: row.username,
+    profile: row.profile,
+    qos: row.qos,
+    status: row.status,
+    ack_at: row.ack_at,
+    result_at: row.result_at,
+    result_message: row.result_message ?? null,
+    result_payload: row.result_payload ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function normalizeHotspotDirectoryRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    tenant_code: row.tenant_code,
+    vessel_code: row.vessel_code,
+    edge_code: row.edge_code,
+    username: row.username,
+    profile: row.profile ?? null,
+    qos: row.qos ?? null,
+    uptime: row.uptime ?? null,
+    is_deleted: Boolean(row.is_deleted),
+    last_action: row.last_action ?? null,
+    status: row.status ?? null,
+    synced_at: row.synced_at ?? null,
+    raw_payload: row.raw_payload ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function normalizeHotspotActiveUserRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    tenant_code: row.tenant_code,
+    vessel_code: row.vessel_code,
+    edge_code: row.edge_code,
+    username: row.username,
+    ip_address: row.ip_address ?? null,
+    mac_address: row.mac_address ?? null,
+    session_time: row.session_time ?? null,
+    uptime: row.uptime ?? null,
+    synced_at: row.synced_at ?? null,
+    raw_payload: row.raw_payload ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+async function syncHotspotAccountFromCommandJob(commandJobId, {
+  status = null,
+  ackAt = null,
+  resultAt = null,
+  resultPayload = null
+} = {}) {
+  ensurePool();
+
+  const jobResult = await pool.query(
+    `
+      select
+        cj.id as command_job_id,
+        cj.command_type,
+        cj.command_payload,
+        cj.status,
+        cj.ack_at,
+        cj.result_at,
+        cj.result_payload,
+        cj.created_at,
+        cj.tenant_id,
+        t.code as tenant_code,
+        cj.vessel_id,
+        v.code as vessel_code,
+        cj.edge_box_id,
+        e.edge_code
+      from command_jobs cj
+      join tenants t on t.id = cj.tenant_id
+      join vessels v on v.id = cj.vessel_id
+      left join edge_boxes e on e.id = cj.edge_box_id
+      where cj.id = $1
+      limit 1
+    `,
+    [commandJobId]
+  );
+
+  const job = jobResult.rows[0];
+  const payload = job?.command_payload ?? {};
+  const path = String(payload.path ?? "").trim().toLowerCase();
+  const method = String(payload.method ?? "").trim().toLowerCase();
+  const isAccountCommand = isHotspotAccountAction(payload.action ?? (
+    path === "/ip/hotspot/user" && method === "add"
+      ? "create_account"
+      : job?.command_type === "hotspot_create_account"
+        ? "create_account"
+        : ""
+  ));
+  if (!job || !isAccountCommand) {
+    return null;
+  }
+
+  const normalizedStatus = String(status ?? job.status ?? "queued").trim() || "queued";
+  await pool.query(
+    `
+      insert into hotspot_accounts (
+        command_job_id,
+        tenant_id,
+        tenant_code,
+        vessel_id,
+        vessel_code,
+        edge_box_id,
+        edge_code,
+        username,
+        profile,
+        qos,
+        status,
+        ack_at,
+        result_at,
+        result_payload,
+        created_at,
+        updated_at
+      )
+      values (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14::jsonb, $15, now()
+      )
+      on conflict (command_job_id) do update set
+        tenant_id = excluded.tenant_id,
+        tenant_code = excluded.tenant_code,
+        vessel_id = excluded.vessel_id,
+        vessel_code = excluded.vessel_code,
+        edge_box_id = excluded.edge_box_id,
+        edge_code = excluded.edge_code,
+        username = excluded.username,
+        profile = excluded.profile,
+        qos = excluded.qos,
+        status = excluded.status,
+        ack_at = coalesce(excluded.ack_at, hotspot_accounts.ack_at),
+        result_at = coalesce(excluded.result_at, hotspot_accounts.result_at),
+        result_payload = coalesce(excluded.result_payload, hotspot_accounts.result_payload),
+        updated_at = now()
+    `,
+    [
+      job.command_job_id,
+      job.tenant_id,
+      job.tenant_code,
+      job.vessel_id,
+      job.vessel_code,
+      job.edge_box_id ?? null,
+      job.edge_code ?? null,
+      String(getHotspotParam(payload, ["username", "name"]) ?? "").trim(),
+      String(getHotspotParam(payload, ["profile"]) ?? "").trim(),
+      String(getHotspotParam(payload, ["qos", "rate_limit", "rate-limit"]) ?? "").trim(),
+      normalizedStatus,
+      ackAt ?? job.ack_at ?? null,
+      resultAt ?? job.result_at ?? null,
+      resultPayload !== null && resultPayload !== undefined
+        ? JSON.stringify(resultPayload)
+        : job.result_payload !== null && job.result_payload !== undefined
+          ? JSON.stringify(job.result_payload)
+          : null,
+      job.created_at
+    ]
+  );
+
+  try {
+    await pool.query(
+      "select pg_notify('hotspot_account_updates', $1)",
+      [
+        JSON.stringify({
+          action: "upsert",
+          job_id: commandJobId,
+          status: normalizedStatus,
+          observed_at: resultAt ?? ackAt ?? new Date().toISOString(),
+          tenant_code: job.tenant_code,
+          vessel_code: job.vessel_code,
+          edge_code: job.edge_code
+        })
+      ]
+    );
+  } catch (error) {
+    console.error("[api] hotspot account notify failed:", error?.message || error);
+  }
 }
 
 async function resolveEdgeCommandContext({ tenantCode, vesselCode, edgeCode }) {
@@ -1068,6 +1496,255 @@ export async function listCommandJobs({
   };
 }
 
+export async function listHotspotAccounts({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  status,
+  limit = 50,
+  offset = 0,
+  after = null
+}) {
+  ensurePool();
+
+  const safeLimit = Math.max(1, Math.min(200, toInt(limit, 50)));
+  const safeOffset = Math.max(0, toInt(offset, 0));
+  const afterValue = after ? new Date(String(after)) : null;
+  const safeAfter = afterValue && !Number.isNaN(afterValue.getTime()) ? afterValue.toISOString() : null;
+  const filters = [];
+  const params = [];
+
+  if (tenantCode) {
+    params.push(String(tenantCode).trim());
+    filters.push(`cj.tenant_code = $${params.length}`);
+  }
+
+  if (vesselCode) {
+    params.push(String(vesselCode).trim());
+    filters.push(`cj.vessel_code = $${params.length}`);
+  }
+
+  if (edgeCode) {
+    params.push(String(edgeCode).trim());
+    filters.push(`cj.edge_code = $${params.length}`);
+  }
+
+  if (status) {
+    params.push(String(status).trim());
+    filters.push(`cj.status = $${params.length}`);
+  }
+
+  if (safeAfter) {
+    params.push(safeAfter);
+    filters.push(`cj.created_at < $${params.length}::timestamptz`);
+  }
+
+  const query = `
+    select
+      cj.id,
+      cj.id as command_job_id,
+      cj.tenant_code,
+      cj.vessel_code,
+      cj.edge_code,
+      cj.command_type,
+      nullif(cj.command_payload->>'path', '') as path,
+      nullif(cj.command_payload->>'method', '') as method,
+      nullif(cj.command_payload->>'reference_id', '') as reference_id,
+      coalesce(
+        nullif(cj.command_payload->>'reference_id', ''),
+        nullif(cj.command_payload->'params'->>'reference_id', ''),
+        nullif(cj.command_payload->>'name', ''),
+        nullif(cj.command_payload->'params'->>'name', ''),
+        nullif(cj.command_payload->>'username', ''),
+        nullif(cj.command_payload->'params'->>'username', ''),
+        nullif(cj.command_payload->>'interface', ''),
+        nullif(cj.command_payload->'params'->>'interface', ''),
+        nullif(cj.command_payload->>'pool', ''),
+        nullif(cj.command_payload->'params'->>'pool', ''),
+        nullif(cj.command_payload->>'pool_name', ''),
+        nullif(cj.command_payload->'params'->>'pool_name', ''),
+        nullif(cj.command_payload->'params'->>'server', '')
+      ) as subject,
+      nullif(cj.command_payload->'params'->>'username', '') as username,
+      nullif(cj.command_payload->'params'->>'name', '') as profile,
+      coalesce(
+        nullif(cj.command_payload->'params'->>'rate-limit', ''),
+        nullif(cj.command_payload->'params'->>'rate_limit', ''),
+        nullif(cj.command_payload->'params'->>'qos', '')
+      ) as qos,
+      cj.status,
+      cj.ack_at,
+      cj.result_at,
+      coalesce(
+        nullif(cj.result_payload->>'message', ''),
+        nullif(cj.result_payload->>'detail', ''),
+        nullif(cj.result_payload->>'status', '')
+      ) as result_message,
+      cj.result_payload,
+      cj.created_at,
+      cj.updated_at
+    from command_jobs cj
+    where lower(cj.command_type) in ('hotspot', 'hotspot_create_account')
+    ${filters.length ? `and ${filters.join(" and ")}` : ""}
+    order by cj.created_at desc
+    offset $${params.length + 1}
+    limit $${params.length + 2}
+  `;
+
+  const result = await pool.query(query, [...params, safeOffset, safeLimit]);
+  return {
+    total: result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    next_after: result.rows.at(-1)?.created_at ?? null,
+    items: result.rows.map(normalizeHotspotAccountRow)
+  };
+}
+
+export async function listHotspotUserDirectory({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  username,
+  limit = 100,
+  offset = 0,
+  after = null
+}) {
+  ensurePool();
+
+  const safeLimit = Math.max(1, Math.min(500, toInt(limit, 100)));
+  const safeOffset = Math.max(0, toInt(offset, 0));
+  const afterValue = after ? new Date(String(after)) : null;
+  const safeAfter = afterValue && !Number.isNaN(afterValue.getTime()) ? afterValue.toISOString() : null;
+  const filters = [];
+  const params = [];
+
+  if (tenantCode) {
+    params.push(String(tenantCode).trim());
+    filters.push(`hud.tenant_code = $${params.length}`);
+  }
+  if (vesselCode) {
+    params.push(String(vesselCode).trim());
+    filters.push(`hud.vessel_code = $${params.length}`);
+  }
+  if (edgeCode) {
+    params.push(String(edgeCode).trim());
+    filters.push(`hud.edge_code = $${params.length}`);
+  }
+  if (username) {
+    params.push(String(username).trim());
+    filters.push(`hud.username = $${params.length}`);
+  }
+  if (safeAfter) {
+    params.push(safeAfter);
+    filters.push(`hud.synced_at < $${params.length}::timestamptz`);
+  }
+
+  const query = `
+    select
+      hud.id,
+      hud.tenant_code,
+      hud.vessel_code,
+      hud.edge_code,
+      hud.username,
+      hud.profile,
+      hud.qos,
+      hud.uptime,
+      hud.is_deleted,
+      hud.last_action,
+      hud.status,
+      hud.synced_at,
+      hud.raw_payload,
+      hud.created_at,
+      hud.updated_at
+    from hotspot_user_directory hud
+    ${filters.length ? `where ${filters.join(" and ")}` : ""}
+    order by hud.synced_at desc nulls last, hud.created_at desc
+    offset $${params.length + 1}
+    limit $${params.length + 2}
+  `;
+
+  const result = await pool.query(query, [...params, safeOffset, safeLimit]);
+  return {
+    total: result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    next_after: result.rows.at(-1)?.synced_at ?? null,
+    items: result.rows.map(normalizeHotspotDirectoryRow)
+  };
+}
+
+export async function listHotspotActiveUsers({
+  tenantCode,
+  vesselCode,
+  edgeCode,
+  username,
+  limit = 100,
+  offset = 0,
+  after = null
+}) {
+  ensurePool();
+
+  const safeLimit = Math.max(1, Math.min(500, toInt(limit, 100)));
+  const safeOffset = Math.max(0, toInt(offset, 0));
+  const afterValue = after ? new Date(String(after)) : null;
+  const safeAfter = afterValue && !Number.isNaN(afterValue.getTime()) ? afterValue.toISOString() : null;
+  const filters = [];
+  const params = [];
+
+  if (tenantCode) {
+    params.push(String(tenantCode).trim());
+    filters.push(`hau.tenant_code = $${params.length}`);
+  }
+  if (vesselCode) {
+    params.push(String(vesselCode).trim());
+    filters.push(`hau.vessel_code = $${params.length}`);
+  }
+  if (edgeCode) {
+    params.push(String(edgeCode).trim());
+    filters.push(`hau.edge_code = $${params.length}`);
+  }
+  if (username) {
+    params.push(String(username).trim());
+    filters.push(`hau.username = $${params.length}`);
+  }
+  if (safeAfter) {
+    params.push(safeAfter);
+    filters.push(`hau.synced_at < $${params.length}::timestamptz`);
+  }
+
+  const query = `
+    select
+      hau.id,
+      hau.tenant_code,
+      hau.vessel_code,
+      hau.edge_code,
+      hau.username,
+      hau.ip_address,
+      hau.mac_address,
+      hau.session_time,
+      hau.uptime,
+      hau.synced_at,
+      hau.raw_payload,
+      hau.created_at,
+      hau.updated_at
+    from hotspot_active_users hau
+    ${filters.length ? `where ${filters.join(" and ")}` : ""}
+    order by hau.synced_at desc nulls last, hau.created_at desc
+    offset $${params.length + 1}
+    limit $${params.length + 2}
+  `;
+
+  const result = await pool.query(query, [...params, safeOffset, safeLimit]);
+  return {
+    total: result.rowCount,
+    limit: safeLimit,
+    offset: safeOffset,
+    next_after: result.rows.at(-1)?.synced_at ?? null,
+    items: result.rows.map(normalizeHotspotActiveUserRow)
+  };
+}
+
 export async function getCommandJob(commandJobId) {
   ensurePool();
 
@@ -1162,7 +1839,32 @@ export async function createCommandJob({
     ]
   );
 
-  return getCommandJob(result.rows[0].id);
+  const job = await getCommandJob(result.rows[0].id);
+  if (job) {
+    const jobPayload = job.command_payload ?? {};
+    const jobPath = String(jobPayload.path ?? "").trim().toLowerCase();
+    const jobMethod = String(jobPayload.method ?? "").trim().toLowerCase();
+    const syncAction = jobPayload.action ?? (
+      jobPath === "/ip/hotspot/user" && jobMethod === "add"
+        ? "create_account"
+        : job.command_type === "hotspot_create_account"
+          ? "create_account"
+          : ""
+    );
+    if (isHotspotAccountAction(syncAction)) {
+      await syncHotspotAccountFromCommandJob(job.id, { status: "queued" }).catch((error) => {
+        console.error("[api] hotspot account create sync failed:", error?.message || error);
+      });
+    }
+    realtimeBus.emit("command", {
+      action: "created",
+      command: job,
+      tenant_code: job.tenant_code ?? tenant,
+      vessel_code: job.vessel_code ?? vessel,
+      edge_code: job.edge_code ?? edge
+    });
+  }
+  return job;
 }
 
 export async function markCommandJobStatus(commandJobId, {
@@ -1204,7 +1906,27 @@ export async function markCommandJobStatus(commandJobId, {
     return null;
   }
 
-  return getCommandJob(commandJobId);
+  const job = await getCommandJob(commandJobId);
+  if (job) {
+    if (isHotspotCommandType(job.command_type)) {
+      await syncHotspotAccountFromCommandJob(job.id, {
+        status: normalizedStatus,
+        ackAt,
+        resultAt,
+        resultPayload
+      }).catch((error) => {
+        console.error("[api] hotspot account status sync failed:", error?.message || error);
+      });
+    }
+    realtimeBus.emit("command", {
+      action: "status",
+      command: job,
+      tenant_code: job.tenant_code ?? null,
+      vessel_code: job.vessel_code ?? null,
+      edge_code: job.edge_code ?? null
+    });
+  }
+  return job;
 }
 
 export async function getMcuEdgeTraffic({

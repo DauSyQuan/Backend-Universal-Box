@@ -20,6 +20,12 @@ export const pool = new Pool({
 });
 
 const contextCache = new Map();
+const ALLOWED_COMMAND_JOB_STATUSES = new Set(["queued", "sent", "ack", "success", "failed"]);
+const HOTSPOT_ACTION_ALIASES = new Map([
+  ["hotspot_create_account", "create_account"],
+  ["create_user", "create_account"],
+  ["setup_server", "create_hotspot_server"]
+]);
 
 function getCachedContext(key) {
   const cached = contextCache.get(key);
@@ -35,6 +41,458 @@ function setCachedContext(key, data) {
   if (contextCache.size > 5000) {
     const oldestKey = contextCache.keys().next().value;
     contextCache.delete(oldestKey);
+  }
+}
+
+function normalizeCommandJobStatus(value, fallback = "failed") {
+  const text = String(value ?? "").trim().toLowerCase();
+  if (ALLOWED_COMMAND_JOB_STATUSES.has(text)) {
+    return text;
+  }
+  if (text === "error") {
+    return "failed";
+  }
+  if (text === "ok") {
+    return "success";
+  }
+  return fallback;
+}
+
+function normalizeHotspotAction(action) {
+  const text = String(action ?? "").trim().toLowerCase();
+  if (!text) {
+    return "";
+  }
+  return HOTSPOT_ACTION_ALIASES.get(text) || text;
+}
+
+function isHotspotAccountAction(action) {
+  return normalizeHotspotAction(action) === "create_account";
+}
+
+function deriveHotspotReferenceId(action, payload = {}) {
+  const normalized = normalizeHotspotAction(action);
+  if (normalized === "create_account") {
+    return String(payload.username ?? payload.reference_id ?? payload.referenceId ?? payload.name ?? "").trim();
+  }
+  return String(payload.name ?? payload.reference_id ?? payload.referenceId ?? payload.username ?? payload.pool ?? payload.pool_name ?? payload.interface ?? "").trim();
+}
+
+function getHotspotParamsObject(commandPayload = {}) {
+  const params = commandPayload.params;
+  if (params && typeof params === "object" && !Array.isArray(params)) {
+    return params;
+  }
+  return {};
+}
+
+function getHotspotParam(commandPayload = {}, keys = []) {
+  const nestedParams = getHotspotParamsObject(commandPayload);
+  for (const source of [commandPayload, nestedParams]) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const value = source[key];
+        if (value !== null && value !== undefined && value !== "") {
+          return value;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function isBridgeHotspotPayload(commandPayload = {}) {
+  return Object.prototype.hasOwnProperty.call(commandPayload, "path") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "method") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "params") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "reference_id") ||
+    Object.prototype.hasOwnProperty.call(commandPayload, "referenceId");
+}
+
+export async function syncHotspotAccountFromCommandJob({ jobId, observedAt }) {
+  const jobResult = await pool.query(
+    `
+      select
+        cj.id as command_job_id,
+        cj.command_type,
+        cj.command_payload,
+        cj.status,
+        cj.ack_at,
+        cj.result_at,
+        cj.result_payload,
+        cj.created_at,
+        cj.tenant_id,
+        t.code as tenant_code,
+        cj.vessel_id,
+        v.code as vessel_code,
+        cj.edge_box_id,
+        e.edge_code
+      from command_jobs cj
+      join tenants t on t.id = cj.tenant_id
+      join vessels v on v.id = cj.vessel_id
+      left join edge_boxes e on e.id = cj.edge_box_id
+      where cj.id = $1
+      limit 1
+    `,
+    [jobId]
+  );
+
+  const job = jobResult.rows[0];
+  const payload = job?.command_payload ?? {};
+  const path = String(payload.path ?? "").trim().toLowerCase();
+  const method = String(payload.method ?? "").trim().toLowerCase();
+  const isAccountCommand = isHotspotAccountAction(payload.action ?? (
+    path === "/ip/hotspot/user" && method === "add"
+      ? "create_account"
+      : job?.command_type === "hotspot_create_account"
+        ? "create_account"
+        : ""
+  ));
+  if (!job || !isAccountCommand) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+      insert into hotspot_accounts (
+        command_job_id,
+        tenant_id,
+        tenant_code,
+        vessel_id,
+        vessel_code,
+        edge_box_id,
+        edge_code,
+        username,
+        profile,
+        qos,
+        status,
+        ack_at,
+        result_at,
+        result_payload,
+        created_at,
+        updated_at
+      )
+      values (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11,
+        $12,
+        $13,
+        $14::jsonb,
+        $15,
+        now()
+      )
+      on conflict (command_job_id) do update set
+        tenant_id = excluded.tenant_id,
+        tenant_code = excluded.tenant_code,
+        vessel_id = excluded.vessel_id,
+        vessel_code = excluded.vessel_code,
+        edge_box_id = excluded.edge_box_id,
+        edge_code = excluded.edge_code,
+        username = excluded.username,
+        profile = excluded.profile,
+        qos = excluded.qos,
+        status = excluded.status,
+        ack_at = coalesce(excluded.ack_at, hotspot_accounts.ack_at),
+        result_at = coalesce(excluded.result_at, hotspot_accounts.result_at),
+        result_payload = coalesce(excluded.result_payload, hotspot_accounts.result_payload),
+        updated_at = now()
+      returning
+        id,
+        command_job_id,
+        tenant_id,
+        tenant_code,
+        vessel_id,
+        vessel_code,
+        edge_box_id,
+        edge_code,
+        username,
+        profile,
+        qos,
+        status,
+        ack_at,
+        result_at,
+        result_payload,
+        created_at,
+        updated_at
+    `,
+    [
+      job.command_job_id,
+      job.tenant_id,
+      job.tenant_code,
+      job.vessel_id,
+      job.vessel_code,
+      job.edge_box_id ?? null,
+      job.edge_code ?? null,
+      String(getHotspotParam(payload, ["username", "name"]) ?? "").trim(),
+      String(getHotspotParam(payload, ["profile"]) ?? "").trim(),
+      String(getHotspotParam(payload, ["qos", "rate_limit", "rate-limit"]) ?? "").trim(),
+      normalizeCommandJobStatus(job.status, "ack"),
+      job.ack_at ?? observedAt,
+      job.result_at ?? null,
+      job.result_payload ? JSON.stringify(job.result_payload) : null,
+      job.created_at
+    ]
+  );
+
+  const account = result.rows[0] ?? null;
+  if (!account) {
+    return null;
+  }
+
+  try {
+    await pool.query(
+      "select pg_notify('hotspot_account_updates', $1)",
+      [
+        JSON.stringify({
+          action: "upsert",
+          job_id: jobId,
+          status: account.status,
+          observed_at: observedAt,
+          tenant_code: account.tenant_code,
+          vessel_code: account.vessel_code,
+          edge_code: account.edge_code
+        })
+      ]
+    );
+  } catch (error) {
+    console.error("[worker] hotspot account notify failed:", error?.message || error);
+  }
+
+  return account;
+}
+
+export async function getCommandJob(jobId) {
+  if (!jobId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+      select
+        cj.id,
+        cj.tenant_id,
+        t.code as tenant_code,
+        cj.vessel_id,
+        v.code as vessel_code,
+        cj.edge_box_id,
+        e.edge_code,
+        cj.command_type,
+        cj.command_payload,
+        cj.status,
+        cj.ack_at,
+        cj.result_at,
+        cj.result_payload,
+        cj.created_at,
+        cj.updated_at,
+        cj.created_by
+      from command_jobs cj
+      join tenants t on t.id = cj.tenant_id
+      join vessels v on v.id = cj.vessel_id
+      left join edge_boxes e on e.id = cj.edge_box_id
+      where cj.id = $1
+      limit 1
+    `,
+    [jobId]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function syncHotspotUserDirectorySnapshot({ context, users, observedAt, sourceAction, sourceJobId, sourcePayload }) {
+  if (!context?.tenant_id || !context?.vessel_id || !context?.edge_box_id) {
+    return [];
+  }
+
+  const list = Array.isArray(users) ? users : [];
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(
+      `delete from hotspot_user_directory where tenant_code = $1 and vessel_code = $2 and edge_code = $3`,
+      [context.tenant_code, context.vessel_code, context.edge_code]
+    );
+
+    const rows = [];
+    for (const user of list) {
+      const username = String(user?.username ?? user?.name ?? "").trim();
+      if (!username) {
+        continue;
+      }
+      const result = await client.query(
+        `
+          insert into hotspot_user_directory (
+            tenant_id, tenant_code, vessel_id, vessel_code, edge_box_id, edge_code,
+            username, profile, qos, uptime, is_deleted, last_action, status, raw_payload, synced_at, updated_at
+          )
+          values (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, now()
+          )
+          on conflict (tenant_code, vessel_code, edge_code, username) do update set
+            tenant_id = excluded.tenant_id,
+            vessel_id = excluded.vessel_id,
+            edge_box_id = excluded.edge_box_id,
+            profile = excluded.profile,
+            qos = excluded.qos,
+            uptime = excluded.uptime,
+            is_deleted = excluded.is_deleted,
+            last_action = excluded.last_action,
+            status = excluded.status,
+            raw_payload = excluded.raw_payload,
+            synced_at = excluded.synced_at,
+            updated_at = now()
+          returning id, username, profile, qos, uptime, status, is_deleted, synced_at, created_at, updated_at
+        `,
+        [
+          context.tenant_id,
+          context.tenant_code,
+          context.vessel_id,
+          context.vessel_code,
+          context.edge_box_id,
+          context.edge_code,
+          username,
+          String(user.profile ?? user.group ?? "").trim() || null,
+          String(user.qos ?? user.rate_limit ?? "").trim() || null,
+          String(user.uptime ?? user.session_time ?? "").trim() || null,
+          Boolean(user.is_deleted ?? user.deleted ?? false),
+          sourceAction || null,
+          String(user.status ?? "synced").trim() || "synced",
+          JSON.stringify({
+            action: sourceAction || "get_all_users",
+            command_job_id: sourceJobId ?? null,
+            user
+          }),
+          observedAt
+        ]
+      );
+      rows.push(result.rows[0]);
+    }
+    await client.query("commit");
+
+    try {
+      await pool.query(
+        "select pg_notify('hotspot_user_directory_updates', $1)",
+        [
+          JSON.stringify({
+            action: "replace",
+            job_id: sourceJobId ?? null,
+            tenant_code: context.tenant_code,
+            vessel_code: context.vessel_code,
+            edge_code: context.edge_code,
+            observed_at: observedAt,
+            count: rows.length
+          })
+        ]
+      );
+    } catch (error) {
+      console.error("[worker] hotspot directory notify failed:", error?.message || error);
+    }
+
+    return rows;
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function syncHotspotActiveUsersSnapshot({ context, users, observedAt, sourceAction, sourceJobId }) {
+  if (!context?.tenant_id || !context?.vessel_id || !context?.edge_box_id) {
+    return [];
+  }
+
+  const list = Array.isArray(users) ? users : [];
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(
+      `delete from hotspot_active_users where tenant_code = $1 and vessel_code = $2 and edge_code = $3`,
+      [context.tenant_code, context.vessel_code, context.edge_code]
+    );
+
+    const rows = [];
+    for (const user of list) {
+      const username = String(user?.username ?? user?.name ?? "").trim();
+      if (!username) {
+        continue;
+      }
+      const result = await client.query(
+        `
+          insert into hotspot_active_users (
+            tenant_id, tenant_code, vessel_id, vessel_code, edge_box_id, edge_code,
+            username, ip_address, mac_address, session_time, uptime, raw_payload, synced_at, updated_at
+          )
+          values (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11, $12::jsonb, $13, now()
+          )
+          on conflict (tenant_code, vessel_code, edge_code, username) do update set
+            tenant_id = excluded.tenant_id,
+            vessel_id = excluded.vessel_id,
+            edge_box_id = excluded.edge_box_id,
+            ip_address = excluded.ip_address,
+            mac_address = excluded.mac_address,
+            session_time = excluded.session_time,
+            uptime = excluded.uptime,
+            raw_payload = excluded.raw_payload,
+            synced_at = excluded.synced_at,
+            updated_at = now()
+          returning id, username, ip_address, mac_address, session_time, uptime, synced_at, created_at, updated_at
+        `,
+        [
+          context.tenant_id,
+          context.tenant_code,
+          context.vessel_id,
+          context.vessel_code,
+          context.edge_box_id,
+          context.edge_code,
+          username,
+          String(user.ip_address ?? user.ip ?? user.address ?? "").trim() || null,
+          String(user.mac_address ?? user.mac ?? "").trim() || null,
+          String(user.session_time ?? user.sessionTime ?? "").trim() || null,
+          String(user.uptime ?? "").trim() || null,
+          JSON.stringify({
+            action: sourceAction || "get_active_users",
+            command_job_id: sourceJobId ?? null,
+            user
+          }),
+          observedAt
+        ]
+      );
+      rows.push(result.rows[0]);
+    }
+    await client.query("commit");
+
+    try {
+      await pool.query(
+        "select pg_notify('hotspot_active_user_updates', $1)",
+        [
+          JSON.stringify({
+            action: "replace",
+            job_id: sourceJobId ?? null,
+            tenant_code: context.tenant_code,
+            vessel_code: context.vessel_code,
+            edge_code: context.edge_code,
+            observed_at: observedAt,
+            count: rows.length
+          })
+        ]
+      );
+    } catch (error) {
+      console.error("[worker] hotspot active notify failed:", error?.message || error);
+    }
+
+    return rows;
+  } catch (error) {
+    try {
+      await client.query("rollback");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -837,6 +1295,70 @@ export async function markCommandJobSent({ jobId, observedAt }) {
   return result.rowCount > 0;
 }
 
+export async function findHotspotCommandJobByReferenceId({ referenceId, lookbackHours = 24 } = {}) {
+  const normalizedReferenceId = String(referenceId ?? "").trim();
+  if (!normalizedReferenceId) {
+    return null;
+  }
+
+  const safeLookbackHours = Math.max(1, Math.min(168, Number.parseInt(String(lookbackHours), 10) || 24));
+  const params = [normalizedReferenceId, safeLookbackHours];
+  const result = await pool.query(
+    `
+      select
+        cj.id as command_job_id,
+        cj.command_type,
+        cj.command_payload,
+        cj.status,
+        cj.ack_at,
+        cj.result_at,
+        cj.result_payload,
+        cj.created_at,
+        cj.tenant_id,
+        t.code as tenant_code,
+        cj.vessel_id,
+        v.code as vessel_code,
+        cj.edge_box_id,
+        e.edge_code
+      from command_jobs cj
+      join tenants t on t.id = cj.tenant_id
+      join vessels v on v.id = cj.vessel_id
+      left join edge_boxes e on e.id = cj.edge_box_id
+      where lower(cj.command_type) in ('hotspot', 'hotspot_create_account')
+        and cj.status not in ('success', 'failed')
+        and cj.created_at >= now() - ($2::int || ' hours')::interval
+        and lower(coalesce(
+          cj.command_payload->>'reference_id',
+          cj.command_payload->>'referenceId',
+          cj.command_payload->'params'->>'reference_id',
+          cj.command_payload->'params'->>'referenceId',
+          cj.command_payload->>'name',
+          cj.command_payload->'params'->>'name',
+          cj.command_payload->>'username',
+          cj.command_payload->'params'->>'username',
+          ''
+        )) = lower($1)
+      order by cj.created_at desc
+      limit 1
+    `,
+    params
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function findHotspotCommandJobByUsername({ username, lookbackHours = 24 } = {}) {
+  const normalizedUsername = String(username ?? "").trim();
+  if (!normalizedUsername) {
+    return null;
+  }
+
+  return findHotspotCommandJobByReferenceId({
+    referenceId: normalizedUsername,
+    lookbackHours
+  });
+}
+
 export async function markCommandJobAck({ jobId, payload, observedAt }) {
   const result = await pool.query(
     `
@@ -856,11 +1378,28 @@ export async function markCommandJobAck({ jobId, payload, observedAt }) {
     ]
   );
 
+  if (result.rowCount > 0) {
+    try {
+      await pool.query(
+        "select pg_notify('command_job_updates', $1)",
+        [JSON.stringify({ action: 'ack', job_id: jobId, observed_at: observedAt })]
+      );
+    } catch (error) {
+      console.error("[worker] command ack notify failed:", error?.message || error);
+    }
+
+    try {
+      await syncHotspotAccountFromCommandJob({ jobId, observedAt });
+    } catch (error) {
+      console.error("[worker] hotspot ack sync failed:", error?.message || error);
+    }
+  }
+
   return result.rowCount > 0;
 }
 
 export async function markCommandJobResult({ jobId, status, payload, observedAt }) {
-  const normalizedStatus = String(status ?? "").trim();
+  const normalizedStatus = normalizeCommandJobStatus(status, "failed");
   const result = await pool.query(
     `
       update command_jobs
@@ -880,6 +1419,23 @@ export async function markCommandJobResult({ jobId, status, payload, observedAt 
       payload ? JSON.stringify(payload) : null
     ]
   );
+
+  if (result.rowCount > 0) {
+    try {
+      await pool.query(
+        "select pg_notify('command_job_updates', $1)",
+        [JSON.stringify({ action: 'result', job_id: jobId, status: normalizedStatus, observed_at: observedAt })]
+      );
+    } catch (error) {
+      console.error("[worker] command result notify failed:", error?.message || error);
+    }
+
+    try {
+      await syncHotspotAccountFromCommandJob({ jobId, observedAt });
+    } catch (error) {
+      console.error("[worker] hotspot result sync failed:", error?.message || error);
+    }
+  }
 
   return result.rowCount > 0;
 }

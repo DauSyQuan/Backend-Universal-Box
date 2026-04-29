@@ -13,8 +13,13 @@ import {
   insertTelemetry,
   insertUsage,
   insertVms,
+  getCommandJob,
   markCommandJobAck,
   markCommandJobResult,
+  syncHotspotAccountFromCommandJob,
+  syncHotspotActiveUsersSnapshot,
+  syncHotspotUserDirectorySnapshot,
+  findHotspotCommandJobByReferenceId,
   markEdgeLastSeen,
   maybeCreateQuotaWarning,
   getEdgeLastSeenSnapshot,
@@ -55,8 +60,11 @@ const inboundTopicFilters = [
   "mcu/+/+/+/vms",
   "mcu/+/+/+/command",
   "mcu/+/+/+/ack",
-  "mcu/+/+/+/result"
+  "mcu/+/+/+/result",
+  "tram1/reply/hotspot"
 ];
+
+const HOTSPOT_REPLY_TOPIC = "tram1/reply/hotspot";
 
 const mqttAutoProvision = workerConfig.mqttAutoProvision;
 const mqttReconnectBaseMs = workerConfig.mqttReconnectBaseMs;
@@ -89,6 +97,105 @@ function normalizeParsedTopic(parsedTopic) {
     tenantCode: normalizeTopicCode(parsedTopic.tenantCode, workerConfig.topicAliases?.tenant),
     vesselCode: normalizeTopicCode(parsedTopic.vesselCode, workerConfig.topicAliases?.vessel),
     edgeCode: normalizeTopicCode(parsedTopic.edgeCode, workerConfig.topicAliases?.edge)
+  };
+}
+
+function parseHotspotReplyPayload(rawBuffer) {
+  const text = rawBuffer.toString("utf8");
+  const parsed = JSON.parse(text);
+  const parsedObject = parsed && typeof parsed === "object" ? parsed : {};
+  const hasPayloadField = parsedObject.payload && typeof parsedObject.payload === "object";
+  const payload = hasPayloadField ? parsedObject.payload : parsedObject;
+  const action = String(
+    payload.action ??
+      parsedObject.action ??
+      payload.command_action ??
+      parsedObject.command_action ??
+      ""
+  ).trim().toLowerCase();
+  const commandJobId = String(
+    payload.command_job_id ??
+      payload.commandJobId ??
+      payload.job_id ??
+      payload.msg_id ??
+      payload.command_id ??
+      parsedObject.command_job_id ??
+      parsedObject.commandJobId ??
+      parsedObject.job_id ??
+      parsedObject.msg_id ??
+      parsedObject.command_id ??
+      ""
+  ).trim();
+  const referenceId = String(
+    payload.reference_id ??
+      payload.referenceId ??
+      payload.params?.reference_id ??
+      payload.params?.referenceId ??
+      payload.name ??
+      payload.params?.name ??
+      payload.pool ??
+      payload.pool_name ??
+      payload.interface ??
+      payload.username ??
+      parsedObject.reference_id ??
+      parsedObject.referenceId ??
+      parsedObject.params?.reference_id ??
+      parsedObject.params?.referenceId ??
+      parsedObject.name ??
+      parsedObject.params?.name ??
+      parsedObject.pool ??
+      parsedObject.pool_name ??
+      parsedObject.interface ??
+      parsedObject.username ??
+      ""
+  ).trim();
+  const path = String(
+    payload.path ??
+      parsedObject.path ??
+      ""
+  ).trim();
+  const method = String(
+    payload.method ??
+      parsedObject.method ??
+      ""
+  ).trim().toLowerCase();
+  const username = String(
+    payload.username ??
+      payload.user ??
+      payload.params?.username ??
+      parsedObject.username ??
+      parsedObject.user ??
+      parsedObject.params?.username ??
+      ""
+  ).trim();
+  const status = String(
+    payload.status ??
+      payload.result_status ??
+      parsedObject.status ??
+      parsedObject.result_status ??
+      ""
+  ).trim().toLowerCase();
+  const normalizedStatus =
+    status === "error" || status === "failed"
+      ? "failed"
+      : status === "ack" || status === "sent" || status === "success"
+        ? status
+        : payload.ok === false || parsedObject.ok === false
+          ? "failed"
+          : "success";
+
+  return {
+    raw: payload,
+    action: action || null,
+    path: path || null,
+    method: method || null,
+    commandJobId: commandJobId || null,
+    referenceId: referenceId || null,
+    username: username || null,
+    status: normalizedStatus,
+    observedAt: toObservedAt(payload.timestamp ?? payload.observed_at ?? payload.observedAt, {
+      maxSkewSeconds: Number.isFinite(observedAtMaxSkewSeconds) ? observedAtMaxSkewSeconds : 300
+    })
   };
 }
 
@@ -206,7 +313,139 @@ client.on("error", (error) => {
   console.error("[worker] mqtt error:", message);
 });
 
-client.on("message", async (topic, payloadBuffer) => {
+  client.on("message", async (topic, payloadBuffer) => {
+    if (topic === HOTSPOT_REPLY_TOPIC) {
+      let reply;
+      try {
+        reply = parseHotspotReplyPayload(payloadBuffer);
+    } catch (error) {
+      const message = error?.message || String(error);
+      console.error(`[worker] failed parsing hotspot reply topic=${topic}: ${message}`);
+      await saveIngestError({
+        topic,
+        channel: "hotspot_reply",
+        reason: "invalid_json",
+        detail: message,
+        raw: { raw_text: payloadBuffer.toString("utf8") }
+        });
+        return;
+      }
+
+      const replyLookupName = reply.referenceId || reply.username || null;
+
+      if (!reply.commandJobId && replyLookupName) {
+        try {
+          const matchedJob = await findHotspotCommandJobByReferenceId({
+            referenceId: replyLookupName,
+            lookbackHours: 24
+          });
+          if (matchedJob?.command_job_id) {
+            reply.commandJobId = matchedJob.command_job_id;
+            console.log(
+              `[worker] hotspot reply matched by reference reference=${replyLookupName} job_id=${reply.commandJobId}`
+            );
+          }
+        } catch (error) {
+          console.error("[worker] hotspot reference lookup failed:", error?.message || error);
+        }
+      }
+
+      const ingest = await insertIngestMessage({
+        topic,
+        channel: "hotspot_reply",
+        msgId: reply.commandJobId,
+        tenantCode: null,
+        vesselCode: null,
+        edgeCode: null,
+        schemaVersion: "v1",
+        payload: reply.raw,
+      raw: reply.raw
+    });
+
+    if (!ingest.inserted) {
+      console.log(`[worker] duplicate hotspot reply skipped job_id=${reply.commandJobId || "n/a"}`);
+      return;
+    }
+
+      if (!reply.commandJobId) {
+        await saveIngestError({
+          topic,
+          channel: "hotspot_reply",
+          reason: "command_job_not_found",
+          detail: replyLookupName
+            ? `hotspot reply missing command_job_id/msg_id for reference=${replyLookupName}`
+            : "hotspot reply missing command_job_id/msg_id",
+          raw: reply.raw
+        });
+        return;
+      }
+
+      const job = await getCommandJob(reply.commandJobId);
+      const context = job
+        ? {
+            tenant_id: job.tenant_id,
+            tenant_code: job.tenant_code,
+            vessel_id: job.vessel_id,
+            vessel_code: job.vessel_code,
+            edge_box_id: job.edge_box_id,
+            edge_code: job.edge_code
+          }
+        : null;
+
+      if (reply.action === "get_all_users" && context) {
+        const users = Array.isArray(reply.raw?.data) ? reply.raw.data : Array.isArray(reply.raw?.users) ? reply.raw.users : [];
+        try {
+          await syncHotspotUserDirectorySnapshot({
+            context,
+            users,
+            observedAt: reply.observedAt,
+            sourceAction: reply.action,
+            sourceJobId: reply.commandJobId,
+            sourcePayload: reply.raw
+          });
+        } catch (error) {
+          console.error("[worker] hotspot directory sync failed:", error?.message || error);
+        }
+      }
+
+      if (reply.action === "get_active_users" && context) {
+        const users = Array.isArray(reply.raw?.data) ? reply.raw.data : Array.isArray(reply.raw?.users) ? reply.raw.users : [];
+        try {
+          await syncHotspotActiveUsersSnapshot({
+            context,
+            users,
+            observedAt: reply.observedAt,
+            sourceAction: reply.action,
+            sourceJobId: reply.commandJobId
+          });
+        } catch (error) {
+          console.error("[worker] hotspot active sync failed:", error?.message || error);
+        }
+      }
+
+      const updated = await markCommandJobResult({
+        jobId: reply.commandJobId,
+        status: reply.status || "success",
+        payload: reply.raw,
+        observedAt: reply.observedAt
+    });
+
+    if (!updated) {
+      await saveIngestError({
+        topic,
+        channel: "hotspot_reply",
+        msgId: reply.commandJobId,
+        reason: "command_job_not_found",
+        detail: "hotspot reply did not match an existing command job",
+        raw: reply.raw
+      });
+      return;
+    }
+
+    console.log(`[worker] hotspot reply stored topic=${topic} job_id=${reply.commandJobId} status=${reply.status}`);
+    return;
+  }
+
   const parsedTopic = normalizeParsedTopic(parseTopic(topic));
   if (!parsedTopic) {
     console.warn(`[worker] ignore invalid topic: ${topic}`);

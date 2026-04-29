@@ -3,6 +3,7 @@
 Current responsibility:
 
 - subscribe MQTT topics: `mcu/+/+/+/+`
+- subscribe hotspot reply topic: `tram1/reply/hotspot`
 - parse topic and envelope
 - persist raw messages to `ingest_messages`
 - persist heartbeat to `edge_heartbeats`
@@ -11,6 +12,7 @@ Current responsibility:
 - persist event to `events`
 - persist vms to `vms_positions`
 - update command jobs on `ack` and `result`
+- update hotspot command jobs from `tram1/reply/hotspot`
 - persist ingest failures to `ingest_errors`
 - skip duplicate `msg_id` safely
 - reconnect automatically on broker disconnect

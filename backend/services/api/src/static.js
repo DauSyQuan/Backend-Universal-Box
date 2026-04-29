@@ -156,6 +156,12 @@ export async function maybeServeStatic(req, res, url) {
     return true;
   }
 
+  if (url.pathname === "/hotspot" || url.pathname === "/hotspot/" || url.pathname === "/hotspot/index.html") {
+    res.writeHead(302, { location: "/marine-portal/dashboard#hotspot-section" });
+    res.end();
+    return true;
+  }
+
   if (url.pathname === "/marine-portal/alerts" || url.pathname === "/marine-portal/alerts/" || url.pathname === "/marine-portal/alerts/index.html") {
     res.writeHead(302, { location: "/marine-portal/dashboard#alerts-section" });
     res.end();
@@ -182,6 +188,12 @@ export async function maybeServeStatic(req, res, url) {
 
   if (url.pathname === "/marine-portal/commands" || url.pathname === "/marine-portal/commands/" || url.pathname === "/marine-portal/commands/index.html") {
     res.writeHead(302, { location: "/marine-portal/dashboard#commands-section" });
+    res.end();
+    return true;
+  }
+
+  if (url.pathname === "/marine-portal/hotspot" || url.pathname === "/marine-portal/hotspot/" || url.pathname === "/marine-portal/hotspot/index.html") {
+    res.writeHead(302, { location: "/marine-portal/dashboard#hotspot-section" });
     res.end();
     return true;
   }

@@ -477,6 +477,9 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
         <i class="bi bi-terminal-fill"></i> Command History
       </button>
+      <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
+        <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
+      </button>
       <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
         <i class="bi bi-sliders"></i> Policy Center
       </button>
@@ -528,6 +531,7 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         <div class="topbar-actions">
           <div id="dash-mode-badge" class="pill pill-gray">loading</div>
           <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot Accounts</button>
           <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
             <i class="bi bi-arrow-clockwise"></i> Refresh
           </button>
@@ -637,9 +641,12 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <!-- Create command -->
-      <div class="card" style="margin-top:16px;">
+      <div class="card" id="cmd-create-card" style="margin-top:16px;">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-send-fill" style="color:var(--green);"></i> Send command</div>
+          <div>
+            <div class="card-title"><i class="bi bi-send-fill" style="color:var(--green);"></i> Send command</div>
+            <div class="card-subtitle">Dispatch uplink failover commands to the selected edge.</div>
+          </div>
         </div>
         <div class="card-body">
           <div id="cmd-notice" style="display:none;" class="alert"></div>
@@ -660,12 +667,10 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             </div>
             <div class="form-group">
               <label class="form-label">Command type</label>
-              <select id="cmd-type" class="form-control">
+              <select id="cmd-type" class="form-control" onchange="updateCommandTypeFields()">
                 <option value="failover_starlink">failover_starlink</option>
-                <option value="failover_vsat">failover_vsat</option>
-                <option value="policy_sync">policy_sync</option>
-                <option value="reboot">reboot</option>
-                <option value="ping">ping</option>
+                <option value="failback_vsat">failback_vsat</option>
+                <option value="restore_automatic">restore_automatic</option>
               </select>
             </div>
           </div>
@@ -813,6 +818,191 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         </div>
         <div class="card-body" id="cmd-history-detail-body">
           <div class="empty"><span class="spinner"></span> Loading command detail…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── HOTSPOT ─── -->
+    <div class="page" id="page-hotspot">
+      <div class="topbar">
+        <div class="page-title">
+          <h1>Hotspot Bridge</h1>
+          <p>JSON bridge · path / method / params / reference_id</p>
+        </div>
+        <div class="topbar-actions">
+          <div id="hotspot-mode-badge" class="pill pill-gray">loading</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadHotspotDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:16px;" id="hotspot-stats">
+        <div class="stat-card">
+          <div class="stat-label">Bridge log</div>
+          <div class="stat-value stat-accent" id="hotspot-ops-total">—</div>
+          <div class="stat-note">Command jobs sent to Pi</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Directory users</div>
+          <div class="stat-value stat-green" id="hotspot-directory-total">—</div>
+          <div class="stat-note">Synced from live snapshots</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Online users</div>
+          <div class="stat-value stat-amber" id="hotspot-active-total">—</div>
+          <div class="stat-note">Synced from live snapshots</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Last sync</div>
+          <div class="stat-value stat-accent" id="hotspot-last-sync">—</div>
+          <div class="stat-note">Most recent reply observed</div>
+        </div>
+      </div>
+
+      <div class="card" id="hotspot-create-card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-diagram-3-fill" style="color:var(--accent);"></i> JSON bridge request</div>
+            <div class="card-subtitle">Send RouterOS API calls as JSON. Example fields: <code>path</code>, <code>method</code>, <code>params</code>, <code>reference_id</code>.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="hotspot-create-notice" style="display:none;" class="alert"></div>
+          <div class="pill pill-gray" style="margin-bottom:14px;justify-content:flex-start;">
+            <i class="bi bi-info-circle"></i>
+            <span>Use <code>params</code> for RouterOS keys, including dashed names like <code>rate-limit</code> and <code>address-pool</code>.</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Tenant code</label>
+              <input id="hotspot-create-tenant" class="form-control" value="tnr13" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Vessel code</label>
+              <input id="hotspot-create-vessel" class="form-control" value="vsl-001" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Edge code</label>
+              <input id="hotspot-create-edge" class="form-control" value="edge-001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Template</label>
+              <select id="hotspot-template" class="form-control" onchange="applyHotspotTemplate()">
+                <option value="custom" selected>Custom</option>
+                <option value="vlan">VLAN interface</option>
+                <option value="ip_pool">IP pool</option>
+                <option value="dhcp_server">DHCP server</option>
+                <option value="dhcp_network">DHCP network</option>
+                <option value="hotspot_profile">Hotspot profile</option>
+                <option value="hotspot_server">Hotspot server</option>
+                <option value="hotspot_user">Hotspot user</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Reference ID</label>
+              <input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Method</label>
+              <select id="hotspot-method" class="form-control">
+                <option value="add" selected>add</option>
+                <option value="set">set</option>
+                <option value="remove">remove</option>
+                <option value="get">get</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Path</label>
+            <input id="hotspot-path" class="form-control" placeholder="/ip/pool" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Params JSON</label>
+            <textarea id="hotspot-params" class="form-control" rows="10" style="font-family:'JetBrains Mono',monospace;" placeholder='{"name":"pool_vlan50","ranges":"192.168.50.10-192.168.50.254"}'></textarea>
+          </div>
+          <div class="detail-section" style="margin-bottom:14px;">
+            <div class="detail-section-title">Payload preview</div>
+            <pre id="hotspot-preview" style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;min-height:120px;">{}</pre>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="hotspot-action-submit" type="button" onclick="sendHotspotAction()">
+              <i class="bi bi-send"></i> Send bridge request
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-person-lines-fill" style="color:var(--green);"></i> Router directory</div>
+              <div class="card-subtitle" id="hotspot-directory-source">Loading…</div>
+            </div>
+            <span class="num-badge" id="hotspot-directory-count">0</span>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl">
+              <thead>
+                <tr><th>Username</th><th>Profile</th><th>QoS</th><th>Uptime</th><th>Status</th></tr>
+              </thead>
+              <tbody id="hotspot-directory-body">
+                <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="bi bi-broadcast-pin" style="color:var(--amber);"></i> Active users</div>
+              <div class="card-subtitle" id="hotspot-active-source">Loading…</div>
+            </div>
+            <span class="num-badge" id="hotspot-active-count">0</span>
+          </div>
+          <div style="padding:0;">
+            <table class="tbl">
+              <thead>
+                <tr><th>Username</th><th>IP</th><th>MAC</th><th>Session</th><th>Uptime</th></tr>
+              </thead>
+              <tbody id="hotspot-active-body">
+                <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="bi bi-person-badge-fill" style="color:var(--accent);"></i> Hotspot operations</div>
+            <div class="card-subtitle" id="hotspot-ops-source">Loading…</div>
+          </div>
+          <span class="num-badge" id="hotspot-ops-count">0</span>
+        </div>
+        <div style="padding:0;">
+          <table class="tbl">
+            <thead>
+              <tr><th>Target</th><th>Path</th><th>Method</th><th>Reference</th><th>Status</th><th>Result</th><th>Created</th></tr>
+            </thead>
+            <tbody id="hotspot-ops-body">
+              <tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <span class="kicker">Realtime note</span>
+          <div style="margin-top:8px;color:var(--text2);font-size:13px;line-height:1.6;">
+            Bridge requests are sent as raw RouterOS resource calls. Directory and active-user tables refresh independently from the live router snapshots.
+          </div>
         </div>
       </div>
     </div>
@@ -1413,9 +1603,6 @@ function showPage(name) {
   if (nav) nav.classList.add('active');
 
   currentPage = name;
-  if (name !== 'dashboard') {
-    stopEdgeStream();
-  }
   if (name !== 'commands') {
     stopCommandDetailPoll();
   }
@@ -1426,6 +1613,7 @@ function showPage(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'alerts') loadAlertsCenter();
   if (name === 'commands') loadCommandHistory();
+  if (name === 'hotspot') loadHotspotDashboard();
   if (name === 'policy') loadPolicyPage();
   if (name === 'traffic') loadTrafficView();
   if (name === 'packages') { loadPackages(); loadUsage(); }
@@ -1436,6 +1624,7 @@ function showPage(name) {
     dashboard: '#summary-section',
     alerts: '#alerts-section',
     commands: '#commands-section',
+    hotspot: '#hotspot-section',
     policy: '#policy-section',
     traffic: '#traffic-section',
     packages: '#packages-section',
@@ -1446,6 +1635,31 @@ function showPage(name) {
   if (nextHash && location.hash !== nextHash) {
     history.replaceState(null, '', nextHash);
   }
+}
+
+function openHotspotCommand() {
+  showPage('hotspot');
+  const template = document.getElementById('hotspot-template');
+  if (template) template.value = 'custom';
+  applyHotspotTemplate();
+  const card = document.getElementById('hotspot-create-card');
+  if (card) {
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+  const input = document.getElementById('hotspot-path');
+  if (input) {
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+async function loadHotspotDashboard() {
+  hotspotOffset = 0;
+  applyHotspotTemplate();
+  await Promise.all([
+    loadHotspotAccounts(),
+    loadHotspotUsers(true),
+    loadHotspotActiveUsers(true)
+  ]);
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -1493,6 +1707,11 @@ let connStatus = { status: 'idle', label: 'Idle', tone: 'idle' };
 let rateLimit = null;
 let cmdOffset = 0;
 const CMD_PAGE = 5;
+let hotspotOffset = 0;
+const HOTSPOT_PAGE = 20;
+let hotspotData = { items: [], total: 0, limit: HOTSPOT_PAGE, offset: 0, mode: 'loading' };
+let hotspotDirectoryData = { items: [], total: 0, limit: HOTSPOT_PAGE, offset: 0, mode: 'loading' };
+let hotspotActiveData = { items: [], total: 0, limit: HOTSPOT_PAGE, offset: 0, mode: 'loading' };
 let pkgList = [];
 let editingPkgId = null;
 let historyCmdOffset = 0;
@@ -2143,7 +2362,7 @@ function renderLiveEdgeSample(sample, meta = {}) {
 
 function queueEdgeStreamReconnect(edge) {
   clearEdgeStreamReconnectTimer();
-  if (!edge || currentPage !== 'dashboard') return;
+  if (!edge || !edgeStreamContext) return;
   edgeStreamReconnectTimer = setTimeout(() => {
     edgeStreamReconnectTimer = null;
     startEdgeStream(edge).catch(() => {});
@@ -2151,7 +2370,7 @@ function queueEdgeStreamReconnect(edge) {
 }
 
 async function startEdgeStream(edge) {
-  if (!edge || currentPage !== 'dashboard') return;
+  if (!edge) return;
   const nextKey = `${edge.tenant_code || ''}/${edge.vessel_code || ''}/${edge.edge_code || ''}`;
   if (
     edgeStreamSocket &&
@@ -2220,6 +2439,45 @@ async function startEdgeStream(edge) {
 
       if (payload?.type === 'telemetry') {
         renderLiveEdgeSample(payload, payload);
+        applyRealtimeTelemetry(payload);
+        return;
+      }
+
+      if (payload?.type === 'health') {
+        applyRealtimeHealthSnapshot(payload);
+        return;
+      }
+
+      if (payload?.type === 'command') {
+        applyRealtimeCommandEvent(payload);
+        return;
+      }
+
+      if (payload?.type === 'package') {
+        applyRealtimePackageEvent(payload);
+        return;
+      }
+
+      if (payload?.type === 'package_assignment') {
+        if (currentPage === 'packages') {
+          loadUsage().catch(() => {});
+        }
+        return;
+      }
+
+      if (payload?.type === 'hotspot_account') {
+        applyRealtimeHotspotAccount(payload);
+        return;
+      }
+
+      if (payload?.type === 'hotspot_user_directory') {
+        applyRealtimeHotspotUserDirectory(payload);
+        return;
+      }
+
+      if (payload?.type === 'hotspot_active_users') {
+        applyRealtimeHotspotActiveUsers(payload);
+        return;
       }
     };
 
@@ -2227,7 +2485,7 @@ async function startEdgeStream(edge) {
       if (edgeStreamSocket === socket) {
         edgeStreamSocket = null;
       }
-      if (currentPage === 'dashboard' && edgeStreamContext === edge) {
+      if (edgeStreamContext === edge) {
         setEdgeStreamStatus('disconnected', 'amber');
         setEdgeStreamField('edge-stream-last', 'socket closed');
         queueEdgeStreamReconnect(edge);
@@ -2479,6 +2737,413 @@ function renderHealthPills() {
   if (mEl) {
     renderDashboardLivePills();
   }
+}
+
+function normalizeRealtimeList(payload, keys = []) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  for (const key of keys) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
+function upsertRealtimeList(list, item, matcher, place = 'front') {
+  if (!item) return Array.isArray(list) ? [...list] : [];
+  const next = Array.isArray(list) ? [...list] : [];
+  const index = next.findIndex((entry) => matcher(entry, item));
+  if (index >= 0) {
+    next[index] = { ...next[index], ...item };
+    return next;
+  }
+  if (place === 'front') {
+    next.unshift(item);
+  } else {
+    next.push(item);
+  }
+  return next;
+}
+
+function applyRealtimeHealthSnapshot(payload) {
+  const health = payload?.health ?? null;
+  const ready = payload?.ready ?? null;
+  const edges = normalizeRealtimeList(payload?.edges, ['edges', 'items']);
+  if (health) {
+    dashData.health = health;
+  }
+  if (ready) {
+    dashData.ready = ready;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload || {}, 'edges')) {
+    dashData.edges = edges;
+  }
+  if (Array.isArray(dashData.edges)) {
+    dashData.mode = 'live';
+  }
+  renderDashboard();
+  renderHealthPills();
+  updateConnStatus(200);
+}
+
+function applyRealtimeTelemetry(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  const observedAt = payload.observed_at || payload.observedAt || new Date().toISOString();
+  const edgeCode = String(payload.edge_code ?? '').trim();
+  const vesselCode = String(payload.vessel_code ?? '').trim();
+  const tenantCode = String(payload.tenant_code ?? '').trim();
+
+  if (Array.isArray(dashData.edges) && edgeCode) {
+    dashData.edges = dashData.edges.map((edge) => {
+      const edgeMatches =
+        String(edge.edge_code ?? '').trim() === edgeCode &&
+        (!tenantCode || String(edge.tenant_code ?? '').trim() === tenantCode) &&
+        (!vesselCode || String(edge.vessel_code ?? '').trim() === vesselCode);
+      if (!edgeMatches) {
+        return edge;
+      }
+      return {
+        ...edge,
+        online: true,
+        last_seen_at: observedAt,
+        telemetry_at: observedAt,
+        active_uplink: payload.active_uplink ?? payload.active_interface ?? edge.active_uplink ?? null,
+        rx_kbps: payload.rx_kbps ?? edge.rx_kbps ?? null,
+        tx_kbps: payload.tx_kbps ?? edge.tx_kbps ?? null,
+        throughput_kbps: payload.throughput_kbps ?? edge.throughput_kbps ?? null,
+        latency_ms: payload.latency_ms ?? edge.latency_ms ?? null,
+        loss_pct: payload.loss_pct ?? edge.loss_pct ?? null
+      };
+    });
+  }
+
+  renderHealthPills();
+}
+
+function applyRealtimeCommandEvent(payload) {
+  const command = payload?.command ?? null;
+  if (!command) return;
+  dashData.commands = upsertRealtimeList(
+    Array.isArray(dashData.commands) ? dashData.commands : [],
+    command,
+    (left, right) => String(left.id ?? left.command_id ?? '') === String(right.id ?? right.command_id ?? '')
+  ).sort((a, b) => new Date(b.created_at || b.updated_at || 0).getTime() - new Date(a.created_at || a.updated_at || 0).getTime());
+
+  if (currentPage === 'commands') {
+    loadCommandHistory().catch(() => {});
+  }
+  if (currentPage === 'hotspot') {
+    loadHotspotAccounts(true).catch(() => {});
+  }
+  if (currentPage === 'dashboard') {
+    renderDashboard();
+    renderHealthPills();
+  }
+}
+
+function applyRealtimePackageEvent(payload) {
+  const pkg = payload?.package ?? null;
+  if (!pkg) return;
+  pkgList = upsertRealtimeList(
+    Array.isArray(pkgList) ? pkgList : [],
+    pkg,
+    (left, right) => String(left.id ?? '') === String(right.id ?? '')
+  );
+  dashData.packages = upsertRealtimeList(
+    Array.isArray(dashData.packages) ? dashData.packages : [],
+    pkg,
+    (left, right) => String(left.id ?? '') === String(right.id ?? '')
+  );
+
+  if (currentPage === 'packages') {
+    loadPackages().catch(() => {});
+  }
+  if (currentPage === 'dashboard') {
+    renderDashboard();
+    renderHealthPills();
+  }
+}
+
+function applyRealtimeHotspotAccount(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  hotspotData.mode = 'live';
+  if (currentPage === 'hotspot') {
+    loadHotspotDashboard();
+  }
+}
+
+function applyRealtimeHotspotUserDirectory(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  hotspotDirectoryData.mode = 'live';
+  if (currentPage === 'hotspot') {
+    loadHotspotUsers(true).catch(() => {});
+  }
+}
+
+function applyRealtimeHotspotActiveUsers(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  hotspotActiveData.mode = 'live';
+  if (currentPage === 'hotspot') {
+    loadHotspotActiveUsers(true).catch(() => {});
+  }
+}
+
+function updateHotspotLastSync() {
+  const candidates = [
+    hotspotData.items?.[0]?.updated_at || hotspotData.items?.[0]?.result_at || hotspotData.items?.[0]?.ack_at || hotspotData.items?.[0]?.created_at,
+    hotspotDirectoryData.items?.[0]?.synced_at || hotspotDirectoryData.items?.[0]?.updated_at,
+    hotspotActiveData.items?.[0]?.synced_at || hotspotActiveData.items?.[0]?.updated_at
+  ].filter(Boolean);
+  if (!candidates.length) {
+    const el = document.getElementById('hotspot-last-sync');
+    if (el) el.textContent = '—';
+    return;
+  }
+  const latest = candidates
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  const el = document.getElementById('hotspot-last-sync');
+  if (el) el.textContent = latest ? fmtTime(latest.toISOString()) : '—';
+}
+
+async function loadHotspotAccounts(silent = false) {
+  const filter = document.getElementById('hotspot-status-filter')?.value || '';
+  if (!silent) {
+    const btn = document.getElementById('hotspot-refresh-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading'; }
+  }
+  const error = document.getElementById('hotspot-error');
+  if (error) error.style.display = 'none';
+  hotspotData.offset = hotspotOffset;
+  hotspotData.limit = HOTSPOT_PAGE;
+  hotspotData.mode = 'loading';
+
+  try {
+    const params = new URLSearchParams({
+      limit: String(HOTSPOT_PAGE),
+      offset: String(hotspotOffset)
+    });
+    if (filter) {
+      params.set('status', filter);
+    }
+    const data = await apiFetch(`/api/hotspot/accounts?${params.toString()}`);
+    const items = unwrapListResponse(data, ['items', 'accounts', 'hotspots']);
+    hotspotData.items = items;
+    hotspotData.total = data?.total ?? items.length;
+    hotspotData.mode = 'live';
+    renderHotspotAccounts();
+    if (error) error.style.display = 'none';
+  } catch (err) {
+    hotspotData.items = [];
+    hotspotData.total = 0;
+    hotspotData.mode = 'fallback';
+    renderHotspotAccounts();
+    showEl('hotspot-error', `Failed to load hotspot accounts: ${err.message}`, 'alert-danger');
+    if (error) error.style.display = 'flex';
+  } finally {
+    if (!silent) {
+      const btn = document.getElementById('hotspot-refresh-btn');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh'; }
+    }
+  }
+}
+
+async function loadHotspotUsers(silent = false) {
+  const error = document.getElementById('hotspot-error');
+  if (!silent) {
+    const btn = document.getElementById('hotspot-action-submit');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading'; }
+  }
+  hotspotDirectoryData.offset = hotspotOffset;
+  hotspotDirectoryData.limit = HOTSPOT_PAGE;
+  hotspotDirectoryData.mode = 'loading';
+
+  try {
+    const params = new URLSearchParams({
+      limit: String(HOTSPOT_PAGE),
+      offset: String(hotspotOffset)
+    });
+    const data = await apiFetch(`/api/hotspot/users?${params.toString()}`);
+    const items = unwrapListResponse(data, ['items', 'users', 'directory']);
+    hotspotDirectoryData.items = items;
+    hotspotDirectoryData.total = data?.total ?? items.length;
+    hotspotDirectoryData.mode = 'live';
+    renderHotspotUsers();
+    if (error) error.style.display = 'none';
+  } catch (err) {
+    hotspotDirectoryData.items = [];
+    hotspotDirectoryData.total = 0;
+    hotspotDirectoryData.mode = 'fallback';
+    renderHotspotUsers();
+    showEl('hotspot-error', `Failed to load hotspot directory: ${err.message}`, 'alert-danger');
+    if (error) error.style.display = 'flex';
+  } finally {
+    if (!silent) {
+      const btn = document.getElementById('hotspot-action-submit');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> Send bridge request'; }
+    }
+  }
+}
+
+async function loadHotspotActiveUsers(silent = false) {
+  const error = document.getElementById('hotspot-error');
+  if (!silent) {
+    const btn = document.getElementById('hotspot-action-submit');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Loading'; }
+  }
+  hotspotActiveData.offset = hotspotOffset;
+  hotspotActiveData.limit = HOTSPOT_PAGE;
+  hotspotActiveData.mode = 'loading';
+
+  try {
+    const params = new URLSearchParams({
+      limit: String(HOTSPOT_PAGE),
+      offset: String(hotspotOffset)
+    });
+    const data = await apiFetch(`/api/hotspot/active-users?${params.toString()}`);
+    const items = unwrapListResponse(data, ['items', 'users', 'active_users']);
+    hotspotActiveData.items = items;
+    hotspotActiveData.total = data?.total ?? items.length;
+    hotspotActiveData.mode = 'live';
+    renderHotspotActiveUsers();
+    if (error) error.style.display = 'none';
+  } catch (err) {
+    hotspotActiveData.items = [];
+    hotspotActiveData.total = 0;
+    hotspotActiveData.mode = 'fallback';
+    renderHotspotActiveUsers();
+    showEl('hotspot-error', `Failed to load hotspot active users: ${err.message}`, 'alert-danger');
+    if (error) error.style.display = 'flex';
+  } finally {
+    if (!silent) {
+      const btn = document.getElementById('hotspot-action-submit');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> Send bridge request'; }
+    }
+  }
+}
+
+function renderHotspotAccounts() {
+  const list = Array.isArray(hotspotData.items) ? hotspotData.items : [];
+  const modeBadge = document.getElementById('hotspot-mode-badge');
+  const source = document.getElementById('hotspot-ops-source');
+  const body = document.getElementById('hotspot-ops-body');
+
+  if (modeBadge) {
+    modeBadge.textContent = hotspotData.mode === 'live' ? 'live' : hotspotData.mode === 'fallback' ? 'fallback' : 'loading';
+    modeBadge.className = 'pill ' + (hotspotData.mode === 'live' ? 'pill-green' : hotspotData.mode === 'fallback' ? 'pill-amber' : 'pill-gray');
+  }
+  if (source) {
+    source.textContent = `from /api/hotspot/accounts · bridge log · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+  }
+  const totalEl = document.getElementById('hotspot-ops-total');
+  if (totalEl) totalEl.textContent = list.length;
+  const countEl = document.getElementById('hotspot-ops-count');
+  if (countEl) countEl.textContent = list.length;
+  updateHotspotLastSync();
+
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="bi bi-person-badge"></i><p>No hotspot operations found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map((account) => {
+    const status = String(account.status || 'pending').toLowerCase();
+    const pillClass = status === 'success'
+      ? 'pill-green'
+      : status === 'failed'
+        ? 'pill-red'
+        : status === 'ack' || status === 'sent'
+          ? 'pill-amber'
+          : 'pill-gray';
+    const target = [account.tenant_code, account.vessel_code, account.edge_code].filter(Boolean).join('/');
+    const resultText = account.result_message || status || '—';
+    const path = String(account.path || account.command_payload?.path || '—');
+    const method = String(account.method || account.command_payload?.method || '—').toLowerCase();
+    const reference = String(account.reference_id || account.subject || account.username || '—');
+    return `
+      <tr>
+        <td class="mono" style="font-size:12px;">${escapeHtml(target || '—')}</td>
+        <td class="mono" style="font-size:12px;">${escapeHtml(path)}</td>
+        <td><span class="chip">${escapeHtml(method)}</span></td>
+        <td style="font-weight:500;">${escapeHtml(reference)}</td>
+        <td><span class="pill ${pillClass}">${escapeHtml(status)}</span></td>
+        <td style="color:var(--text2);font-size:12px;">${escapeHtml(resultText)}</td>
+        <td style="color:var(--text3);font-size:12px;">${escapeHtml(fmtTime(account.created_at))}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderHotspotUsers() {
+  const list = Array.isArray(hotspotDirectoryData.items) ? hotspotDirectoryData.items : [];
+  const body = document.getElementById('hotspot-directory-body');
+  const source = document.getElementById('hotspot-directory-source');
+  const countEl = document.getElementById('hotspot-directory-count');
+  const totalEl = document.getElementById('hotspot-directory-total');
+  if (source) {
+    source.textContent = `from /api/hotspot/users · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+  }
+  if (countEl) countEl.textContent = list.length;
+  if (totalEl) totalEl.textContent = list.length;
+  updateHotspotLastSync();
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-person-lines-fill"></i><p>No hotspot users found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map((user) => {
+    const status = String(user.status || (user.is_deleted ? 'deleted' : 'synced')).toLowerCase();
+    const pillClass = user.is_deleted || status === 'deleted' ? 'pill-red' : 'pill-green';
+    return `
+      <tr>
+        <td style="font-weight:500;">${escapeHtml(user.username || '—')}</td>
+        <td>${escapeHtml(user.profile || '—')}</td>
+        <td class="mono" style="font-size:12px;">${escapeHtml(user.qos || '—')}</td>
+        <td class="mono" style="font-size:12px;">${escapeHtml(user.uptime || '—')}</td>
+        <td><span class="pill ${pillClass}">${escapeHtml(status)}</span></td>
+      </tr>`;
+  }).join('');
+}
+
+function renderHotspotActiveUsers() {
+  const list = Array.isArray(hotspotActiveData.items) ? hotspotActiveData.items : [];
+  const body = document.getElementById('hotspot-active-body');
+  const source = document.getElementById('hotspot-active-source');
+  const countEl = document.getElementById('hotspot-active-count');
+  const totalEl = document.getElementById('hotspot-active-total');
+  if (source) {
+    source.textContent = `from /api/hotspot/active-users · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+  }
+  if (countEl) countEl.textContent = list.length;
+  if (totalEl) totalEl.textContent = list.length;
+  updateHotspotLastSync();
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-broadcast-pin"></i><p>No active hotspot users found</p></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map((user) => `
+    <tr>
+      <td style="font-weight:500;">${escapeHtml(user.username || '—')}</td>
+      <td class="mono" style="font-size:12px;">${escapeHtml(user.ip_address || '—')}</td>
+      <td class="mono" style="font-size:12px;">${escapeHtml(user.mac_address || '—')}</td>
+      <td class="mono" style="font-size:12px;">${escapeHtml(user.session_time || '—')}</td>
+      <td class="mono" style="font-size:12px;">${escapeHtml(user.uptime || '—')}</td>
+    </tr>`).join('');
+}
+
+async function prevHotspotPage() {
+  hotspotOffset = Math.max(0, hotspotOffset - HOTSPOT_PAGE);
+  await loadHotspotDashboard();
+}
+
+async function nextHotspotPage() {
+  hotspotOffset += HOTSPOT_PAGE;
+  await loadHotspotDashboard();
 }
 
 function getDashboardLiveEdge(edges = []) {
@@ -3016,32 +3681,236 @@ async function selectEdge(edgeJson, options = {}) {
       ${!d ? '<div class="alert alert-warn"><i class="bi bi-exclamation-triangle"></i> Edge detail unavailable from backend — showing partial data from traffic endpoint.</div>' : ''}
     `;
 
-    seedLiveEdgeHistory(samples);
-    startEdgeStream(edge).catch(() => {});
+  seedLiveEdgeHistory(samples);
+  startEdgeStream(edge).catch(() => {});
   } catch (err) {
-    stopEdgeStream();
     body.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> Failed to load edge detail: ${err.message}</div>`;
     subtitle.textContent = 'Error loading';
   }
 }
 
 function closeEdgeDetail() {
-  stopEdgeStream();
   document.getElementById('edge-detail-card').style.display = 'none';
 }
 
-// ─── SEND COMMAND ─────────────────────────────────────────────────────────────
-async function sendCommand() {
+function updateCommandTypeFields() {
+  const type = document.getElementById('cmd-type')?.value || 'failover_starlink';
   const btn = document.getElementById('cmd-submit-btn');
-  const noticeEl = document.getElementById('cmd-notice');
-  const tenant = document.getElementById('cmd-tenant').value.trim();
-  const vessel = document.getElementById('cmd-vessel').value.trim();
-  const edge = document.getElementById('cmd-edge').value.trim();
-  const type = document.getElementById('cmd-type').value;
+  if (btn) {
+    btn.innerHTML = {
+      failover_starlink: '<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
+      failback_vsat: '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
+      restore_automatic: '<i class="bi bi-arrow-repeat"></i> Restore automatic'
+    }[type] || '<i class="bi bi-send"></i> Send command';
+  }
+}
 
-  if (!tenant || !vessel || !edge || !type) {
-    showEl('cmd-notice', 'All fields required.', 'alert-warn');
-    noticeEl.style.display = 'flex';
+const HOTSPOT_TEMPLATE_PRESETS = {
+  custom: {
+    path: '',
+    method: 'add',
+    reference_id: '',
+    params: {}
+  },
+  vlan: {
+    path: '/interface/vlan',
+    method: 'add',
+    reference_id: 'vlan50-bridge',
+    params: {
+      name: 'vlan50-Guest',
+      'vlan-id': '50',
+      interface: 'ether5-USER'
+    }
+  },
+  ip_pool: {
+    path: '/ip/pool',
+    method: 'add',
+    reference_id: 'pool_vlan50',
+    params: {
+      name: 'pool_vlan50',
+      ranges: '192.168.50.10-192.168.50.254'
+    }
+  },
+  dhcp_server: {
+    path: '/ip/dhcp-server',
+    method: 'add',
+    reference_id: 'dhcp_vlan50',
+    params: {
+      name: 'dhcp_vlan50',
+      interface: 'vlan50-Guest',
+      'address-pool': 'pool_vlan50'
+    }
+  },
+  dhcp_network: {
+    path: '/ip/dhcp-server/network',
+    method: 'add',
+    reference_id: 'net_vlan50',
+    params: {
+      address: '192.168.50.0/24',
+      gateway: '192.168.50.1',
+      'dns-server': 'wifi.tau.vn'
+    }
+  },
+  hotspot_profile: {
+    path: '/ip/hotspot/profile',
+    method: 'add',
+    reference_id: 'prof_vlan50',
+    params: {
+      name: 'prof_vlan50',
+      'hotspot-address': '192.168.50.1',
+      'dns-name': 'wifi.tau.vn'
+    }
+  },
+  hotspot_server: {
+    path: '/ip/hotspot',
+    method: 'add',
+    reference_id: 'hs_vlan50',
+    params: {
+      name: 'hs_vlan50',
+      interface: 'vlan50-Guest',
+      'address-pool': 'pool_vlan50',
+      profile: 'prof_vlan50'
+    }
+  },
+  hotspot_user: {
+    path: '/ip/hotspot/user',
+    method: 'add',
+    reference_id: 'banh_01',
+    params: {
+      name: 'banh_01',
+      password: '123',
+      profile: 'GOI_VIP',
+      'rate-limit': '2M/2M'
+    }
+  }
+};
+
+function prettyJson(value) {
+  return JSON.stringify(value, null, 2);
+}
+
+function parseHotspotParamsText(text) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parsed = JSON.parse(trimmed);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('params must be a JSON object');
+  }
+  return parsed;
+}
+
+function applyHotspotTemplate() {
+  const templateName = document.getElementById('hotspot-template')?.value || 'custom';
+  const template = HOTSPOT_TEMPLATE_PRESETS[templateName] || HOTSPOT_TEMPLATE_PRESETS.custom;
+  const pathEl = document.getElementById('hotspot-path');
+  const methodEl = document.getElementById('hotspot-method');
+  const refEl = document.getElementById('hotspot-reference-id');
+  const paramsEl = document.getElementById('hotspot-params');
+  const previewEl = document.getElementById('hotspot-preview');
+
+  if (templateName !== 'custom') {
+    if (pathEl) pathEl.value = template.path;
+    if (methodEl) methodEl.value = template.method;
+    if (refEl) refEl.value = template.reference_id;
+    if (paramsEl) paramsEl.value = prettyJson(template.params);
+  }
+
+  let payload = null;
+  try {
+    payload = collectHotspotActionPayload(true);
+  } catch {
+    payload = null;
+  }
+  if (previewEl) {
+    previewEl.textContent = payload ? prettyJson(payload) : '{}';
+  }
+}
+
+function updateHotspotActionFields() {
+  applyHotspotTemplate();
+}
+
+function collectHotspotActionPayload(silent = false) {
+  const path = document.getElementById('hotspot-path')?.value.trim() || '';
+  const method = document.getElementById('hotspot-method')?.value.trim().toLowerCase() || '';
+  const reference_id = document.getElementById('hotspot-reference-id')?.value.trim() || '';
+  const paramsText = document.getElementById('hotspot-params')?.value || '';
+
+  let params;
+  try {
+    params = parseHotspotParamsText(paramsText);
+  } catch (err) {
+    if (!silent) {
+      const noticeEl = document.getElementById('hotspot-create-notice');
+      if (noticeEl) {
+        showEl('hotspot-create-notice', `Invalid params JSON: ${err.message}`, 'alert-warn');
+        noticeEl.style.display = 'flex';
+      }
+    }
+    throw err;
+  }
+
+  return { path, method, reference_id, params };
+}
+
+async function sendHotspotAction() {
+  const btn = document.getElementById('hotspot-action-submit');
+  const noticeEl = document.getElementById('hotspot-create-notice');
+  const tenant = document.getElementById('hotspot-create-tenant')?.value.trim();
+  const vessel = document.getElementById('hotspot-create-vessel')?.value.trim();
+  const edge = document.getElementById('hotspot-create-edge')?.value.trim();
+
+  let payload;
+  try {
+    payload = collectHotspotActionPayload();
+  } catch {
+    return;
+  }
+
+  if (!tenant || !vessel || !edge) {
+    if (noticeEl) {
+      showEl('hotspot-create-notice', 'Tenant, vessel, and edge are required.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!payload.path || !payload.path.startsWith('/')) {
+    if (noticeEl) {
+      showEl('hotspot-create-notice', 'Path must start with /.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!payload.method || !['add', 'set', 'remove', 'get'].includes(payload.method)) {
+    if (noticeEl) {
+      showEl('hotspot-create-notice', 'Method must be add, set, remove, or get.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!payload.reference_id) {
+    if (noticeEl) {
+      showEl('hotspot-create-notice', 'Reference ID is required for correlation.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!payload.params || typeof payload.params !== 'object' || Array.isArray(payload.params)) {
+    if (noticeEl) {
+      showEl('hotspot-create-notice', 'Params must be a JSON object.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!btn || !noticeEl) {
+    toast('Hotspot form unavailable', 'danger');
     return;
   }
 
@@ -3052,19 +3921,93 @@ async function sendCommand() {
   try {
     const res = await apiFetch('/api/commands', {
       method: 'POST',
-      body: { tenant_code: tenant, vessel_code: vessel, edge_code: edge, command_type: type }
+      body: {
+        tenant_code: tenant,
+        vessel_code: vessel,
+        edge_code: edge,
+        command_type: 'hotspot',
+        command_payload: payload
+      }
     });
-    showEl('cmd-notice', `Command sent successfully! ID: ${res.id || res.command_id || '?'}`, 'alert-success');
+    const commandId = res?.command?.id || res.id || res.command_id || res?.command_id || '?';
+    showEl('hotspot-create-notice', `Bridge request sent successfully! ID: ${commandId}`, 'alert-success');
+    noticeEl.style.display = 'flex';
+    toast('Bridge request sent ✓', 'success');
+    await loadHotspotDashboard();
+  } catch (err) {
+    showEl('hotspot-create-notice', `Failed: ${err.message}`, 'alert-danger');
+    noticeEl.style.display = 'flex';
+    toast(`Bridge request failed: ${err.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    applyHotspotTemplate();
+  }
+}
+
+// ─── SEND COMMAND ─────────────────────────────────────────────────────────────
+async function sendCommand() {
+  const btn = document.getElementById('cmd-submit-btn');
+  const noticeEl = document.getElementById('cmd-notice');
+  const tenant = document.getElementById('cmd-tenant').value.trim();
+  const vessel = document.getElementById('cmd-vessel').value.trim();
+  const edge = document.getElementById('cmd-edge').value.trim();
+  const type = document.getElementById('cmd-type').value;
+  const commandPayload = (() => {
+    if (type === 'failover_starlink') {
+      return { preferred_uplink: 'starlink' };
+    }
+    if (type === 'failback_vsat') {
+      return { preferred_uplink: 'vsat' };
+    }
+    if (type === 'restore_automatic') {
+      return { preferred_uplink: 'automatic', mode: 'automatic' };
+    }
+    return {};
+  })();
+
+  if (!tenant || !vessel || !edge || !type) {
+    if (noticeEl) {
+      showEl(noticeEl.id, 'All fields required.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    return;
+  }
+
+  if (!btn || !noticeEl) {
+    toast('Command form unavailable', 'danger');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sending';
+  noticeEl.style.display = 'none';
+
+  try {
+    const res = await apiFetch('/api/commands', {
+      method: 'POST',
+      body: {
+        tenant_code: tenant,
+        vessel_code: vessel,
+        edge_code: edge,
+        command_type: type,
+        command_payload: commandPayload
+      }
+    });
+    if (noticeEl) {
+      showEl(noticeEl.id, `Command sent successfully! ID: ${res?.command?.id || res.id || res.command_id || res?.command_id || '?'}`, 'alert-success');
+    }
     noticeEl.style.display = 'flex';
     toast('Command sent ✓', 'success');
     await loadDashboard(true);
   } catch (err) {
-    showEl('cmd-notice', `Failed: ${err.message}`, 'alert-danger');
-    noticeEl.style.display = 'flex';
+    if (noticeEl) {
+      showEl(noticeEl.id, `Failed: ${err.message}`, 'alert-danger');
+    }
+    if (noticeEl) noticeEl.style.display = 'flex';
     toast(`Command failed: ${err.message}`, 'danger');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-send"></i> Send command';
+    updateCommandTypeFields();
   }
 }
 
@@ -3580,7 +4523,7 @@ function startTrafficRefresh() {
   }
 
   trafficRefreshTimer = setInterval(() => {
-    if (currentPage === 'traffic') {
+    if (currentPage === 'traffic' && !(trafficStreamSocket && trafficStreamSocket.readyState === WebSocket.OPEN)) {
       loadTrafficView();
     }
   }, 60000);
@@ -3684,8 +4627,10 @@ function toast(msg, type = 'info') {
 function startAutoRefresh() {
   if (dashRefreshTimer) clearInterval(dashRefreshTimer);
   dashRefreshTimer = setInterval(() => {
-    if (currentPage === 'dashboard') loadDashboard(true);
-  }, 60000);
+    if (currentPage !== 'dashboard') return;
+    if (edgeStreamSocket && edgeStreamSocket.readyState === WebSocket.OPEN) return;
+    loadDashboard(true);
+  }, 15000);
   startTrafficRefresh();
 }
 
@@ -3711,6 +4656,8 @@ function init() {
     ? 'alerts'
     : location.hash.includes('commands-section')
       ? 'commands'
+      : location.hash.includes('hotspot-section')
+        ? 'hotspot'
       : location.hash.includes('policy-section')
         ? 'policy'
       : location.hash.includes('traffic-section')
@@ -3725,11 +4672,18 @@ function init() {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     showPage(initialPage);
+    updateCommandTypeFields();
+    startEdgeStream({
+      tenant_code: tenantSettings.tenant_code || 'tnr13',
+      vessel_code: tenantSettings.vessel_code || 'vsl-001',
+      edge_code: tenantSettings.edge_code || null
+    }).catch(() => {});
   } else {
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
   }
 
+  updateCommandTypeFields();
   startAutoRefresh();
 }
 
@@ -3741,6 +4695,8 @@ window.addEventListener('hashchange', () => {
     ? 'alerts'
     : hash.includes('commands-section')
       ? 'commands'
+      : hash.includes('hotspot-section')
+        ? 'hotspot'
       : hash.includes('policy-section')
         ? 'policy'
       : hash.includes('traffic-section')
