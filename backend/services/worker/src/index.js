@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { createServer } from "node:http";
 import path from "node:path";
 import process from "node:process";
 import mqtt from "mqtt";
@@ -69,14 +70,38 @@ const HOTSPOT_REPLY_TOPIC = "tram1/reply/hotspot";
 const mqttAutoProvision = workerConfig.mqttAutoProvision;
 const mqttReconnectBaseMs = workerConfig.mqttReconnectBaseMs;
 const mqttReconnectMaxMs = workerConfig.mqttReconnectMaxMs;
+const workerHealthPort = workerConfig.workerHealthPort;
 let mqttReconnectAttempts = 0;
 let edgeSweepRunning = false;
+let mqttConnected = false;
+let lastMessageAt = null;
 
 const client = mqtt.connect(mqttUrl, {
   username: mqttUsername,
   password: mqttPassword,
   reconnectPeriod: mqttReconnectBaseMs,
   connectTimeout: 30_000
+});
+
+const healthServer = createServer((_req, res) => {
+  if (_req.url !== "/health") {
+    res.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "not_found" }));
+    return;
+  }
+
+  res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+  res.end(
+    JSON.stringify({
+      status: mqttConnected ? "ok" : "degraded",
+      mqttConnected,
+      lastMessageAt
+    })
+  );
+});
+
+healthServer.listen(workerHealthPort, "0.0.0.0", () => {
+  console.log(`[worker] health server listening on http://0.0.0.0:${workerHealthPort}/health`);
 });
 
 function normalizeTopicCode(value, aliases = {}) {
@@ -288,6 +313,7 @@ sweepOfflineEdges().catch((error) => {
 });
 
 client.on("connect", () => {
+  mqttConnected = true;
   console.log(`[worker] connected to broker ${mqttUrl}`);
   mqttReconnectAttempts = 0;
   client.options.reconnectPeriod = mqttReconnectBaseMs;
@@ -301,6 +327,7 @@ client.on("connect", () => {
 });
 
 client.on("reconnect", () => {
+  mqttConnected = false;
   mqttReconnectAttempts += 1;
   const jitter = Math.floor(Math.random() * 250);
   const backoff = Math.min(mqttReconnectMaxMs, mqttReconnectBaseMs * 2 ** Math.min(mqttReconnectAttempts - 1, 5)) + jitter;
@@ -309,11 +336,13 @@ client.on("reconnect", () => {
 });
 
 client.on("error", (error) => {
+  mqttConnected = false;
   const message = error?.message || String(error);
   console.error("[worker] mqtt error:", message);
 });
 
   client.on("message", async (topic, payloadBuffer) => {
+    lastMessageAt = new Date().toISOString();
     if (topic === HOTSPOT_REPLY_TOPIC) {
       let reply;
       try {

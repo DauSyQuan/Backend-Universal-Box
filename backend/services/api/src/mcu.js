@@ -19,7 +19,10 @@ const ALLOWED_COMMAND_TYPES = new Set([
   "failover_starlink",
   "restore_automatic",
   "hotspot",
-  "hotspot_create_account"
+  "hotspot_create_account",
+  "hotspot_cmd",
+  "quota_sync",
+  "radius_setup"
 ]);
 
 const HOTSPOT_PROVISION_ACTIONS = new Set([
@@ -28,7 +31,9 @@ const HOTSPOT_PROVISION_ACTIONS = new Set([
   "create_server_profile",
   "create_hotspot_server",
   "create_user_profile",
-  "create_account"
+  "create_account",
+  "edit_user",
+  "delete_user"
 ]);
 
 const HOTSPOT_MONITOR_ACTIONS = new Set([
@@ -48,7 +53,8 @@ const HOTSPOT_ACTION_ALIASES = new Map([
 ]);
 
 function isHotspotCommandType(commandType) {
-  return String(commandType ?? "").trim() === "hotspot" || String(commandType ?? "").trim() === "hotspot_create_account";
+  const t = String(commandType ?? "").trim();
+  return t === "hotspot" || t === "hotspot_create_account" || t === "hotspot_cmd";
 }
 
 function normalizeHotspotAction(action) {
@@ -568,6 +574,60 @@ function validateCommandPayload(commandType, commandPayload) {
           errors.push("qos must look like 5M/10M");
         }
       }
+
+      if (action === "edit_user") {
+        if (!username) errors.push("username is required for edit_user");
+        const rateLimit = String(commandPayload.rate_limit ?? "").trim();
+        if (rateLimit && !qosPattern.test(rateLimit.replace(/\s+/g, ""))) {
+          errors.push("rate_limit must look like 5M/10M");
+        }
+      }
+
+      if (action === "delete_user") {
+        if (!username) errors.push("username is required for delete_user");
+      }
+    }
+  }
+
+  if (commandType === "quota_sync") {
+    if (!Array.isArray(commandPayload.rules) || commandPayload.rules.length === 0) {
+      errors.push("rules must be a non-empty array");
+    } else {
+      for (const [i, rule] of commandPayload.rules.entries()) {
+        if (!rule || typeof rule !== "object") {
+          errors.push(`rules[${i}] must be an object`);
+          continue;
+        }
+        if (!String(rule.username ?? "").trim()) {
+          errors.push(`rules[${i}].username is required`);
+        }
+        if (!String(rule.uplink ?? "").trim()) {
+          errors.push(`rules[${i}].uplink is required`);
+        }
+        const gb = Number(rule.quota_gb);
+        if (!Number.isFinite(gb) || gb <= 0) {
+          errors.push(`rules[${i}].quota_gb must be a positive number`);
+        }
+      }
+    }
+  }
+
+  if (commandType === "radius_setup") {
+    const radiusIp = String(commandPayload.radius_ip ?? "").trim();
+    if (!radiusIp) {
+      errors.push("radius_ip is required");
+    } else if (!isIP(radiusIp)) {
+      errors.push("radius_ip must be a valid IPv4 or IPv6 address");
+    }
+    if (!String(commandPayload.radius_secret ?? "").trim()) {
+      errors.push("radius_secret is required");
+    }
+    const port = Number(commandPayload.radius_port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      errors.push("radius_port must be a valid port number (1–65535)");
+    }
+    if (!String(commandPayload.hotspot_profile ?? "").trim()) {
+      errors.push("hotspot_profile is required");
     }
   }
 

@@ -80,6 +80,14 @@ create table if not exists users (
   unique (tenant_id, username)
 );
 
+create table if not exists revoked_tokens (
+  jti text primary key,
+  revoked_at timestamptz not null default now()
+);
+
+create index if not exists idx_revoked_tokens_revoked_at
+  on revoked_tokens(revoked_at desc);
+
 create table if not exists packages (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -456,22 +464,6 @@ create table if not exists package_quotas (
 create index if not exists idx_package_quotas_vessel
   on package_quotas(vessel_id);
 
-create table if not exists policies (
-  id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null references tenants(id) on delete cascade,
-  vessel_id uuid not null references vessels(id) on delete cascade,
-  groups jsonb not null default '[]'::jsonb,
-  command_job_id uuid references command_jobs(id) on delete set null,
-  created_at timestamptz not null default now(),
-  applied_at timestamptz
-);
-
-create index if not exists idx_policies_tenant_vessel_created
-  on policies(tenant_id, vessel_id, created_at desc);
-
-create index if not exists idx_policies_applied_at
-  on policies(applied_at desc);
-
 create table if not exists command_jobs (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
@@ -495,6 +487,22 @@ create index if not exists idx_command_jobs_status_created
 
 create index if not exists idx_command_jobs_tenant_status_created
   on command_jobs(tenant_id, status, created_at desc);
+
+create table if not exists policies (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  vessel_id uuid not null references vessels(id) on delete cascade,
+  groups jsonb not null default '[]'::jsonb,
+  command_job_id uuid references command_jobs(id) on delete set null,
+  created_at timestamptz not null default now(),
+  applied_at timestamptz
+);
+
+create index if not exists idx_policies_tenant_vessel_created
+  on policies(tenant_id, vessel_id, created_at desc);
+
+create index if not exists idx_policies_applied_at
+  on policies(applied_at desc);
 
 create table if not exists hotspot_accounts (
   id uuid primary key default gen_random_uuid(),

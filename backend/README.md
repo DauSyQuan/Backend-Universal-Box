@@ -78,6 +78,7 @@ npm run test:smoke
 ```bash
 npm run db:seed:phase2
 ```
+The seeded demo user is `crew01` with password `crew01`.
 
 2. Publish sample MQTT traffic:
 ```bash
@@ -98,6 +99,11 @@ curl "http://localhost:3000/api/mcu/edges/tnr13/vsl-001/edge-001"
 5. Open monitoring dashboard:
 ```bash
 xdg-open http://localhost:3000/dashboard
+```
+
+6. Check schema state:
+```bash
+npm run db:status
 ```
 
 ## Remote access via ngrok
@@ -167,6 +173,7 @@ Notes:
 
 - Dashboard and protected API routes now require HTTP Basic Auth. If `BASIC_AUTH_PASSWORD` is left blank, the API prints a one-time password in its startup log.
 - `POST /api/auth/login` issues a bearer token for the same credentials, and `admin` / `noc` are the only roles allowed to create MCU commands.
+- `POST /api/auth/logout` revokes the current bearer token when one is provided.
 - `/api/mcu/register` is disabled by default and must be explicitly enabled with `MCU_REGISTER_ENABLED=true` plus `MCU_REGISTER_TOKEN`.
 - Worker no longer auto-creates unknown edges unless `MQTT_AUTO_PROVISION=true`. Seed or register the edge first for a cleaner demo.
 - The ngrok helper does not publish MQTT unless `NGROK_ENABLE_MQTT_TUNNEL=true`.
@@ -218,13 +225,15 @@ The production stack includes:
 - Worker container built from `Dockerfile.worker`
 - Nginx reverse proxy on port `80`
 
-If you want more throughput on a single host, scale the stateless services:
+The production compose file keeps the API as a single instance because its rate limiting and metrics are still in-memory.
+If you need more throughput on a single host, scale the worker only after moving API rate limiting off-process:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --scale api=2 --scale worker=3
+docker compose -f docker-compose.prod.yml up -d --scale worker=3
 ```
 
 Before deploying, make sure `ops/.env` contains production secrets and not demo values.
+The API now requires a strong `AUTH_TOKEN_SECRET` and refuses to start without one.
 
 ## API documentation
 
@@ -243,8 +252,10 @@ Before deploying, make sure `ops/.env` contains production secrets and not demo 
 - `telemetry` inserts into `telemetry` when tenant/vessel mapping exists.
 - `usage`, `event`, `vms` inserts are enabled in Phase 2.
 - Validation and processing failures are persisted to `ingest_errors`.
+- Worker exposes a `/health` endpoint on `WORKER_HEALTH_PORT` for container health checks.
 - MCU visibility endpoints are available under `/api/mcu/*`.
 - Monitoring dashboard is available at `/dashboard`.
 - Pi4 / RouterOS client setup guide: `../backend-mcu-client/mcu-client/README.md`.
 - Sample Pi4 environment: `../backend-mcu-client/mcu-client/pi4_uplink.env.example`.
 - Sample RouterOS MCU environment: `../backend-mcu-client/mcu-client/read_traffic.env.example`.
+- Run `npm run audit:password-hashes` from `backend/` to find any user rows that still do not use `pbkdf2$...` hashes.

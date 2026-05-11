@@ -13,4 +13,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --chown=app:app . .
 USER app
 WORKDIR /app/services/worker
+EXPOSE 3100
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 CMD node -e "const port=process.env.WORKER_HEALTH_PORT||3100; fetch('http://127.0.0.1:' + port + '/health').then(async (res)=>{ if(!res.ok) throw new Error('status ' + res.status); process.exit(0); }).catch(() => process.exit(1));"
 CMD ["node", "src/index.js"]

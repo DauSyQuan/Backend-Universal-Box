@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mcu_backend
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d mcu_backend"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run db:migrate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/mcu_backend
+      - run: npm run db:status
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/mcu_backend
+      - run: npm run verify
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/mcu_backend
+          AUTH_TOKEN_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          BASIC_AUTH_PASSWORD: 123456789012345678901234
+          MQTT_ALLOW_ANONYMOUS: true

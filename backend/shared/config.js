@@ -9,6 +9,13 @@ function parseIntEnv(value, fallback, { min = null, max = null } = {}) {
   return safe;
 }
 
+function parseCsvEnv(value) {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function loadDatabaseConfig(env = process.env, { applicationName = "app" } = {}) {
   const databaseUrl = normalizeSecret(env.DATABASE_URL);
   if (!databaseUrl) {
@@ -27,6 +34,15 @@ export function loadDatabaseConfig(env = process.env, { applicationName = "app" 
 }
 
 export function loadApiRuntimeConfig(env = process.env) {
+  const secretV2 = normalizeSecret(env.AUTH_TOKEN_SECRET_V2);
+  const secretV1 = normalizeSecret(env.AUTH_TOKEN_SECRET_V1);
+  const currentSecret = normalizeSecret(env.AUTH_TOKEN_SECRET);
+  const authTokenSecrets = [
+    secretV2,
+    currentSecret,
+    secretV1
+  ].filter(Boolean);
+
   return {
     mqttUrl: normalizeSecret(env.MQTT_URL) || "mqtt://localhost:1883",
     mqttUsername: normalizeSecret(env.MQTT_USERNAME) || undefined,
@@ -35,11 +51,14 @@ export function loadApiRuntimeConfig(env = process.env) {
     basicAuthUsername: normalizeSecret(env.BASIC_AUTH_USERNAME) || "demo",
     basicAuthPassword: normalizeSecret(env.BASIC_AUTH_PASSWORD) || "",
     basicAuthRole: normalizeSecret(env.BASIC_AUTH_ROLE) || "admin",
-    authTokenSecret: normalizeSecret(env.AUTH_TOKEN_SECRET || env.JWT_SECRET || ""),
+    authTokenSecret: authTokenSecrets[0] || "",
+    authTokenSecrets,
+    authTokenSecretKid: secretV2 ? "v2" : "v1",
     authTokenTtlSeconds: parseIntEnv(env.AUTH_TOKEN_TTL_SECONDS ?? 3600, 3600, { min: 300, max: 86_400 }),
     trustProxyHeaders: parseBoolean(env.TRUST_PROXY_HEADERS, false),
     mcuRegisterEnabled: parseBoolean(env.MCU_REGISTER_ENABLED, false),
     mcuRegisterToken: normalizeSecret(env.MCU_REGISTER_TOKEN),
+    corsAllowedOrigins: parseCsvEnv(env.CORS_ALLOWED_ORIGINS),
     serverRequestTimeoutMs: parseIntEnv(env.SERVER_REQUEST_TIMEOUT_MS ?? 30_000, 30_000, { min: 5_000, max: 300_000 }),
     requestTimeoutMs: parseIntEnv(env.REQUEST_TIMEOUT_MS ?? 25_000, 25_000, { min: 5_000, max: 300_000 }),
     serverKeepAliveTimeoutMs: parseIntEnv(env.SERVER_KEEPALIVE_TIMEOUT_MS ?? 65_000, 65_000, { min: 1_000, max: 300_000 }),
@@ -75,6 +94,7 @@ export function loadWorkerRuntimeConfig(env = process.env) {
       vessel: parseAliasMap(env.MQTT_TOPIC_VESSEL_ALIASES || "vessel-01=vsl-001"),
       edge: parseAliasMap(env.MQTT_TOPIC_EDGE_ALIASES || "remote_01=edge-001")
     },
+    workerHealthPort: parseIntEnv(env.WORKER_HEALTH_PORT ?? 3100, 3100, { min: 1, max: 65_535 }),
     mqttReconnectBaseMs: parseIntEnv(env.MQTT_RECONNECT_BASE_MS ?? 1_000, 1_000, { min: 500, max: 30_000 }),
     mqttReconnectMaxMs: parseIntEnv(env.MQTT_RECONNECT_MAX_MS ?? 30_000, 30_000, { min: 500, max: 120_000 })
   };

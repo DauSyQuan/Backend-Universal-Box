@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { createHmac, pbkdf2Sync, randomBytes } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHmac, pbkdf2Sync, randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { isIP } from "node:net";
 import mqtt from "mqtt";
@@ -38,8 +39,33 @@ import { attachRealtimeServer } from "./realtime.js";
 import { maybeServeStatic } from "./static.js";
 import { realtimeBus } from "../../../shared/realtime-bus.js";
 
-const console = createLogger("api");
 const apiConfig = loadApiRuntimeConfig(process.env);
+const requestContext = new AsyncLocalStorage();
+
+function getRequestContext() {
+  return requestContext.getStore() ?? null;
+}
+
+function getRequestLogger() {
+  const context = getRequestContext();
+  return context
+    ? createLogger("api", { request_id: context.requestId, route: context.route })
+    : createLogger("api");
+}
+
+const console = new Proxy({}, {
+  get(_target, prop) {
+    if (prop === "inspect") {
+      return undefined;
+    }
+    const method = String(prop);
+    return (...args) => {
+      const logger = getRequestLogger();
+      const fn = logger[method] ?? logger.info;
+      return fn(...args);
+    };
+  }
+});
 
 const mqttUrl = apiConfig.mqttUrl;
 const mqttClient = mqtt.connect(mqttUrl, {
@@ -59,14 +85,27 @@ const generatedBasicAuthPassword = basicAuthEnabled && !normalizeSecret(apiConfi
   : null;
 const basicAuthPassword = generatedBasicAuthPassword ?? normalizeSecret(apiConfig.basicAuthPassword);
 const basicAuthRole = apiConfig.basicAuthRole;
-const authTokenSecret = normalizeSecret(apiConfig.authTokenSecret || basicAuthPassword || "mcu-dev-auth-secret");
+const authTokenSecrets = (apiConfig.authTokenSecrets ?? [apiConfig.authTokenSecret]).filter(Boolean);
+const authTokenSecret = authTokenSecrets[0] ?? "";
+const authTokenKid = apiConfig.authTokenSecretKid ?? "v1";
 const authTokenTtlSeconds = apiConfig.authTokenTtlSeconds;
 const trustProxyHeaders = apiConfig.trustProxyHeaders;
 const mcuRegisterEnabled = apiConfig.mcuRegisterEnabled;
 const mcuRegisterToken = normalizeSecret(apiConfig.mcuRegisterToken);
+const corsAllowedOrigins = new Set((apiConfig.corsAllowedOrigins ?? []).map((origin) => String(origin).trim()).filter(Boolean));
 
 if (basicAuthEnabled && !basicAuthPassword) {
   throw new Error("BASIC_AUTH_PASSWORD is required when BASIC_AUTH_ENABLED=true");
+}
+
+if (!authTokenSecret || authTokenSecret.length < 32) {
+  throw new Error("AUTH_TOKEN_SECRET is required and must be at least 32 characters long");
+}
+
+for (const secret of authTokenSecrets) {
+  if (!secret || secret.length < 32) {
+    throw new Error("AUTH_TOKEN_SECRET values must be at least 32 characters long");
+  }
 }
 
 if (mcuRegisterEnabled && !mcuRegisterToken) {
@@ -74,12 +113,57 @@ if (mcuRegisterEnabled && !mcuRegisterToken) {
 }
 
 const sendJson = (res, statusCode, data, extraHeaders = {}) => {
+  const requestId = getRequestId();
+  if (requestId && !res.getHeader("x-request-id")) {
+    res.setHeader("x-request-id", requestId);
+  }
+
   res.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
     ...extraHeaders
   });
-  res.end(JSON.stringify(data));
+  res.end(JSON.stringify(statusCode >= 400 ? normalizeErrorResponse(statusCode, data) : data));
 };
+
+function setCommonResponseHeaders(req, res, requestId) {
+  res.setHeader("x-request-id", requestId);
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("x-frame-options", "DENY");
+  res.setHeader("referrer-policy", "no-referrer");
+  res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  res.setHeader(
+    "content-security-policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+  );
+
+  const origin = getHeaderValue(req.headers, "origin");
+  if (origin && corsAllowedOrigins.has(origin)) {
+    res.setHeader("vary", "Origin");
+    res.setHeader("access-control-allow-origin", origin);
+    res.setHeader("access-control-allow-credentials", "true");
+    res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
+    res.setHeader("access-control-allow-headers", "authorization,content-type,x-request-id");
+  }
+}
+
+function handlePreflightRequest(req, res) {
+  if (req.method !== "OPTIONS") {
+    return false;
+  }
+
+  const origin = getHeaderValue(req.headers, "origin");
+  if (origin && corsAllowedOrigins.has(origin)) {
+    res.setHeader("vary", "Origin");
+    res.setHeader("access-control-allow-origin", origin);
+    res.setHeader("access-control-allow-credentials", "true");
+    res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
+    res.setHeader("access-control-allow-headers", "authorization,content-type,x-request-id");
+  }
+
+  res.writeHead(204);
+  res.end();
+  return true;
+}
 
 const roleOrder = new Map([
   ["customer", 1],
@@ -111,35 +195,135 @@ function parseBase64UrlJson(value) {
   return JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
 }
 
+function getRequestId() {
+  return getRequestContext()?.requestId ?? null;
+}
+
+function humanizeErrorCode(code) {
+  return String(code ?? "")
+    .replace(/[_:-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function isCodeLike(value) {
+  return /^[a-z0-9][a-z0-9._:-]*$/i.test(String(value ?? "")) && !String(value ?? "").includes(" ");
+}
+
+function normalizeErrorResponse(statusCode, data) {
+  if (statusCode < 400 || !data || typeof data !== "object" || Array.isArray(data)) {
+    return data;
+  }
+
+  if (!("error" in data)) {
+    const statusCodeMap = {
+      400: "bad_request",
+      401: "unauthorized",
+      403: "forbidden",
+      404: "not_found",
+      408: "request_timeout",
+      409: "conflict",
+      413: "payload_too_large",
+      429: "rate_limited",
+      500: "internal_error",
+      503: "service_unavailable"
+    };
+
+    return {
+      error: {
+        code: statusCodeMap[statusCode] ?? (statusCode >= 500 ? "internal_error" : "bad_request"),
+        message: humanizeErrorCode(statusCodeMap[statusCode] ?? (statusCode >= 500 ? "internal_error" : "bad_request")),
+        request_id: getRequestId(),
+        details: data
+      }
+    };
+  }
+
+  const errorValue = data.error;
+  const details = Object.fromEntries(
+    Object.entries(data).filter(([key]) => key !== "error")
+  );
+  const requestId = getRequestId();
+
+  const baseError = {
+    request_id: requestId
+  };
+
+  if (typeof errorValue === "string") {
+    if (isCodeLike(errorValue)) {
+      baseError.code = errorValue;
+      baseError.message = humanizeErrorCode(errorValue);
+    } else {
+      baseError.code = statusCode >= 500 ? "internal_error" : "bad_request";
+      baseError.message = errorValue;
+    }
+  } else if (errorValue && typeof errorValue === "object") {
+    baseError.code = typeof errorValue.code === "string"
+      ? errorValue.code
+      : statusCode >= 500
+        ? "internal_error"
+        : "bad_request";
+    baseError.message = typeof errorValue.message === "string"
+      ? errorValue.message
+      : humanizeErrorCode(baseError.code);
+    if (errorValue.details && typeof errorValue.details === "object") {
+      baseError.details = errorValue.details;
+    }
+  } else {
+    baseError.code = statusCode >= 500 ? "internal_error" : "bad_request";
+    baseError.message = humanizeErrorCode(baseError.code);
+  }
+
+  if (Object.keys(details).length > 0) {
+    baseError.details = {
+      ...(baseError.details ?? {}),
+      ...details
+    };
+  }
+
+  return {
+    error: baseError
+  };
+}
+
+function makeJwtHeader(kid) {
+  return {
+    alg: "HS256",
+    typ: "JWT",
+    kid
+  };
+}
+
 function signAuthToken(claims) {
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + authTokenTtlSeconds;
+  const jti = randomUUID();
   const payload = {
     ...claims,
+    iss: "mcu-api",
+    aud: "mcu-dashboard",
+    jti,
     iat: issuedAt,
     exp: expiresAt
   };
+  const header = base64UrlJson(makeJwtHeader(authTokenKid));
   const body = base64UrlJson(payload);
-  const signature = createHmac("sha256", authTokenSecret).update(body).digest("base64url");
-  return `${body}.${signature}`;
+  const signature = createHmac("sha256", authTokenSecret).update(`${header}.${body}`).digest("base64url");
+  return `${header}.${body}.${signature}`;
 }
 
-function verifyAuthToken(token) {
+function verifyAuthTokenSignature(token) {
   const trimmed = String(token ?? "").trim();
   if (!trimmed) {
     return null;
   }
 
   const parts = trimmed.split(".");
-  if (parts.length !== 2) {
+  if (parts.length !== 3) {
     return null;
   }
 
-  const [body, signature] = parts;
-  const expectedSignature = createHmac("sha256", authTokenSecret).update(body).digest("base64url");
-  if (!safeEqual(signature, expectedSignature)) {
-    return null;
-  }
+  const [headerText, body, signature] = parts;
 
   let payload;
   try {
@@ -152,7 +336,73 @@ function verifyAuthToken(token) {
     return null;
   }
 
+  let header;
+  try {
+    header = parseBase64UrlJson(headerText);
+  } catch {
+    return null;
+  }
+
+  if (!header || typeof header !== "object" || header.alg !== "HS256") {
+    return null;
+  }
+
   if (typeof payload.exp !== "number" || Date.now() / 1000 >= payload.exp) {
+    return null;
+  }
+
+  return { header, payload, token: trimmed, signedPart: `${headerText}.${body}`, signature };
+}
+
+async function isAuthTokenRevoked(jti) {
+  if (!pool || !jti) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `
+      select 1
+      from revoked_tokens
+      where jti = $1
+      limit 1
+    `,
+    [String(jti)]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function verifyAuthToken(token) {
+  const parsed = verifyAuthTokenSignature(token);
+  if (!parsed) {
+    return null;
+  }
+
+  const { header, payload, signedPart, signature } = parsed;
+  const expectedSecrets = header?.kid === "v2" && authTokenSecrets[1]
+    ? [authTokenSecrets[1], authTokenSecrets[0]]
+    : header?.kid === "v1" && authTokenSecrets[0]
+      ? [authTokenSecrets[0], authTokenSecrets[1]].filter(Boolean)
+      : authTokenSecrets;
+
+  let signatureValid = false;
+  for (const secret of expectedSecrets) {
+    const expectedSignature = createHmac("sha256", secret).update(signedPart).digest("base64url");
+    if (safeEqual(signature, expectedSignature)) {
+      signatureValid = true;
+      break;
+    }
+  }
+
+  if (!signatureValid) {
+    return null;
+  }
+
+  if (String(payload.iss ?? "") !== "mcu-api" || String(payload.aud ?? "") !== "mcu-dashboard") {
+    return null;
+  }
+
+  if (await isAuthTokenRevoked(payload.jti)) {
     return null;
   }
 
@@ -173,11 +423,6 @@ function verifyPasswordHash(password, storedHash) {
     return false;
   }
 
-  if (hashText.startsWith("plain:") || hashText.startsWith("plaintext:")) {
-    const prefixLength = hashText.indexOf(":") + 1;
-    return safeEqual(passwordText, hashText.slice(prefixLength));
-  }
-
   if (hashText.startsWith("pbkdf2$")) {
     const parts = hashText.split("$");
     const iterations = Number.parseInt(parts[1] || "", 10);
@@ -192,7 +437,7 @@ function verifyPasswordHash(password, storedHash) {
     return safeEqual(derived, expectedHex);
   }
 
-  return safeEqual(passwordText, hashText);
+  return false;
 }
 
 async function lookupUserPrincipal(username, password) {
@@ -264,7 +509,7 @@ function extractBearerToken(req) {
 async function resolveRequestPrincipal(req) {
   const bearerToken = extractBearerToken(req);
   if (bearerToken) {
-    const payload = verifyAuthToken(bearerToken);
+    const payload = await verifyAuthToken(bearerToken);
     if (payload) {
       return {
         user_id: payload.user_id ?? null,
@@ -1334,6 +1579,13 @@ function validateRegisterAccess(req, res, body, url) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const requestId = String(getHeaderValue(req.headers, "x-request-id") ?? randomUUID()).trim() || randomUUID();
+  requestContext.enterWith({ requestId, route: url.pathname });
+  setCommonResponseHeaders(req, res, requestId);
+  if (handlePreflightRequest(req, res)) {
+    return;
+  }
+
   const startedAt = process.hrtime.bigint();
   let metricsRecorded = false;
   const shouldTimeoutRequest = !url.pathname.endsWith("/stream");
@@ -1484,6 +1736,23 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/auth/logout" && req.method === "POST") {
+    const bearerToken = extractBearerToken(req);
+    if (bearerToken) {
+      const tokenPayload = await verifyAuthToken(bearerToken);
+      if (tokenPayload?.jti && pool) {
+        await pool.query(
+          `
+            insert into revoked_tokens (jti, revoked_at)
+            values ($1, now())
+            on conflict (jti) do update set revoked_at = excluded.revoked_at
+          `,
+          [String(tokenPayload.jti)]
+        ).catch((error) => {
+          console.error("[api/auth/logout] revoke failed:", error);
+        });
+      }
+    }
+
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -1948,7 +2217,7 @@ const server = createServer(async (req, res) => {
       limit: url.searchParams.get("limit"),
       offset: url.searchParams.get("offset"),
       after: url.searchParams.get("after"),
-      onlineSeconds: url.searchParams.get("online_seconds")
+      onlineSeconds: url.searchParams.get("online_seconds") ?? url.searchParams.get("onlineSeconds")
     };
 
     try {
@@ -1978,7 +2247,7 @@ const server = createServer(async (req, res) => {
           url.searchParams.get("public_wan_ip") ??
           url.searchParams.get("public_ip") ??
           url.searchParams.get("ip"),
-        onlineSeconds: url.searchParams.get("online_seconds")
+        onlineSeconds: url.searchParams.get("online_seconds") ?? url.searchParams.get("onlineSeconds")
       });
 
       if (!detail) {
@@ -2019,7 +2288,7 @@ const server = createServer(async (req, res) => {
           url.searchParams.get("public_ip") ??
           url.searchParams.get("ip"),
         interfaceName: url.searchParams.get("interface"),
-        windowMinutes: url.searchParams.get("window_minutes"),
+        windowMinutes: url.searchParams.get("window_minutes") ?? url.searchParams.get("windowMinutes"),
         limit: url.searchParams.get("limit")
       });
 
@@ -2316,7 +2585,7 @@ const server = createServer(async (req, res) => {
           vesselCode,
           edgeCode,
           interfaceName: url.searchParams.get("interface"),
-          windowMinutes: url.searchParams.get("window_minutes"),
+          windowMinutes: url.searchParams.get("window_minutes") ?? url.searchParams.get("windowMinutes"),
           limit: url.searchParams.get("limit")
         });
 
@@ -2341,7 +2610,7 @@ const server = createServer(async (req, res) => {
     const tenantCode = parts[3];
     const vesselCode = parts[4];
     const edgeCode = parts[5];
-    const onlineSeconds = url.searchParams.get("online_seconds");
+    const onlineSeconds = url.searchParams.get("online_seconds") ?? url.searchParams.get("onlineSeconds");
 
     if (!assertScopedAccess(principal, { tenantCode, vesselCode })) {
       sendJson(res, 403, { error: "forbidden" });

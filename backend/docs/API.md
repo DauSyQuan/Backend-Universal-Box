@@ -113,7 +113,22 @@ Refresh an existing bearer token.
 
 ### `POST /api/auth/logout`
 
-No-op logout endpoint for client-side session cleanup.
+Revokes the current bearer token when one is provided in `Authorization: Bearer ...`, then returns `{ "ok": true }`.
+
+Every response includes `x-request-id`. Error responses are normalized to:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Not Found",
+    "details": {},
+    "request_id": "01HX..."
+  }
+}
+```
+
+Password hashes stored in `users.password_hash` must use the `pbkdf2$...` format. Legacy `plain:` or raw-text values are rejected by the API and should be cleaned up with the password audit script before production use.
 
 ## Commands
 

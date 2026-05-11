@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { pbkdf2Sync, randomBytes } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { Client } from "pg";
@@ -54,6 +55,9 @@ async function run() {
     );
 
     const vesselId = vessel.rows[0].id;
+    const seedPassword = "crew01";
+    const seedSalt = randomBytes(16).toString("base64url");
+    const seedPasswordHash = `pbkdf2$210000$${seedSalt}$${pbkdf2Sync(seedPassword, seedSalt, 210000, 32, "sha256").toString("hex")}`;
 
     await client.query(
       `
@@ -72,7 +76,7 @@ async function run() {
         on conflict (tenant_id, username) do update
           set vessel_id = excluded.vessel_id, role = excluded.role, is_active = true
       `,
-      [tenantId, vesselId, "crew01", "phase2_seed_placeholder", "customer"]
+      [tenantId, vesselId, "crew01", seedPasswordHash, "customer"]
     );
 
     await client.query("commit");
@@ -82,6 +86,7 @@ async function run() {
     console.log("vessel_code=vsl-001");
     console.log("edge_code=edge-001");
     console.log("usage_user=crew01");
+    console.log("usage_password=crew01");
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -94,4 +99,3 @@ run().catch((error) => {
   console.error("[phase2 seed] failed:", error.message);
   process.exit(1);
 });
-

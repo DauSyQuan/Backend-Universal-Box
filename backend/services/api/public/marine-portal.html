@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi" class="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,430 +7,300 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        boxdark:  '#24303F',
+        'boxdark-2': '#1A222C',
+        strokedark: '#2E3A47',
+        'form-strokedark': '#3d4d60',
+        'form-input': '#1d2a39',
+        primary:  '#3C50E0',
+        secondary:'#80CAEE',
+        meta3:    '#10B981',
+        meta6:    '#FBBF24',
+        meta1:    '#F03846',
+        meta5:    '#259AE6',
+        bodydark: '#AEB7C0',
+        bodydark2:'#8A99AF',
+        graydark: '#333A48',
+      },
+      keyframes: {
+        slideIn: { from:{opacity:'0',transform:'translateX(16px)'}, to:{opacity:'1',transform:'translateX(0)'} },
+        fadeIn:  { from:{opacity:'0',transform:'translateY(4px)'}, to:{opacity:'1',transform:'translateY(0)'} },
+        spin:    { to:{transform:'rotate(360deg)'} },
+      },
+      animation: {
+        slideIn: 'slideIn 0.2s ease',
+        fadeIn:  'fadeIn 0.2s ease',
+        spin:    'spin 0.7s linear infinite',
+      },
+    }
+  }
+}
+</script>
 <style>
-:root {
-  --bg: #060d18;
-  --bg2: #0b1525;
-  --bg3: #111f35;
-  --surface: rgba(16, 28, 50, 0.7);
-  --surface2: rgba(22, 38, 66, 0.6);
-  --glass: rgba(255,255,255,0.04);
-  --glass-border: rgba(255,255,255,0.08);
-  --accent: #38bdf8;
-  --accent2: #0ea5e9;
-  --accent3: #7dd3fc;
-  --green: #34d399;
-  --green-dim: rgba(52,211,153,0.15);
-  --amber: #fbbf24;
-  --amber-dim: rgba(251,191,36,0.15);
-  --red: #f87171;
-  --red-dim: rgba(248,113,113,0.15);
-  --text: #e2e8f0;
-  --text2: #94a3b8;
-  --text3: #64748b;
-  --sidebar: 240px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-}
+  /* ── Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Space Grotesk', system-ui, sans-serif; background: #1C2434; color: #AEB7C0; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ── Animations ── */
+  @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes spin    { to{transform:rotate(360deg)} }
+  @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-html, body { height: 100%; overflow: hidden; }
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.25s ease; }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
+  /* ── Scrollbar ── */
+  .main::-webkit-scrollbar { width: 5px; }
+  .main::-webkit-scrollbar-track { background: transparent; }
+  .main::-webkit-scrollbar-thumb { background: #2E3A47; border-radius: 10px; }
 
-body::before {
-  content: '';
-  position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(56,189,248,0.12), transparent),
-    radial-gradient(ellipse 60% 40% at 85% 15%, rgba(14,165,233,0.09), transparent),
-    radial-gradient(ellipse 40% 60% at 75% 85%, rgba(52,211,153,0.06), transparent);
-}
+  /* ── Spinner ── */
+  .spinner { display:inline-block;width:14px;height:14px;border:2px solid rgba(60,80,224,.2);border-top-color:#3C50E0;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle; }
 
-/* Layout */
-#app { display: flex; height: 100vh; position: relative; z-index: 1; }
+  /* ── Sidebar Navigation ── */
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    color: #8A99AF; font-size: 13px; font-weight: 500;
+    transition: all .18s ease; border: none; border-left: 3px solid transparent;
+    background: none; width: 100%; text-align: left; position: relative;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.05); color: #C9D1E0; border-left-color: transparent; }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(60,80,224,.18) 0%, rgba(60,80,224,.06) 100%);
+    color: #fff; border-left: 3px solid #3C50E0;
+    box-shadow: inset 0 0 0 1px rgba(60,80,224,.15);
+  }
+  .nav-item.active i { color: #3C50E0; }
+  .nav-item i { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; transition: color .18s; }
 
-/* ─── Sidebar ─── */
-.sidebar {
-  width: var(--sidebar);
-  min-width: var(--sidebar);
-  background: rgba(6,13,24,0.9);
-  border-right: 1px solid var(--glass-border);
-  display: flex; flex-direction: column;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; transition: all .18s ease;
+    font-family: inherit; white-space: nowrap; letter-spacing: .01em;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary {
+    background: linear-gradient(135deg, #3C50E0, #3347c8);
+    color: #fff; border-color: #3C50E0;
+    box-shadow: 0 4px 14px rgba(60,80,224,.35);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4560f0, #3C50E0);
+    box-shadow: 0 6px 20px rgba(60,80,224,.5); transform: translateY(-1px);
+  }
+  .btn-ghost { background: #1E2A38; color: #AEB7C0; border-color: #2E3A47; }
+  .btn-ghost:hover:not(:disabled) { background: #2A3749; color: #E0E6F0; border-color: #3d4d60; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+  .btn-danger { background: rgba(240,56,70,.1); color: #F03846; border-color: rgba(240,56,70,.3); }
+  .btn-danger:hover:not(:disabled) { background: rgba(240,56,70,.2); box-shadow: 0 4px 12px rgba(240,56,70,.2); }
+  .btn-success { background: rgba(16,185,129,.1); color: #10B981; border-color: rgba(16,185,129,.3); }
+  .btn-success:hover:not(:disabled) { background: rgba(16,185,129,.2); box-shadow: 0 4px 12px rgba(16,185,129,.2); }
 
-.sidebar-brand {
-  padding: 20px 18px;
-  border-bottom: 1px solid var(--glass-border);
-  display: flex; align-items: center; gap: 12px;
-}
+  /* ── Form Controls ── */
+  .form-control {
+    width: 100%; padding: 10px 13px;
+    background: #1A2537; border: 1px solid #2E3A47;
+    border-radius: 8px; color: #C9D1E0; font-size: 13px; font-family: inherit;
+    transition: border-color .18s, box-shadow .18s; outline: none;
+  }
+  .form-control:focus { border-color: #3C50E0; box-shadow: 0 0 0 3px rgba(60,80,224,.15); }
+  .form-control::placeholder { color: #4d5e72; }
+  select.form-control {
+    appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238A99AF'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 13px center; padding-right: 34px;
+  }
+  .form-label { display:block;font-size:11px;font-weight:700;color:#6B7A8D;margin-bottom:7px;text-transform:uppercase;letter-spacing:.7px;font-family:'JetBrains Mono',monospace; }
+  .form-group { margin-bottom: 18px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-.brand-icon {
-  width: 36px; height: 36px;
-  background: linear-gradient(135deg, var(--accent2), var(--accent));
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; color: white;
-  flex-shrink: 0;
-}
+  /* ── Pills / Badges ── */
+  .pill { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.3px; }
+  .pill::before { content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0; }
+  .pill-green { background:rgba(16,185,129,.12);color:#10B981;border:1px solid rgba(16,185,129,.25); }
+  .pill-amber { background:rgba(251,191,36,.12);color:#FBBF24;border:1px solid rgba(251,191,36,.25); }
+  .pill-red   { background:rgba(240,56,70,.12);color:#F03846;border:1px solid rgba(240,56,70,.25); }
+  .pill-blue  { background:rgba(37,154,230,.12);color:#259AE6;border:1px solid rgba(37,154,230,.25); }
+  .pill-gray  { background:rgba(255,255,255,.05);color:#8A99AF;border:1px solid #2E3A47; }
 
-.brand-name { font-size: 13px; font-weight: 700; color: white; letter-spacing: 1.5px; text-transform: uppercase; }
-.brand-sub { font-size: 10px; color: var(--accent3); letter-spacing: 2.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  /* ── Cards ── */
+  .card {
+    background: #24303F; border: 1px solid #2E3A47; border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.2);
+  }
+  .card-body { padding: 22px; }
+  .card-header {
+    padding: 15px 22px; border-bottom: 1px solid #2E3A47;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .card-title { font-size: 14px; font-weight: 700; color: #E0E6F0; display: flex; align-items: center; gap: 8px; }
+  .card-subtitle { font-size: 11px; color: #6B7A8D; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
 
-.sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+  /* ── Tables ── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th {
+    color: #6B7A8D; font-weight: 700; font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .8px; padding: 11px 16px; border-bottom: 1px solid #2E3A47;
+    text-align: left; font-family: 'JetBrains Mono', monospace;
+    background: rgba(0,0,0,.12);
+  }
+  .tbl td { padding: 12px 16px; border-bottom: 1px solid rgba(46,58,71,.4); color: #AEB7C0; vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr.row-click { transition: background .15s; }
+  .tbl tr.row-click:hover { background: rgba(60,80,224,.06); cursor: pointer; }
+  .tbl tr.row-selected td { background: rgba(60,80,224,.08); border-left: 2px solid #3C50E0; }
 
-.nav-section-label {
-  font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase;
-  padding: 8px 8px 4px; font-family: 'JetBrains Mono', monospace;
-}
+  /* ── Stat Cards ── */
+  .stat-card {
+    background: #24303F; border: 1px solid #2E3A47; border-radius: 14px;
+    padding: 20px 22px; position: relative; overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,.2);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(0,0,0,.3); }
+  .stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #3C50E0 0%, #259AE6 100%);
+    border-radius: 14px 14px 0 0;
+  }
+  .stat-card:has(.stat-green)::after  { background: linear-gradient(90deg, #10B981, #34d399); }
+  .stat-card:has(.stat-amber)::after  { background: linear-gradient(90deg, #FBBF24, #f59e0b); }
+  .stat-card:has(.stat-red)::after    { background: linear-gradient(90deg, #F03846, #fb7185); }
+  .stat-label { font-size: 11px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; font-weight: 600; }
+  .stat-value { font-size: 28px; font-weight: 800; color: #E0E6F0; line-height: 1; }
+  .stat-note  { font-size: 11px; color: #4d5e72; margin-top: 8px; }
+  .stat-accent { color: #3C50E0; }
+  .stat-green  { color: #10B981; }
+  .stat-amber  { color: #FBBF24; }
+  .stat-red    { color: #F03846; }
 
-.nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 10px; border-radius: 8px;
-  cursor: pointer; color: var(--text2);
-  font-size: 13px; font-weight: 500;
-  transition: all 0.15s ease; border: none; background: none; width: 100%; text-align: left;
-}
+  /* ── Layout Grid ── */
+  .grid   { display: grid; gap: 18px; }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
-.nav-item:hover { background: var(--glass); color: var(--text); }
-.nav-item.active { background: rgba(56,189,248,0.12); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); }
-.nav-item i { font-size: 16px; width: 18px; text-align: center; flex-shrink: 0; }
+  /* ── Alerts ── */
+  .alert { padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .alert-warn    { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); color: #FBBF24; }
+  .alert-danger  { background: rgba(240,56,70,.08); border: 1px solid rgba(240,56,70,.2); color: #F87171; }
+  .alert-info    { background: rgba(37,154,230,.08); border: 1px solid rgba(37,154,230,.2); color: #80CAEE; }
+  .alert-success { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: #34d399; }
 
-.sidebar-footer {
-  padding: 14px;
-  border-top: 1px solid var(--glass-border);
-}
+  /* ── Toast ── */
+  .toast-stack { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+  .toast-item {
+    background: #2A3749; border: 1px solid #3d4d60; border-radius: 12px;
+    padding: 14px 18px; font-size: 13px; max-width: 340px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5); animation: slideIn .25s ease;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .toast-dismiss { margin-left: auto; cursor: pointer; color: #6B7A8D; font-size: 18px; flex-shrink: 0; transition: color .15s; }
+  .toast-dismiss:hover { color: #fff; }
 
-.conn-card {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 12px;
-}
+  /* ── Misc Utilities ── */
+  .kicker { font-size: 10px; color: #6B7A8D; text-transform: uppercase; letter-spacing: 1.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: block; font-weight: 700; }
+  .mono   { font-family: 'JetBrains Mono', monospace; }
+  .num-badge { display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;background:rgba(60,80,224,.18);color:#6473f0;border-radius:100px;font-size:10px;font-weight:800;font-family:'JetBrains Mono',monospace;border:1px solid rgba(60,80,224,.25); }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, #2E3A47 30%, #2E3A47 70%, transparent); margin: 18px 0; }
+  .empty { text-align: center; padding: 48px 20px; color: #4d5e72; }
+  .empty i { font-size: 36px; display: block; margin-bottom: 12px; opacity: .5; }
+  .empty p  { font-size: 13px; }
 
-.conn-avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent2), var(--accent));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; color: white; position: relative; flex-shrink: 0;
-}
+  /* ── Status Banner ── */
+  .status-banner {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, rgba(30,42,56,.8) 0%, rgba(26,34,44,.95) 100%);
+    border: 1px solid #2E3A47; border-radius: 12px; margin-bottom: 22px; flex-wrap: wrap;
+    box-shadow: 0 2px 12px rgba(0,0,0,.2);
+  }
+  .status-banner-label { font-size: 12px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; margin-right: auto; }
 
-.conn-dot {
-  position: absolute; bottom: 0; right: 0;
-  width: 8px; height: 8px; border-radius: 50%;
-  border: 1.5px solid var(--bg);
-}
+  /* ── Chip ── */
+  .chip { display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;background:rgba(255,255,255,.06);color:#AEB7C0;border:1px solid #2E3A47; }
 
-.dot-good { background: var(--green); }
-.dot-warn { background: var(--amber); }
-.dot-bad { background: var(--red); }
-.dot-idle { background: var(--text3); }
+  /* ── Traffic bars ── */
+  .traffic-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .traffic-bar-bg   { flex: 1; height: 6px; background: #1A2537; border-radius: 4px; overflow: hidden; }
+  .traffic-bar      { height: 100%; border-radius: 4px; transition: width .5s ease; }
+  .bar-rx { background: linear-gradient(90deg, #3C50E0, #259AE6); }
+  .bar-tx { background: linear-gradient(90deg, #10B981, #34d399); }
 
-/* ─── Main content ─── */
-.main {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
-  display: flex; flex-direction: column;
-  scroll-behavior: smooth;
-}
+  /* ── Charts ── */
+  .live-chart { width: 100%; height: 200px; display: block; }
+  .sparkline-wrap { width: 100%; height: 50px; overflow: hidden; }
+  .sparkline-bar-row { display: flex; align-items: flex-end; gap: 2px; height: 100%; }
+  .sparkline-bar { flex: 1; border-radius: 3px 3px 0 0; min-height: 2px; transition: height .4s ease; }
 
-/* Scrollbar */
-.main::-webkit-scrollbar { width: 4px; }
-.main::-webkit-scrollbar-track { background: transparent; }
-.main::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+  /* ── Detail sections ── */
+  .detail-section { margin-bottom: 22px; }
+  .detail-section-title { font-size: 11px; color: #6B7A8D; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid #2E3A47; }
+  .live-chart-shell { display: grid; gap: 12px; padding: 14px; background: rgba(0,0,0,.18); border: 1px solid #2E3A47; border-radius: 12px; }
+  .live-chart-meta  { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .live-sample-trail { display: grid; gap: 10px; }
+  .live-sample-item { padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); transition: background .15s; }
+  .live-sample-item:hover { background: rgba(255,255,255,.05); }
+  .live-sample-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .live-sample-time { font-size: 11px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; }
+  .live-sample-grid { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; }
 
-/* ─── Page ─── */
-.page { display: none; padding: 24px; animation: fadeIn 0.2s ease; }
-.page.active { display: block; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  /* ── Login ── */
+  .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; background: radial-gradient(ellipse at 60% 20%, rgba(60,80,224,.08) 0%, transparent 60%); }
+  .login-card { width: 100%; max-width: 400px; }
 
-/* ─── Topbar ─── */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 24px; gap: 12px; flex-wrap: wrap;
-}
+  /* ── Misc ── */
+  input[type=checkbox] { accent-color: #3C50E0; width: 14px; height: 14px; }
+  .edge-detail-panel { margin-top: 18px; }
+  .pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding-top: 14px; }
+  .pagination span { font-size: 12px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; }
 
-.page-title h1 { font-size: 20px; font-weight: 700; color: white; }
-.page-title p { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+  /* ── Top bar ── */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; gap: 14px; flex-wrap: wrap; }
+  .page-title h1 { font-size: 22px; font-weight: 800; color: #E8EDF5; letter-spacing: -.3px; }
+  .page-title p  { font-size: 12px; color: #6B7A8D; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-.topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  /* ── Quota ── */
+  .quota-rule-row { padding: 16px; border-bottom: 1px solid #2E3A47; transition: background .15s; }
+  .quota-rule-row:hover { background: rgba(255,255,255,.02); }
 
-/* ─── Buttons ─── */
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
-  cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease;
-  font-family: inherit; white-space: nowrap;
-}
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-primary {
-  background: var(--accent2); color: white; border-color: var(--accent2);
-}
-.btn-primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
-
-.btn-ghost {
-  background: var(--glass); color: var(--text2); border-color: var(--glass-border);
-}
-.btn-ghost:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,0.14); }
-
-.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
-.btn-danger { background: rgba(248,113,113,0.15); color: var(--red); border-color: rgba(248,113,113,0.3); }
-.btn-danger:hover:not(:disabled) { background: rgba(248,113,113,0.25); }
-.btn-success { background: rgba(52,211,153,0.15); color: var(--green); border-color: rgba(52,211,153,0.3); }
-.btn-success:hover:not(:disabled) { background: rgba(52,211,153,0.25); }
-
-/* ─── Cards ─── */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.card-body { padding: 20px; }
-.card-header { padding: 16px 20px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.card-title { font-size: 13px; font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; }
-.card-subtitle { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
-
-/* ─── Grid ─── */
-.grid { display: grid; gap: 16px; }
-.grid-2 { grid-template-columns: repeat(2, 1fr); }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-.grid-4 { grid-template-columns: repeat(4, 1fr); }
-.grid-auto { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-
-/* ─── Stat cards ─── */
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  padding: 16px 18px;
-  transition: border-color 0.2s;
-}
-.stat-card:hover { border-color: rgba(255,255,255,0.14); }
-.stat-label { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
-.stat-value { font-size: 26px; font-weight: 700; color: white; line-height: 1.1; }
-.stat-note { font-size: 11px; color: var(--text3); margin-top: 4px; }
-.stat-accent { color: var(--accent); }
-.stat-green { color: var(--green); }
-.stat-amber { color: var(--amber); }
-.stat-red { color: var(--red); }
-
-/* ─── Pills / Badges ─── */
-.pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 9px; border-radius: 100px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
-}
-.pill-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
-.pill-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
-.pill-red { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
-.pill-blue { background: rgba(56,189,248,0.1); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); }
-.pill-gray { background: rgba(148,163,184,0.1); color: var(--text2); border: 1px solid rgba(148,163,184,0.15); }
-
-.pill::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-
-/* ─── Table ─── */
-.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; padding: 10px 14px; border-bottom: 1px solid var(--glass-border); text-align: left; font-family: 'JetBrains Mono', monospace; }
-.tbl td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); vertical-align: middle; }
-.tbl tr:last-child td { border-bottom: none; }
-.tbl tr.row-click:hover { background: var(--glass); cursor: pointer; }
-.tbl tr.row-selected td { background: rgba(56,189,248,0.06); }
-
-/* ─── Form ─── */
-.form-group { margin-bottom: 16px; }
-.form-label { display: block; font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace; }
-.form-control {
-  width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.3);
-  border: 1px solid var(--glass-border); border-radius: 8px;
-  color: var(--text); font-size: 13px; font-family: inherit;
-  transition: border-color 0.15s;
-  outline: none;
-}
-.form-control:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 3px rgba(56,189,248,0.1); }
-.form-control::placeholder { color: var(--text3); }
-select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%2364748b'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-/* ─── Alert / Toast ─── */
-.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
-.alert-warn { background: var(--amber-dim); border: 1px solid rgba(251,191,36,0.25); color: var(--amber); }
-.alert-danger { background: var(--red-dim); border: 1px solid rgba(248,113,113,0.25); color: var(--red); }
-.alert-info { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.2); color: var(--accent3); }
-.alert-success { background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
-
-/* ─── Toast stack ─── */
-.toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-.toast-item {
-  background: var(--bg3); border: 1px solid var(--glass-border);
-  border-radius: 10px; padding: 12px 16px; font-size: 13px;
-  max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  animation: slideIn 0.2s ease; display: flex; align-items: flex-start; gap: 10px;
-}
-@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-.toast-dismiss { margin-left: auto; cursor: pointer; color: var(--text3); font-size: 16px; flex-shrink: 0; }
-
-/* ─── Loading spinner ─── */
-.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--glass-border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── Traffic bars ─── */
-.traffic-bar-wrap { display: flex; align-items: center; gap: 8px; }
-.traffic-bar-bg { flex: 1; height: 5px; background: var(--glass); border-radius: 3px; overflow: hidden; }
-.traffic-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
-.bar-rx { background: var(--accent2); }
-.bar-tx { background: var(--green); }
-
-/* ─── Empty state ─── */
-.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
-.empty i { font-size: 32px; display: block; margin-bottom: 10px; }
-.empty p { font-size: 13px; }
-
-/* ─── Pagination ─── */
-.pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding-top: 12px; }
-.pagination span { font-size: 12px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
-
-/* ─── Status banner ─── */
-.status-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); margin-bottom: 20px; flex-wrap: wrap; }
-.status-banner-label { font-size: 12px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-right: auto; }
-
-/* ─── Edge panel ─── */
-.edge-detail-panel { margin-top: 16px; }
-.detail-section { margin-bottom: 20px; }
-.detail-section-title { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--glass-border); }
-
-/* ─── Login page ─── */
-.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-.login-card { width: 100%; max-width: 400px; }
-.login-logo { text-align: center; margin-bottom: 28px; }
-.login-logo .brand-icon { margin: 0 auto 12px; width: 56px; height: 56px; font-size: 26px; border-radius: 14px; }
-.login-logo h2 { font-size: 20px; font-weight: 700; color: white; }
-.login-logo p { font-size: 12px; color: var(--text3); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
-
-/* ─── Divider ─── */
-.divider { height: 1px; background: var(--glass-border); margin: 16px 0; }
-
-/* ─── Mini chart (sparkline) ─── */
-.sparkline-wrap { width: 100%; height: 50px; overflow: hidden; }
-.sparkline-bar-row { display: flex; align-items: flex-end; gap: 2px; height: 100%; }
-.sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 2px; transition: height 0.4s ease; }
-
-/* ─── Live telemetry ─── */
-.live-chart-shell {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.14);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-}
-.live-chart {
-  width: 100%;
-  height: 200px;
-  display: block;
-}
-.live-chart-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.live-sample-trail {
-  display: grid;
-  gap: 8px;
-}
-.live-sample-item {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-.live-sample-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.live-sample-time {
-  font-size: 11px;
-  color: var(--text2);
-  font-family: 'JetBrains Mono', monospace;
-}
-.live-sample-grid {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--text);
-}
-.live-sample-grid span {
-  color: var(--text2);
-}
-.live-sample-grid strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-/* ─── Responsive ─── */
-@media (max-width: 900px) {
-  .grid-3 { grid-template-columns: repeat(2, 1fr); }
-  .grid-4 { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 600px) {
-  .sidebar { display: none; }
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
-}
-
-/* ─── Kicker label ─── */
-.kicker { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; display: block; }
-
-/* ─── Mono text ─── */
-.mono { font-family: 'JetBrains Mono', monospace; }
-
-/* ─── Number badge ─── */
-.num-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 5px; background: rgba(56,189,248,0.15); color: var(--accent); border-radius: 100px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-
-/* Uplink mode chips */
-.chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; background: var(--glass); color: var(--text2); border: 1px solid var(--glass-border); }
-
-/* input checkbox */
-input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; }
+  /* ── Responsive ── */
+  @media(max-width:900px) { .grid-3{grid-template-columns:repeat(2,1fr)} .grid-4{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:600px) { .sidebar{display:none} .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
 </style>
 </head>
-<body>
+<body class="bg-[#1C2434] text-[#AEB7C0]" style="background: linear-gradient(160deg, #1C2434 0%, #1A2030 100%); min-height: 100vh;">
 
-<!-- LOGIN -->
+<!-- ─── LOGIN ──────────────────────────────────────────────────────────────── -->
 <div id="login-page" class="login-wrap" style="display:none;">
   <div class="login-card">
-    <div class="login-logo">
-      <div class="brand-icon"><i class="bi bi-compass"></i></div>
-      <h2>Marine Pro</h2>
-      <p>FLEET OPS · SECURE ACCESS</p>
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="width:56px;height:56px;background:linear-gradient(135deg,#3347c8,#3C50E0);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin:0 auto 12px;">⚓</div>
+      <h2 style="font-size:20px;font-weight:700;color:#fff;">Marine Pro</h2>
+      <p class="font-mono" style="font-size:12px;color:#8A99AF;margin-top:4px;">FLEET OPS · SECURE ACCESS</p>
     </div>
     <div class="card card-body">
-      <div id="login-notice" style="display:none;" class="alert alert-info" style="margin-bottom:12px;"></div>
+      <div id="login-notice" style="display:none;" class="alert alert-info"></div>
       <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
         <i class="bi bi-shield-check"></i>
-        <div>
-          <strong>Auth header saved</strong><br/>
-          <span style="font-size:12px;">Your credentials are stored in this browser.</span>
-        </div>
+        <div><strong>Auth header saved</strong><br/><span style="font-size:12px;">Credentials stored in this browser.</span></div>
       </div>
       <div class="form-group">
         <label class="form-label">Username</label>
@@ -443,7 +313,7 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <div id="login-err" style="display:none;" class="alert alert-danger"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
         <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
-        <button class="btn btn-primary" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Save & continue</button>
+        <button class="btn btn-primary" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Save &amp; continue</button>
       </div>
     </div>
     <div style="text-align:center;margin-top:12px;">
@@ -454,20 +324,23 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
   </div>
 </div>
 
-<!-- MAIN APP -->
-<div id="app" style="display:none;">
+<!-- ─── MAIN APP ─────────────────────────────────────────────────────────── -->
+<div id="app" style="display:none;display:flex;height:100vh;overflow:hidden;">
+
   <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <div class="brand-icon"><i class="bi bi-compass"></i></div>
+  <aside class="sidebar" style="width:240px;min-width:240px;background:#1E2A38;border-right:1px solid #2E3A47;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;box-shadow:4px 0 24px rgba(0,0,0,.25);">
+    <!-- Brand -->
+    <div style="padding:20px 16px;border-bottom:1px solid #2E3A47;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(60,80,224,.08) 0%,transparent 100%);">
+      <div style="width:40px;height:40px;background:linear-gradient(135deg,#3347c8,#3C50E0);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(60,80,224,.4);">⚓</div>
       <div>
-        <div class="brand-name">Marine Pro</div>
-        <div class="brand-sub">Fleet Ops</div>
+        <div style="font-size:14px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase;">Marine Pro</div>
+        <div class="font-mono" style="font-size:10px;color:#3C50E0;letter-spacing:2px;text-transform:uppercase;margin-top:1px;">Fleet Ops</div>
       </div>
     </div>
 
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Menu chính</div>
+    <!-- Nav -->
+    <nav style="flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:10px;color:#8A99AF;letter-spacing:1.5px;text-transform:uppercase;padding:8px 8px 4px;font-family:'JetBrains Mono',monospace;">Menu chính</div>
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
         <i class="bi bi-speedometer2"></i> Executive Summary
       </button>
@@ -480,6 +353,9 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
         <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
       </button>
+      <button class="nav-item" id="nav-quota" onclick="showPage('quota')">
+        <i class="bi bi-speedometer"></i> Quota Sync
+      </button>
       <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
         <i class="bi bi-sliders"></i> Policy Center
       </button>
@@ -489,7 +365,7 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
         <i class="bi bi-box-seam-fill"></i> Package Catalog
       </button>
-      <div class="nav-section-label" style="margin-top:8px;">Hệ thống</div>
+      <div style="font-size:10px;color:#8A99AF;letter-spacing:1.5px;text-transform:uppercase;padding:8px 8px 4px;margin-top:8px;font-family:'JetBrains Mono',monospace;">Hệ thống</div>
       <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
         <i class="bi bi-gear-fill"></i> Tenant Settings
       </button>
@@ -498,16 +374,17 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </button>
     </nav>
 
-    <div class="sidebar-footer">
-      <div class="conn-card">
+    <!-- Footer connection status -->
+    <div style="padding:14px;border-top:1px solid #2E3A47;">
+      <div style="background:rgba(60,80,224,.05);border:1px solid rgba(60,80,224,.15);border-radius:12px;padding:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div class="conn-avatar">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#3347c8,#3C50E0);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
             M
-            <span class="conn-dot" id="sidebar-dot"></span>
+            <span id="sidebar-dot" style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:#8A99AF;border:1.5px solid #24303F;"></span>
           </div>
           <div style="flex:1;overflow:hidden;">
-            <div style="font-size:13px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
-            <div style="font-size:11px;color:var(--text3);" id="sidebar-conn-label">Idle</div>
+            <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
+            <div id="sidebar-conn-label" style="font-size:11px;color:#8A99AF;">Idle</div>
           </div>
         </div>
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -519,10 +396,10 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
   </aside>
 
   <!-- Content -->
-  <main class="main">
+  <main class="main" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;">
 
-    <!-- ─── DASHBOARD ─── -->
-    <div class="page active" id="page-dashboard">
+    <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
+    <div class="page active" id="page-dashboard" style="padding:24px;">
       <div class="topbar">
         <div class="page-title">
           <h1>Fleet Command Center</h1>
@@ -531,33 +408,27 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         <div class="topbar-actions">
           <div id="dash-mode-badge" class="pill pill-gray">loading</div>
           <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
-          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot Accounts</button>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot</button>
           <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
             <i class="bi bi-arrow-clockwise"></i> Refresh
           </button>
         </div>
       </div>
 
-      <!-- Status banner -->
       <div class="status-banner" id="dash-status-banner">
         <span class="kicker" style="margin-bottom:0;">Portal status</span>
-        <span id="dash-conn-label" style="font-size:13px;color:var(--text);">Checking backend…</span>
+        <span id="dash-conn-label" style="font-size:13px;color:#fff;">Checking backend…</span>
         <span class="status-banner-label"></span>
         <span class="pill pill-gray" id="dash-conn-pill">idle</span>
       </div>
 
-      <!-- Error -->
       <div id="dash-error" style="display:none;" class="alert alert-warn">
         <i class="bi bi-exclamation-triangle"></i>
         <span id="dash-error-msg"></span>
       </div>
 
-      <!-- Summary cards -->
-      <div class="grid grid-4" style="margin-bottom:16px;" id="dash-stats">
-        <!-- filled by JS -->
-      </div>
+      <div class="grid grid-4" style="margin-bottom:16px;" id="dash-stats"></div>
 
-      <!-- Backend health + Current mode -->
       <div class="grid grid-2" style="margin-bottom:16px;">
         <div class="card card-body">
           <span class="kicker">Backend status</span>
@@ -573,39 +444,29 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         </div>
       </div>
 
-      <!-- Edges + Commands -->
       <div class="grid grid-2" style="margin-bottom:16px;">
         <!-- Fleet snapshot -->
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title"><i class="bi bi-router-fill" style="color:var(--accent);"></i> Fleet snapshot</div>
+              <div class="card-title"><i class="bi bi-router-fill" style="color:#3C50E0;"></i> Fleet snapshot</div>
               <div class="card-subtitle" id="edges-source">Loading…</div>
             </div>
             <span class="num-badge" id="edges-count">0</span>
           </div>
           <div style="padding:0;">
             <table class="tbl" id="edges-table">
-              <thead>
-                <tr>
-                  <th>Edge</th>
-                  <th>Status</th>
-                  <th>WAN IP</th>
-                  <th>Last seen</th>
-                </tr>
-              </thead>
-              <tbody id="edges-body">
-                <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
-              </tbody>
+              <thead><tr><th>Edge</th><th>Status</th><th>WAN IP</th><th>Last seen</th></tr></thead>
+              <tbody id="edges-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Commands -->
+        <!-- Command jobs -->
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title"><i class="bi bi-terminal-fill" style="color:var(--amber);"></i> Command jobs</div>
+              <div class="card-title"><i class="bi bi-terminal-fill" style="color:#FBBF24;"></i> Command jobs</div>
               <div class="card-subtitle" id="commands-source">Loading…</div>
             </div>
             <div style="display:flex;gap:6px;">
@@ -615,37 +476,33 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
           </div>
           <div style="padding:0;">
             <table class="tbl">
-              <thead>
-                <tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th></tr>
-              </thead>
-              <tbody id="commands-body">
-                <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
-              </tbody>
+              <thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th></tr></thead>
+              <tbody id="commands-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- Selected edge detail -->
-      <div class="card" id="edge-detail-card" style="display:none;">
+      <!-- Edge detail panel -->
+      <div class="card" id="edge-detail-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
           <div>
-            <div class="card-title"><i class="bi bi-cpu-fill" style="color:var(--accent);"></i> <span id="edge-detail-title">Edge detail</span></div>
+            <div class="card-title"><i class="bi bi-cpu-fill" style="color:#3C50E0;"></i> <span id="edge-detail-title">Edge detail</span></div>
             <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="closeEdgeDetail()"><i class="bi bi-x"></i> Close</button>
         </div>
         <div class="card-body" id="edge-detail-body">
-          <div class="empty"><span class="spinner"></span> Loading edge detail…</div>
+          <div class="empty"><span class="spinner"></span> Loading…</div>
         </div>
       </div>
 
-      <!-- Create command -->
-      <div class="card" id="cmd-create-card" style="margin-top:16px;">
+      <!-- Send command -->
+      <div class="card" id="cmd-create-card" style="display:none;">
         <div class="card-header">
           <div>
-            <div class="card-title"><i class="bi bi-send-fill" style="color:var(--green);"></i> Send command</div>
-            <div class="card-subtitle">Dispatch uplink failover commands to the selected edge.</div>
+            <div class="card-title"><i class="bi bi-send-fill" style="color:#10B981;"></i> Send command</div>
+            <div class="card-subtitle">Dispatch commands to the selected edge.</div>
           </div>
         </div>
         <div class="card-body">
@@ -668,28 +525,96 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             <div class="form-group">
               <label class="form-label">Command type</label>
               <select id="cmd-type" class="form-control" onchange="updateCommandTypeFields()">
-                <option value="failover_starlink">failover_starlink</option>
-                <option value="failback_vsat">failback_vsat</option>
-                <option value="restore_automatic">restore_automatic</option>
+                <optgroup label="Failover">
+                  <option value="failover_starlink">failover_starlink</option>
+                  <option value="failback_vsat">failback_vsat</option>
+                  <option value="restore_automatic">restore_automatic</option>
+                </optgroup>
+                <optgroup label="Hotspot">
+                  <option value="hotspot_cmd">hotspot_cmd (Quản lý user)</option>
+                </optgroup>
+                <optgroup label="Cấu hình">
+                  <option value="radius_setup">radius_setup (One-time RADIUS)</option>
+                </optgroup>
               </select>
+            </div>
+          </div>
+          <!-- hotspot_cmd fields -->
+          <div id="cmd-hotspot-fields" style="display:none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Action</label>
+                <select id="cmd-hotspot-action" class="form-control">
+                  <option value="create_user_profile">create_user_profile</option>
+                  <option value="create_account">create_user</option>
+                  <option value="edit_user">edit_user</option>
+                  <option value="delete_user">delete_user</option>
+                  <option value="get_all_users">get_all_users</option>
+                  <option value="get_active_users">get_active_users</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input id="cmd-hotspot-username" class="form-control" placeholder="nguyen-van-a" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Profile / Name</label>
+                <input id="cmd-hotspot-profile" class="form-control" placeholder="crew" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <input id="cmd-hotspot-password" class="form-control" type="password" placeholder="abc123" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Rate limit</label>
+                <input id="cmd-hotspot-ratelimit" class="form-control" placeholder="2M/2M" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Shared users</label>
+                <input id="cmd-hotspot-shared" class="form-control" type="number" placeholder="1" />
+              </div>
+            </div>
+          </div>
+          <!-- radius_setup fields -->
+          <div id="cmd-radius-fields" style="display:none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">RADIUS IP</label>
+                <input id="cmd-radius-ip" class="form-control" placeholder="10.0.0.2" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">RADIUS port</label>
+                <input id="cmd-radius-port" class="form-control" type="number" value="1812" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">RADIUS secret</label>
+                <input id="cmd-radius-secret" class="form-control" placeholder="mcu_radius_secret" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hotspot profile</label>
+                <input id="cmd-radius-profile" class="form-control" placeholder="hsprof1" />
+              </div>
             </div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary" id="cmd-submit-btn" onclick="sendCommand()">
-              <i class="bi bi-send"></i> Send command
+              <i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ─── ALERT CENTER ─── -->
-    <div class="page" id="page-alerts">
+    <!-- ─── ALERT CENTER ───────────────────────────────────────────────────── -->
+    <div class="page" id="page-alerts" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Alert Center</h1>
-          <p>Fleet-wide alerts · warning and critical tracking</p>
-        </div>
+        <div class="page-title"><h1>Alert Center</h1><p>Fleet-wide alerts · warning and critical tracking</p></div>
         <div class="topbar-actions">
           <div id="alert-mode-badge" class="pill pill-gray">loading</div>
           <select id="alert-severity-filter" class="form-control" style="width:150px;" onchange="loadAlertsCenter()">
@@ -698,7 +623,7 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             <option value="warning">Warning</option>
             <option value="info">Info</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#AEB7C0;cursor:pointer;">
             <input id="alert-unread-only" type="checkbox" checked onchange="loadAlertsCenter()" />
             Unread only
           </label>
@@ -707,56 +632,30 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
-        <div class="stat-card">
-          <div class="stat-label">Total alerts</div>
-          <div class="stat-value stat-accent" id="alert-total">—</div>
-          <div class="stat-note">Collected from edge details</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Critical</div>
-          <div class="stat-value stat-red" id="alert-critical">—</div>
-          <div class="stat-note">Needs immediate attention</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Warnings</div>
-          <div class="stat-value stat-amber" id="alert-warning">—</div>
-          <div class="stat-note">Follow up when possible</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Total alerts</div><div class="stat-value stat-accent" id="alert-total">—</div><div class="stat-note">Collected from edge details</div></div>
+        <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value stat-red" id="alert-critical">—</div><div class="stat-note">Needs immediate attention</div></div>
+        <div class="stat-card"><div class="stat-label">Warnings</div><div class="stat-value stat-amber" id="alert-warning">—</div><div class="stat-note">Follow up when possible</div></div>
       </div>
 
       <div id="alert-error" style="display:none;" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle"></i>
-        <span id="alert-error-msg"></span>
+        <i class="bi bi-exclamation-triangle"></i><span id="alert-error-msg"></span>
       </div>
-
       <div class="card">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-bell-fill" style="color:var(--amber);"></i> Active alerts</div>
-            <div class="card-subtitle" id="alert-source">Loading…</div>
-          </div>
+          <div><div class="card-title"><i class="bi bi-bell-fill" style="color:#FBBF24;"></i> Active alerts</div><div class="card-subtitle" id="alert-source">Loading…</div></div>
           <span class="num-badge" id="alert-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl">
-            <thead>
-              <tr><th>Edge</th><th>Severity</th><th>Message</th><th>Time</th></tr>
-            </thead>
-            <tbody id="alert-body">
-              <tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr>
-            </tbody>
-          </table>
+          <table class="tbl"><thead><tr><th>Edge</th><th>Severity</th><th>Message</th><th>Time</th></tr></thead>
+          <tbody id="alert-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
     </div>
 
-    <!-- ─── COMMAND HISTORY ─── -->
-    <div class="page" id="page-commands">
+    <!-- ─── COMMAND HISTORY ────────────────────────────────────────────────── -->
+    <div class="page" id="page-commands" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Command History</h1>
-          <p>Review command jobs · retry failed commands</p>
-        </div>
+        <div class="page-title"><h1>Command History</h1><p>Review command jobs · retry failed commands</p></div>
         <div class="topbar-actions">
           <div id="cmd-history-mode-badge" class="pill pill-gray">loading</div>
           <button class="btn btn-ghost btn-sm" onclick="prevHistoryCmdPage()" id="cmd-history-prev" disabled><i class="bi bi-chevron-left"></i></button>
@@ -764,71 +663,37 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
           <button class="btn btn-primary btn-sm" onclick="loadCommandHistory()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
-
       <div class="grid grid-3" style="margin-bottom:16px;" id="command-stats">
-        <div class="stat-card">
-          <div class="stat-label">Total jobs</div>
-          <div class="stat-value stat-accent" id="cmd-history-total">—</div>
-          <div class="stat-note">Current page only</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Sent</div>
-          <div class="stat-value stat-green" id="cmd-history-sent">—</div>
-          <div class="stat-note">Queued to MQTT</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Failed</div>
-          <div class="stat-value stat-red" id="cmd-history-failed">—</div>
-          <div class="stat-note">Can retry directly</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Total jobs</div><div class="stat-value stat-accent" id="cmd-history-total">—</div><div class="stat-note">Current page only</div></div>
+        <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value stat-green" id="cmd-history-sent">—</div><div class="stat-note">Queued to MQTT</div></div>
+        <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value stat-red" id="cmd-history-failed">—</div><div class="stat-note">Can retry directly</div></div>
       </div>
-
       <div id="cmd-history-error" style="display:none;" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle"></i>
-        <span id="cmd-history-error-msg"></span>
+        <i class="bi bi-exclamation-triangle"></i><span id="cmd-history-error-msg"></span>
       </div>
-
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-list-check" style="color:var(--accent);"></i> Jobs</div>
-            <div class="card-subtitle" id="cmd-history-source">Loading…</div>
-          </div>
+          <div><div class="card-title"><i class="bi bi-list-check" style="color:#3C50E0;"></i> Jobs</div><div class="card-subtitle" id="cmd-history-source">Loading…</div></div>
           <span class="num-badge" id="cmd-history-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl">
-            <thead>
-              <tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th><th style="text-align:right;">Actions</th></tr>
-            </thead>
-            <tbody id="cmd-history-body">
-              <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
-            </tbody>
-          </table>
+          <table class="tbl"><thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th><th style="text-align:right;">Actions</th></tr></thead>
+          <tbody id="cmd-history-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
-
       <div class="card" id="cmd-history-detail-card" style="display:none;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-card-text" style="color:var(--green);"></i> Command detail</div>
-            <div class="card-subtitle" id="cmd-history-detail-subtitle">Select a job to inspect</div>
-          </div>
+          <div><div class="card-title"><i class="bi bi-card-text" style="color:#10B981;"></i> Command detail</div><div class="card-subtitle" id="cmd-history-detail-subtitle">Select a job to inspect</div></div>
           <button class="btn btn-ghost btn-sm" onclick="closeCommandDetail()"><i class="bi bi-x"></i> Close</button>
         </div>
-        <div class="card-body" id="cmd-history-detail-body">
-          <div class="empty"><span class="spinner"></span> Loading command detail…</div>
-        </div>
+        <div class="card-body" id="cmd-history-detail-body"><div class="empty"><span class="spinner"></span> Loading…</div></div>
       </div>
     </div>
 
-    <!-- ─── HOTSPOT ─── -->
-    <div class="page" id="page-hotspot">
+    <!-- ─── HOTSPOT MANAGEMENT ─────────────────────────────────────────────── -->
+    <div class="page" id="page-hotspot" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Hotspot Bridge</h1>
-          <p>JSON bridge · path / method / params / reference_id</p>
-        </div>
+        <div class="page-title"><h1>Hotspot Management</h1><p>Quản lý tài khoản thuyền viên · JSON bridge · Snapshot đồng bộ</p></div>
         <div class="topbar-actions">
           <div id="hotspot-mode-badge" class="pill pill-gray">loading</div>
           <button class="btn btn-ghost btn-sm" onclick="loadHotspotDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
@@ -836,56 +701,83 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <div class="grid grid-4" style="margin-bottom:16px;" id="hotspot-stats">
-        <div class="stat-card">
-          <div class="stat-label">Bridge log</div>
-          <div class="stat-value stat-accent" id="hotspot-ops-total">—</div>
-          <div class="stat-note">Command jobs sent to Pi</div>
+        <div class="stat-card"><div class="stat-label">Bridge log</div><div class="stat-value stat-accent" id="hotspot-ops-total">—</div><div class="stat-note">Command jobs sent</div></div>
+        <div class="stat-card"><div class="stat-label">Directory users</div><div class="stat-value stat-green" id="hotspot-directory-total">—</div><div class="stat-note">Synced from snapshots</div></div>
+        <div class="stat-card"><div class="stat-label">Online users</div><div class="stat-value stat-amber" id="hotspot-active-total">—</div><div class="stat-note">Currently connected</div></div>
+        <div class="stat-card"><div class="stat-label">Last sync</div><div class="stat-value stat-accent" style="font-size:16px;" id="hotspot-last-sync">—</div><div class="stat-note">Most recent reply</div></div>
+      </div>
+
+      <!-- User Management (hotspot_cmd) -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div><div class="card-title"><i class="bi bi-people-fill" style="color:#10B981;"></i> Quản lý thuyền viên</div>
+          <div class="card-subtitle">Tạo / sửa / xóa tài khoản và profile hotspot trực tiếp trên Pi4</div></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Directory users</div>
-          <div class="stat-value stat-green" id="hotspot-directory-total">—</div>
-          <div class="stat-note">Synced from live snapshots</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Online users</div>
-          <div class="stat-value stat-amber" id="hotspot-active-total">—</div>
-          <div class="stat-note">Synced from live snapshots</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Last sync</div>
-          <div class="stat-value stat-accent" id="hotspot-last-sync">—</div>
-          <div class="stat-note">Most recent reply observed</div>
+        <div class="card-body">
+          <div id="usermgmt-notice" style="display:none;" class="alert"></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Tenant code</label><input id="usermgmt-tenant" class="form-control" value="tnr13" /></div>
+            <div class="form-group"><label class="form-label">Vessel code</label><input id="usermgmt-vessel" class="form-control" value="vsl-001" /></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Edge code</label><input id="usermgmt-edge" class="form-control" value="edge-001" /></div>
+            <div class="form-group">
+              <label class="form-label">Action</label>
+              <select id="usermgmt-action" class="form-control" onchange="updateUserMgmtFields()">
+                <option value="create_user_profile">Tạo Profile (create_user_profile)</option>
+                <option value="create_account">Tạo user (create_user)</option>
+                <option value="edit_user">Sửa user (edit_user)</option>
+                <option value="delete_user">Xóa user (delete_user)</option>
+                <option value="get_all_users">Lấy tất cả users</option>
+                <option value="get_active_users">Lấy users đang online</option>
+              </select>
+            </div>
+          </div>
+          <div id="usermgmt-profile-fields">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Tên profile (name)</label><input id="usermgmt-name" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label">Rate limit</label><input id="usermgmt-profile-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Shared users</label><input id="usermgmt-shared-users" class="form-control" type="number" value="1" min="1" /></div>
+              <div class="form-group"><label class="form-label">Mô tả</label><input id="usermgmt-description" class="form-control" placeholder="Thuyền viên – 2Mbps" /></div>
+            </div>
+          </div>
+          <div id="usermgmt-user-fields" style="display:none;">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Username</label><input id="usermgmt-username" class="form-control" placeholder="nguyen-van-a" /></div>
+              <div class="form-group" id="usermgmt-password-group"><label class="form-label">Password</label><input id="usermgmt-password" class="form-control" type="password" placeholder="abc123" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" id="usermgmt-profile-select-group"><label class="form-label">Profile</label><input id="usermgmt-user-profile" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label">Rate limit (tuỳ chọn)</label><input id="usermgmt-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+            </div>
+            <div class="form-group"><label class="form-label">Comment (tuỳ chọn)</label><input id="usermgmt-comment" class="form-control" placeholder="Máy trưởng" /></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-primary" id="usermgmt-submit-btn" onclick="sendUserMgmtCmd()"><i class="bi bi-send"></i> Gửi lệnh</button>
+          </div>
         </div>
       </div>
 
+      <!-- JSON Bridge -->
       <div class="card" id="hotspot-create-card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-diagram-3-fill" style="color:var(--accent);"></i> JSON bridge request</div>
-            <div class="card-subtitle">Send RouterOS API calls as JSON. Example fields: <code>path</code>, <code>method</code>, <code>params</code>, <code>reference_id</code>.</div>
-          </div>
+          <div><div class="card-title"><i class="bi bi-diagram-3-fill" style="color:#3C50E0;"></i> JSON bridge request (RouterOS nâng cao)</div>
+          <div class="card-subtitle">Gửi lệnh RouterOS API thô. Dùng cho VLAN, DHCP, Hotspot server…</div></div>
         </div>
         <div class="card-body">
           <div id="hotspot-create-notice" style="display:none;" class="alert"></div>
-          <div class="pill pill-gray" style="margin-bottom:14px;justify-content:flex-start;">
+          <div class="alert alert-info" style="margin-bottom:14px;">
             <i class="bi bi-info-circle"></i>
-            <span>Use <code>params</code> for RouterOS keys, including dashed names like <code>rate-limit</code> and <code>address-pool</code>.</span>
+            <span>Dùng <code>params</code> cho RouterOS keys, kể cả dashed names như <code>rate-limit</code>.</span>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Tenant code</label>
-              <input id="hotspot-create-tenant" class="form-control" value="tnr13" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Vessel code</label>
-              <input id="hotspot-create-vessel" class="form-control" value="vsl-001" />
-            </div>
+            <div class="form-group"><label class="form-label">Tenant code</label><input id="hotspot-create-tenant" class="form-control" value="tnr13" /></div>
+            <div class="form-group"><label class="form-label">Vessel code</label><input id="hotspot-create-vessel" class="form-control" value="vsl-001" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Edge code</label>
-              <input id="hotspot-create-edge" class="form-control" value="edge-001" />
-            </div>
+            <div class="form-group"><label class="form-label">Edge code</label><input id="hotspot-create-edge" class="form-control" value="edge-001" /></div>
             <div class="form-group">
               <label class="form-label">Template</label>
               <select id="hotspot-template" class="form-control" onchange="applyHotspotTemplate()">
@@ -901,10 +793,7 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Reference ID</label>
-              <input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" />
-            </div>
+            <div class="form-group"><label class="form-label">Reference ID</label><input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" /></div>
             <div class="form-group">
               <label class="form-label">Method</label>
               <select id="hotspot-method" class="form-control">
@@ -915,105 +804,117 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
               </select>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Path</label>
-            <input id="hotspot-path" class="form-control" placeholder="/ip/pool" />
-          </div>
+          <div class="form-group"><label class="form-label">Path</label><input id="hotspot-path" class="form-control" placeholder="/ip/pool" /></div>
           <div class="form-group">
             <label class="form-label">Params JSON</label>
-            <textarea id="hotspot-params" class="form-control" rows="10" style="font-family:'JetBrains Mono',monospace;" placeholder='{"name":"pool_vlan50","ranges":"192.168.50.10-192.168.50.254"}'></textarea>
+            <textarea id="hotspot-params" class="form-control font-mono" rows="8" placeholder='{"name":"pool_vlan50","ranges":"192.168.50.10-192.168.50.254"}'></textarea>
           </div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="hotspot-preview" style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;min-height:120px;">{}</pre>
+            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-primary btn-sm" id="hotspot-action-submit" type="button" onclick="sendHotspotAction()">
-              <i class="bi bi-send"></i> Send bridge request
-            </button>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-primary btn-sm" id="hotspot-action-submit" onclick="sendHotspotAction()"><i class="bi bi-send"></i> Send bridge request</button>
           </div>
         </div>
       </div>
 
+      <!-- Directory & Active -->
       <div class="grid grid-2" style="margin-bottom:16px;">
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-person-lines-fill" style="color:var(--green);"></i> Router directory</div>
-              <div class="card-subtitle" id="hotspot-directory-source">Loading…</div>
-            </div>
+            <div><div class="card-title"><i class="bi bi-person-lines-fill" style="color:#10B981;"></i> Router directory</div><div class="card-subtitle" id="hotspot-directory-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-directory-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl">
-              <thead>
-                <tr><th>Username</th><th>Profile</th><th>QoS</th><th>Uptime</th><th>Status</th></tr>
-              </thead>
-              <tbody id="hotspot-directory-body">
-                <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
-              </tbody>
-            </table>
+            <table class="tbl"><thead><tr><th>Username</th><th>Profile</th><th>QoS</th><th>Uptime</th><th>Status</th></tr></thead>
+            <tbody id="hotspot-directory-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
           </div>
         </div>
-
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-broadcast-pin" style="color:var(--amber);"></i> Active users</div>
-              <div class="card-subtitle" id="hotspot-active-source">Loading…</div>
-            </div>
+            <div><div class="card-title"><i class="bi bi-broadcast-pin" style="color:#FBBF24;"></i> Active users</div><div class="card-subtitle" id="hotspot-active-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-active-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl">
-              <thead>
-                <tr><th>Username</th><th>IP</th><th>MAC</th><th>Session</th><th>Uptime</th></tr>
-              </thead>
-              <tbody id="hotspot-active-body">
-                <tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>
-              </tbody>
-            </table>
+            <table class="tbl"><thead><tr><th>Username</th><th>IP</th><th>MAC</th><th>Session</th><th>Uptime</th></tr></thead>
+            <tbody id="hotspot-active-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ops log -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div><div class="card-title"><i class="bi bi-person-badge-fill" style="color:#3C50E0;"></i> Hotspot operations</div><div class="card-subtitle" id="hotspot-ops-source">Loading…</div></div>
+          <span class="num-badge" id="hotspot-ops-count">0</span>
+        </div>
+        <div style="padding:0;">
+          <table class="tbl"><thead><tr><th>Target</th><th>Path</th><th>Method</th><th>Reference</th><th>Status</th><th>Result</th><th>Created</th></tr></thead>
+          <tbody id="hotspot-ops-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── QUOTA SYNC ──────────────────────────────────────────────────────── -->
+    <div class="page" id="page-quota" style="padding:24px;">
+      <div class="topbar">
+        <div class="page-title"><h1>Quota Sync</h1><p>Đồng bộ hạn mức data theo user / uplink / tháng xuống Pi4</p></div>
+        <div class="topbar-actions">
+          <div id="quota-mode-badge" class="pill pill-gray">idle</div>
+          <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Thêm rule</button>
+          <button class="btn btn-primary btn-sm" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Gửi quota_sync</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-label">Số rules</div><div class="stat-value stat-accent" id="quota-rule-count">0</div><div class="stat-note">Chuẩn bị gửi</div></div>
+        <div class="stat-card"><div class="stat-label">Target edge</div><div class="stat-value stat-green" style="font-size:16px;" id="quota-target-label">—</div><div class="stat-note">Tenant / vessel / edge</div></div>
+        <div class="stat-card"><div class="stat-label">Kết quả</div><div class="stat-value stat-amber" style="font-size:14px;" id="quota-result-label">—</div><div class="stat-note">Job ID sau khi gửi</div></div>
+      </div>
+
+      <div id="quota-notice" style="display:none;" class="alert"></div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title"><i class="bi bi-crosshair" style="color:#3C50E0;"></i> Edge đích</div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Tenant code</label><input id="quota-tenant" class="form-control" value="tnr13" oninput="updateQuotaTargetLabel()" /></div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel code</label><input id="quota-vessel" class="form-control" value="vsl-001" oninput="updateQuotaTargetLabel()" /></div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Edge code</label><input id="quota-edge" class="form-control" value="edge-001" oninput="updateQuotaTargetLabel()" /></div>
           </div>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-person-badge-fill" style="color:var(--accent);"></i> Hotspot operations</div>
-            <div class="card-subtitle" id="hotspot-ops-source">Loading…</div>
-          </div>
-          <span class="num-badge" id="hotspot-ops-count">0</span>
+          <div class="card-title"><i class="bi bi-list-ul" style="color:#FBBF24;"></i> Quota rules</div>
+          <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Thêm</button>
         </div>
-        <div style="padding:0;">
-          <table class="tbl">
-            <thead>
-              <tr><th>Target</th><th>Path</th><th>Method</th><th>Reference</th><th>Status</th><th>Result</th><th>Created</th></tr>
-            </thead>
-            <tbody id="hotspot-ops-body">
-              <tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr>
-            </tbody>
-          </table>
+        <div id="quota-rules-container">
+          <div class="empty" id="quota-rules-empty" style="padding:24px;">
+            <i class="bi bi-database-slash"></i><p>Chưa có rule nào. Nhấn "Thêm rule" để bắt đầu.</p>
+          </div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:#8A99AF;"></i> Payload preview</div></div>
         <div class="card-body">
-          <span class="kicker">Realtime note</span>
-          <div style="margin-top:8px;color:var(--text2);font-size:13px;line-height:1.6;">
-            Bridge requests are sent as raw RouterOS resource calls. Directory and active-user tables refresh independently from the live router snapshots.
-          </div>
+          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:80px;">{}</pre>
         </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn btn-ghost" onclick="clearQuotaRules()"><i class="bi bi-trash"></i> Xóa tất cả</button>
+        <button class="btn btn-primary" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Gửi quota_sync</button>
       </div>
     </div>
 
-    <!-- ─── POLICY CENTER ─── -->
-    <div class="page" id="page-policy">
+    <!-- ─── POLICY CENTER ───────────────────────────────────────────────────── -->
+    <div class="page" id="page-policy" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Policy Center</h1>
-          <p>Compose uplink policy payloads and dispatch them as command jobs</p>
-        </div>
+        <div class="page-title"><h1>Policy Center</h1><p>Compose uplink policy payloads and dispatch as command jobs</p></div>
         <div class="topbar-actions">
           <div id="policy-mode-badge" class="pill pill-gray">idle</div>
           <button class="btn btn-ghost btn-sm" onclick="fillPolicyFromSelectedEdge()"><i class="bi bi-arrow-return-right"></i> Use selected edge</button>
@@ -1022,51 +923,24 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Policy target</div>
-          <div class="stat-value stat-accent" id="policy-target">—</div>
-          <div class="stat-note">Tenant / vessel / edge</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Command mode</div>
-          <div class="stat-value stat-green">policy_sync</div>
-          <div class="stat-note">Uses existing command flow</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Latest result</div>
-          <div class="stat-value stat-amber" id="policy-result">—</div>
-          <div class="stat-note">Shows created command job id</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Policy target</div><div class="stat-value stat-accent" style="font-size:16px;" id="policy-target">—</div><div class="stat-note">Tenant / vessel / edge</div></div>
+        <div class="stat-card"><div class="stat-label">Command mode</div><div class="stat-value stat-green" style="font-size:16px;">policy_sync</div><div class="stat-note">Uses existing command flow</div></div>
+        <div class="stat-card"><div class="stat-label">Latest result</div><div class="stat-value stat-amber" style="font-size:14px;" id="policy-result">—</div><div class="stat-note">Shows created command job id</div></div>
       </div>
 
       <div id="policy-error" style="display:none;" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle"></i>
-        <span id="policy-error-msg"></span>
+        <i class="bi bi-exclamation-triangle"></i><span id="policy-error-msg"></span>
       </div>
 
       <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-sliders2" style="color:var(--accent);"></i> Uplink policy</div>
-            <div class="card-subtitle">Enter work / entertainment IP ranges and gateway hints</div>
-          </div>
-        </div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-sliders2" style="color:#3C50E0;"></i> Uplink policy</div></div>
         <div class="card-body">
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Tenant code</label>
-              <input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Vessel code</label>
-              <input id="policy-vessel" class="form-control" value="vsl-001" oninput="updatePolicyPreview()" />
-            </div>
+            <div class="form-group"><label class="form-label">Tenant code</label><input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label">Vessel code</label><input id="policy-vessel" class="form-control" value="vsl-001" oninput="updatePolicyPreview()" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Edge code</label>
-              <input id="policy-edge" class="form-control" value="edge-001" oninput="updatePolicyPreview()" />
-            </div>
+            <div class="form-group"><label class="form-label">Edge code</label><input id="policy-edge" class="form-control" value="edge-001" oninput="updatePolicyPreview()" /></div>
             <div class="form-group">
               <label class="form-label">Active uplink</label>
               <select id="policy-active-uplink" class="form-control" onchange="updatePolicyPreview()">
@@ -1077,30 +951,15 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">VSAT gateway</label>
-              <input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Starlink gateway</label>
-              <input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" />
-            </div>
+            <div class="form-group"><label class="form-label">VSAT gateway</label><input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label">Starlink gateway</label><input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" /></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Work IPs</label>
-            <textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Entertainment IPs</label>
-            <textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24, 192.168.101.0/24" oninput="updatePolicyPreview()"></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Notes</label>
-            <textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea>
-          </div>
+          <div class="form-group"><label class="form-label">Work IPs</label><textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label">Entertainment IPs</label><textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="policy-preview" style="white-space:pre-wrap;background:rgba(0,0,0,0.22);padding:14px;border-radius:10px;border:1px solid var(--glass-border);color:var(--text2);font-size:12px;overflow:auto;min-height:120px;">{}</pre>
+            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="fillPolicyFromSelectedEdge()">Use selected edge</button>
@@ -1111,13 +970,10 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
     </div>
 
-    <!-- ─── TRAFFIC VIEW ─── -->
-    <div class="page" id="page-traffic">
+    <!-- ─── TRAFFIC VIEW ────────────────────────────────────────────────────── -->
+    <div class="page" id="page-traffic" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Traffic View</h1>
-          <p>Daily and monthly telemetry summary built from /api/telemetry and /api/traffic/summary</p>
-        </div>
+        <div class="page-title"><h1>Traffic View</h1><p>Daily and monthly telemetry summary</p></div>
         <div class="topbar-actions">
           <div id="traffic-mode-badge" class="pill pill-gray">idle</div>
           <select id="traffic-period" class="form-control" style="width:130px;" onchange="loadTrafficView()">
@@ -1130,55 +986,25 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Average RX</div>
-          <div class="stat-value stat-accent" id="traffic-avg-rx">—</div>
-          <div class="stat-note">Across selected vessel window</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Average TX</div>
-          <div class="stat-value stat-green" id="traffic-avg-tx">—</div>
-          <div class="stat-note">Across selected vessel window</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Quota remaining</div>
-          <div class="stat-value stat-amber" id="traffic-quota-remaining">—</div>
-          <div class="stat-note">Active assignment nearest to vessel</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Average RX</div><div class="stat-value stat-accent" id="traffic-avg-rx">—</div><div class="stat-note">Across selected vessel window</div></div>
+        <div class="stat-card"><div class="stat-label">Average TX</div><div class="stat-value stat-green" id="traffic-avg-tx">—</div><div class="stat-note">Across selected vessel window</div></div>
+        <div class="stat-card"><div class="stat-label">Quota remaining</div><div class="stat-value stat-amber" id="traffic-quota-remaining">—</div><div class="stat-note">Active assignment</div></div>
       </div>
-
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Monthly total</div>
-          <div class="stat-value stat-accent" id="traffic-month-total">—</div>
-          <div class="stat-note">From /api/traffic/summary</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Monthly RX</div>
-          <div class="stat-value stat-green" id="traffic-month-rx">—</div>
-          <div class="stat-note">Aggregated for selected month</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Monthly TX</div>
-          <div class="stat-value stat-amber" id="traffic-month-tx">—</div>
-          <div class="stat-note">Aggregated for selected month</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Monthly total</div><div class="stat-value stat-accent" id="traffic-month-total">—</div><div class="stat-note">From /api/traffic/summary</div></div>
+        <div class="stat-card"><div class="stat-label">Monthly RX</div><div class="stat-value stat-green" id="traffic-month-rx">—</div><div class="stat-note">Aggregated for selected month</div></div>
+        <div class="stat-card"><div class="stat-label">Monthly TX</div><div class="stat-value stat-amber" id="traffic-month-tx">—</div><div class="stat-note">Aggregated for selected month</div></div>
       </div>
 
       <div id="traffic-error" style="display:none;" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle"></i>
-        <span id="traffic-error-msg"></span>
+        <i class="bi bi-exclamation-triangle"></i><span id="traffic-error-msg"></span>
       </div>
-
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-graph-up-arrow" style="color:var(--accent);"></i> Traffic summary</div>
-            <div class="card-subtitle" id="traffic-source">Loading…</div>
-          </div>
+          <div><div class="card-title"><i class="bi bi-graph-up-arrow" style="color:#3C50E0;"></i> Traffic summary</div><div class="card-subtitle" id="traffic-source">Loading…</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input id="traffic-vessel" class="form-control" style="width:140px;" value="vsl-001" placeholder="vessel code" />
-            <input id="traffic-days" class="form-control" style="width:120px;" type="number" min="1" max="365" value="30" />
+            <input id="traffic-days" class="form-control" style="width:100px;" type="number" min="1" max="365" value="30" />
           </div>
         </div>
         <div class="card-body">
@@ -1189,118 +1015,28 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
           </div>
         </div>
       </div>
-
       <div class="grid grid-2">
         <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-diagram-3" style="color:var(--green);"></i> Daily buckets</div>
-              <div class="card-subtitle">Aggregated RX/TX by day</div>
-            </div>
-          </div>
+          <div class="card-header"><div class="card-title"><i class="bi bi-diagram-3" style="color:#10B981;"></i> Daily buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl">
-              <thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
-              <tbody id="traffic-daily-body">
-                <tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr>
-              </tbody>
-            </table>
+            <table class="tbl"><thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <tbody id="traffic-daily-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
         <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-calendar-month" style="color:var(--amber);"></i> Monthly buckets</div>
-              <div class="card-subtitle">Aggregated RX/TX by month</div>
-            </div>
-          </div>
+          <div class="card-header"><div class="card-title"><i class="bi bi-calendar-month" style="color:#FBBF24;"></i> Monthly buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl">
-              <thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
-              <tbody id="traffic-monthly-body">
-                <tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr>
-              </tbody>
-            </table>
+            <table class="tbl"><thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <tbody id="traffic-monthly-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ─── TENANT SETTINGS ─── -->
-    <div class="page" id="page-settings">
+    <!-- ─── PACKAGE CATALOG ─────────────────────────────────────────────────── -->
+    <div class="page" id="page-packages" style="padding:24px;">
       <div class="topbar">
-        <div class="page-title">
-          <h1>Tenant Settings</h1>
-          <p>Local operator settings for alerts webhook and tenant scope</p>
-        </div>
-        <div class="topbar-actions">
-          <div id="settings-mode-badge" class="pill pill-gray">local</div>
-          <button class="btn btn-ghost btn-sm" onclick="resetTenantSettings()"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
-          <button class="btn btn-primary btn-sm" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
-        </div>
-      </div>
-
-      <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Webhook</div>
-          <div class="stat-value stat-accent" id="settings-webhook-state">disabled</div>
-          <div class="stat-note">POST alert payloads when new alerts arrive</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Tenant</div>
-          <div class="stat-value stat-green" id="settings-tenant-state">tnr13</div>
-          <div class="stat-note">Applied to forms and filters</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Unread alerts</div>
-          <div class="stat-value stat-amber" id="settings-unread-state">0</div>
-          <div class="stat-note">Tracked locally in browser</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-gear-fill" style="color:var(--accent);"></i> Webhook notifications</div>
-            <div class="card-subtitle">Optional browser-side webhook URL for alert notifications</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div id="settings-notice" style="display:none;" class="alert"></div>
-          <div class="form-group">
-            <label class="form-label">Tenant code</label>
-            <input id="settings-tenant-code" class="form-control" value="tnr13" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Webhook URL</label>
-            <input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Webhook enabled</label>
-            <select id="settings-webhook-enabled" class="form-control">
-              <option value="false">Disabled</option>
-              <option value="true">Enabled</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Note</label>
-            <textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea>
-          </div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-ghost" onclick="testWebhookSettings()"><i class="bi bi-send-check"></i> Test webhook</button>
-            <button class="btn btn-primary" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── PACKAGES ─── -->
-    <div class="page" id="page-packages">
-      <div class="topbar">
-        <div class="page-title">
-          <h1>Package Catalog</h1>
-          <p>Quản lý gói cước · Phân công · Báo cáo sử dụng</p>
-        </div>
+        <div class="page-title"><h1>Package Catalog</h1><p>Quản lý gói cước · Phân công · Báo cáo sử dụng</p></div>
         <div class="topbar-actions">
           <div id="pkg-mode-badge" class="pill pill-gray">loading</div>
           <button class="btn btn-ghost btn-sm" onclick="togglePkgForm()"><i class="bi bi-plus-lg"></i> New package</button>
@@ -1308,72 +1044,36 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
         </div>
       </div>
 
-      <!-- Summary stats -->
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card">
-          <div class="stat-label">Total packages</div>
-          <div class="stat-value stat-accent" id="pkg-total">—</div>
-          <div class="stat-note" id="pkg-source-note">Loading…</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Active packages</div>
-          <div class="stat-value stat-green" id="pkg-active">—</div>
-          <div class="stat-note">Assignable to vessels</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total usage (window)</div>
-          <div class="stat-value stat-amber" id="pkg-usage">0 MB</div>
-          <div class="stat-note">Current reporting window</div>
-        </div>
+        <div class="stat-card"><div class="stat-label">Total packages</div><div class="stat-value stat-accent" id="pkg-total">—</div><div class="stat-note" id="pkg-source-note">Loading…</div></div>
+        <div class="stat-card"><div class="stat-label">Active packages</div><div class="stat-value stat-green" id="pkg-active">—</div><div class="stat-note">Assignable to vessels</div></div>
+        <div class="stat-card"><div class="stat-label">Total usage (window)</div><div class="stat-value stat-amber" id="pkg-usage">0 MB</div><div class="stat-note">Current reporting window</div></div>
       </div>
 
-      <!-- Error -->
       <div id="pkg-error" style="display:none;" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle"></i>
-        <span id="pkg-error-msg"></span>
+        <i class="bi bi-exclamation-triangle"></i><span id="pkg-error-msg"></span>
       </div>
 
-      <!-- New package form (hidden) -->
+      <!-- New package form -->
       <div class="card" id="pkg-form-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-plus-circle-fill" style="color:var(--green);"></i> <span id="pkg-form-title">Create package</span></div>
+          <div class="card-title"><i class="bi bi-plus-circle-fill" style="color:#10B981;"></i> <span id="pkg-form-title">Create package</span></div>
           <button class="btn btn-ghost btn-sm" onclick="togglePkgForm(false)"><i class="bi bi-x"></i></button>
         </div>
         <div class="card-body">
           <div id="pkg-form-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Code</label>
-              <input id="pkg-code" class="form-control" placeholder="basic-50gb" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Name</label>
-              <input id="pkg-name" class="form-control" placeholder="Basic 50GB" />
-            </div>
+            <div class="form-group"><label class="form-label">Code</label><input id="pkg-code" class="form-control" placeholder="basic-50gb" /></div>
+            <div class="form-group"><label class="form-label">Name</label><input id="pkg-name" class="form-control" placeholder="Basic 50GB" /></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <input id="pkg-desc" class="form-control" placeholder="Starter package for pilot users" />
+          <div class="form-group"><label class="form-label">Description</label><input id="pkg-desc" class="form-control" placeholder="Starter package" /></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Quota (MB)</label><input id="pkg-quota" class="form-control" type="number" value="51200" /></div>
+            <div class="form-group"><label class="form-label">Validity (days)</label><input id="pkg-validity" class="form-control" type="number" value="30" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Quota (MB)</label>
-              <input id="pkg-quota" class="form-control" type="number" value="51200" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Validity (days)</label>
-              <input id="pkg-validity" class="form-control" type="number" value="30" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Speed limit (Kbps)</label>
-              <input id="pkg-speed" class="form-control" type="number" value="5120" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Price (USD)</label>
-              <input id="pkg-price" class="form-control" type="number" value="0" />
-            </div>
+            <div class="form-group"><label class="form-label">Speed limit (Kbps)</label><input id="pkg-speed" class="form-control" type="number" value="5120" /></div>
+            <div class="form-group"><label class="form-label">Price (USD)</label><input id="pkg-price" class="form-control" type="number" value="0" /></div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="togglePkgForm(false)">Cancel</button>
@@ -1383,51 +1083,31 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       </div>
 
       <!-- Package list -->
-      <div class="grid grid-2" style="margin-bottom:16px;">
-        <div class="card" style="grid-column:1/-1;">
-          <div class="card-header">
-            <div class="card-title"><i class="bi bi-box-seam-fill" style="color:var(--accent);"></i> Packages</div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;">
-              <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
-            </label>
-          </div>
-          <table class="tbl">
-            <thead>
-              <tr><th>Code</th><th>Name</th><th>Quota</th><th>Speed</th><th>Validity</th><th>Status</th><th style="text-align:right;">Actions</th></tr>
-            </thead>
-            <tbody id="pkg-body">
-              <tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr>
-            </tbody>
-          </table>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <div class="card-title"><i class="bi bi-box-seam-fill" style="color:#3C50E0;"></i> Packages</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#AEB7C0;cursor:pointer;">
+            <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
+          </label>
         </div>
+        <table class="tbl">
+          <thead><tr><th>Code</th><th>Name</th><th>Quota</th><th>Speed</th><th>Validity</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+          <tbody id="pkg-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody>
+        </table>
       </div>
 
       <!-- Assign package -->
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header">
-          <div class="card-title"><i class="bi bi-person-plus-fill" style="color:var(--amber);"></i> Assign package</div>
-        </div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-person-plus-fill" style="color:#FBBF24;"></i> Assign package</div></div>
         <div class="card-body">
           <div id="assign-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Package</label>
-              <select id="assign-pkg" class="form-control"><option value="">— select package —</option></select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Username</label>
-              <input id="assign-user" class="form-control" placeholder="user123" />
-            </div>
+            <div class="form-group"><label class="form-label">Package</label><select id="assign-pkg" class="form-control"><option value="">— select package —</option></select></div>
+            <div class="form-group"><label class="form-label">Username</label><input id="assign-user" class="form-control" placeholder="user123" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Vessel code</label>
-              <input id="assign-vessel" class="form-control" value="vsl-001" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Tenant code</label>
-              <input id="assign-tenant" class="form-control" value="tnr13" />
-            </div>
+            <div class="form-group"><label class="form-label">Vessel code</label><input id="assign-vessel" class="form-control" value="vsl-001" /></div>
+            <div class="form-group"><label class="form-label">Tenant code</label><input id="assign-tenant" class="form-control" value="tnr13" /></div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-success" onclick="doAssign()"><i class="bi bi-person-check"></i> Assign</button>
@@ -1438,15 +1118,12 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
       <!-- Usage report -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-bar-chart-fill" style="color:var(--green);"></i> Usage report</div>
+          <div class="card-title"><i class="bi bi-bar-chart-fill" style="color:#10B981;"></i> Usage report</div>
           <button class="btn btn-ghost btn-sm" onclick="exportUsage()"><i class="bi bi-download"></i> Export CSV</button>
         </div>
         <div class="card-body">
           <div class="form-row" style="margin-bottom:12px;">
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Vessel</label>
-              <input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" />
-            </div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel</label><input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" /></div>
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label">Bucket</label>
               <select id="usage-bucket" class="form-control">
@@ -1457,50 +1134,69 @@ input[type=checkbox] { accent-color: var(--accent2); width: 14px; height: 14px; 
             </div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="loadUsage()" style="margin-bottom:12px;"><i class="bi bi-search"></i> Run report</button>
-
           <div id="usage-results" style="display:none;">
             <div class="grid grid-3" style="margin-bottom:12px;">
-              <div class="stat-card">
-                <div class="stat-label">Total MB used</div>
-                <div class="stat-value stat-amber" id="usage-total-mb">—</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-label">Active assignments</div>
-                <div class="stat-value stat-green" id="usage-active-assign">—</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-label">Report rows</div>
-                <div class="stat-value stat-accent" id="usage-rows">—</div>
-              </div>
+              <div class="stat-card"><div class="stat-label">Total MB used</div><div class="stat-value stat-amber" id="usage-total-mb">—</div></div>
+              <div class="stat-card"><div class="stat-label">Active assignments</div><div class="stat-value stat-green" id="usage-active-assign">—</div></div>
+              <div class="stat-card"><div class="stat-label">Report rows</div><div class="stat-value stat-accent" id="usage-rows">—</div></div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ─── LOGIN PAGE (inline) ─── -->
-    <div class="page" id="page-login">
-      <div style="max-width:400px;margin:0 auto;padding-top:40px;">
-        <div class="topbar">
-          <div class="page-title"><h1>Auth Settings</h1><p>HTTP Basic Auth · Browser storage</p></div>
+    <!-- ─── TENANT SETTINGS ─────────────────────────────────────────────────── -->
+    <div class="page" id="page-settings" style="padding:24px;">
+      <div class="topbar">
+        <div class="page-title"><h1>Tenant Settings</h1><p>Local operator settings for alerts webhook and tenant scope</p></div>
+        <div class="topbar-actions">
+          <div id="settings-mode-badge" class="pill pill-gray">local</div>
+          <button class="btn btn-ghost btn-sm" onclick="resetTenantSettings()"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
+          <button class="btn btn-primary btn-sm" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
         </div>
+      </div>
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-label">Webhook</div><div class="stat-value stat-accent" id="settings-webhook-state">disabled</div><div class="stat-note">POST alert payloads</div></div>
+        <div class="stat-card"><div class="stat-label">Tenant</div><div class="stat-value stat-green" id="settings-tenant-state">tnr13</div><div class="stat-note">Applied to forms and filters</div></div>
+        <div class="stat-card"><div class="stat-label">Unread alerts</div><div class="stat-value stat-amber" id="settings-unread-state">0</div><div class="stat-note">Tracked locally in browser</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="bi bi-gear-fill" style="color:#3C50E0;"></i> Webhook notifications</div></div>
+        <div class="card-body">
+          <div id="settings-notice" style="display:none;" class="alert"></div>
+          <div class="form-group"><label class="form-label">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
+          <div class="form-group"><label class="form-label">Webhook URL</label><input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" /></div>
+          <div class="form-group">
+            <label class="form-label">Webhook enabled</label>
+            <select id="settings-webhook-enabled" class="form-control">
+              <option value="false">Disabled</option>
+              <option value="true">Enabled</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Note</label><textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="testWebhookSettings()"><i class="bi bi-send-check"></i> Test webhook</button>
+            <button class="btn btn-primary" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── AUTH SETTINGS ───────────────────────────────────────────────────── -->
+    <div class="page" id="page-login" style="padding:24px;">
+      <div style="max-width:400px;margin:0 auto;padding-top:40px;">
+        <div class="topbar"><div class="page-title"><h1>Auth Settings</h1><p>HTTP Basic Auth · Browser storage</p></div></div>
         <div class="card card-body">
           <div id="login-inline-notice" style="display:none;" class="alert alert-info"></div>
           <div id="login-inline-saved" style="display:none;" class="alert alert-success">
             <i class="bi bi-shield-check"></i> Auth header currently saved in this browser.
           </div>
-          <div class="form-group">
-            <label class="form-label">Username</label>
-            <input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Password</label>
-            <input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" />
-          </div>
+          <div class="form-group"><label class="form-label">Username</label><input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" /></div>
+          <div class="form-group"><label class="form-label">Password</label><input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
           <div id="inline-err" style="display:none;" class="alert alert-danger"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
-            <button class="btn btn-primary" onclick="doLoginInline()"><i class="bi bi-check-lg"></i> Save & continue</button>
+            <button class="btn btn-primary" onclick="doLoginInline()"><i class="bi bi-check-lg"></i> Save &amp; continue</button>
           </div>
         </div>
       </div>
@@ -1614,6 +1310,7 @@ function showPage(name) {
   if (name === 'alerts') loadAlertsCenter();
   if (name === 'commands') loadCommandHistory();
   if (name === 'hotspot') loadHotspotDashboard();
+  if (name === 'quota') loadQuotaPage();
   if (name === 'policy') loadPolicyPage();
   if (name === 'traffic') loadTrafficView();
   if (name === 'packages') { loadPackages(); loadUsage(); }
@@ -1625,6 +1322,7 @@ function showPage(name) {
     alerts: '#alerts-section',
     commands: '#commands-section',
     hotspot: '#hotspot-section',
+    quota: '#quota-section',
     policy: '#policy-section',
     traffic: '#traffic-section',
     packages: '#packages-section',
@@ -3666,17 +3364,6 @@ async function selectEdge(edgeJson, options = {}) {
         </div>`).join('')}
       </div>` : ''}
 
-      ${alerts.length ? `
-      <div class="detail-section">
-        <div class="detail-section-title">Alerts</div>
-        ${alerts.slice(0,3).map(a => `<div class="alert alert-${a.severity === 'critical' ? 'danger' : 'warn'}"><i class="bi bi-exclamation-circle"></i> ${a.message || JSON.stringify(a)}</div>`).join('')}
-      </div>` : ''}
-
-    ${errors.length ? `
-      <div class="detail-section">
-        <div class="detail-section-title">Ingest errors (recent)</div>
-        ${errors.slice(0,2).map(e => `<div class="alert alert-danger" style="font-size:12px;"><i class="bi bi-bug"></i> ${e.error_message || JSON.stringify(e)}</div>`).join('')}
-      </div>` : ''}
 
       ${!d ? '<div class="alert alert-warn"><i class="bi bi-exclamation-triangle"></i> Edge detail unavailable from backend — showing partial data from traffic endpoint.</div>' : ''}
     `;
@@ -3700,9 +3387,15 @@ function updateCommandTypeFields() {
     btn.innerHTML = {
       failover_starlink: '<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
       failback_vsat: '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
-      restore_automatic: '<i class="bi bi-arrow-repeat"></i> Restore automatic'
+      restore_automatic: '<i class="bi bi-arrow-repeat"></i> Restore automatic',
+      hotspot_cmd: '<i class="bi bi-person-badge-fill"></i> Gửi hotspot_cmd',
+      radius_setup: '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
     }[type] || '<i class="bi bi-send"></i> Send command';
   }
+  const hotspotFields = document.getElementById('cmd-hotspot-fields');
+  const radiusFields = document.getElementById('cmd-radius-fields');
+  if (hotspotFields) hotspotFields.style.display = type === 'hotspot_cmd' ? 'block' : 'none';
+  if (radiusFields) radiusFields.style.display = type === 'radius_setup' ? 'block' : 'none';
 }
 
 const HOTSPOT_TEMPLATE_PRESETS = {
@@ -3953,14 +3646,31 @@ async function sendCommand() {
   const edge = document.getElementById('cmd-edge').value.trim();
   const type = document.getElementById('cmd-type').value;
   const commandPayload = (() => {
-    if (type === 'failover_starlink') {
-      return { preferred_uplink: 'starlink' };
+    if (type === 'failover_starlink') return { preferred_uplink: 'starlink' };
+    if (type === 'failback_vsat') return { preferred_uplink: 'vsat' };
+    if (type === 'restore_automatic') return { preferred_uplink: 'automatic', mode: 'automatic' };
+    if (type === 'hotspot_cmd') {
+      const action = document.getElementById('cmd-hotspot-action')?.value || 'get_all_users';
+      const payload = { action };
+      const username = document.getElementById('cmd-hotspot-username')?.value.trim();
+      const profile = document.getElementById('cmd-hotspot-profile')?.value.trim();
+      const password = document.getElementById('cmd-hotspot-password')?.value.trim();
+      const rateLimit = document.getElementById('cmd-hotspot-ratelimit')?.value.trim();
+      const shared = document.getElementById('cmd-hotspot-shared')?.value.trim();
+      if (username) payload.username = username;
+      if (profile) { payload.profile = profile; payload.name = profile; }
+      if (password) payload.password = password;
+      if (rateLimit) payload.rate_limit = rateLimit;
+      if (shared) payload.shared_users = Number(shared);
+      return payload;
     }
-    if (type === 'failback_vsat') {
-      return { preferred_uplink: 'vsat' };
-    }
-    if (type === 'restore_automatic') {
-      return { preferred_uplink: 'automatic', mode: 'automatic' };
+    if (type === 'radius_setup') {
+      return {
+        radius_ip: document.getElementById('cmd-radius-ip')?.value.trim() || '',
+        radius_port: Number(document.getElementById('cmd-radius-port')?.value) || 1812,
+        radius_secret: document.getElementById('cmd-radius-secret')?.value.trim() || '',
+        hotspot_profile: document.getElementById('cmd-radius-profile')?.value.trim() || ''
+      };
     }
     return {};
   })();
@@ -4687,6 +4397,268 @@ function init() {
   startAutoRefresh();
 }
 
+// ─── USER MANAGEMENT (hotspot_cmd) ───────────────────────────────────────────
+function updateUserMgmtFields() {
+  const action = document.getElementById('usermgmt-action')?.value || '';
+  const profileFields = document.getElementById('usermgmt-profile-fields');
+  const userFields = document.getElementById('usermgmt-user-fields');
+  const passwordGroup = document.getElementById('usermgmt-password-group');
+  const profileSelectGroup = document.getElementById('usermgmt-profile-select-group');
+  const isProfile = action === 'create_user_profile';
+  const isUser = ['create_account', 'edit_user', 'delete_user'].includes(action);
+  if (profileFields) profileFields.style.display = isProfile ? 'block' : 'none';
+  if (userFields) userFields.style.display = isUser ? 'block' : 'none';
+  if (passwordGroup) passwordGroup.style.display = action === 'delete_user' ? 'none' : 'block';
+  if (profileSelectGroup) profileSelectGroup.style.display = action === 'delete_user' ? 'none' : 'block';
+}
+
+async function sendUserMgmtCmd() {
+  const btn = document.getElementById('usermgmt-submit-btn');
+  const noticeEl = document.getElementById('usermgmt-notice');
+  const tenant = document.getElementById('usermgmt-tenant')?.value.trim();
+  const vessel = document.getElementById('usermgmt-vessel')?.value.trim();
+  const edge = document.getElementById('usermgmt-edge')?.value.trim();
+  const action = document.getElementById('usermgmt-action')?.value || '';
+
+  if (!tenant || !vessel || !edge) {
+    showEl('usermgmt-notice', 'Tenant, vessel, và edge là bắt buộc.', 'alert-warn');
+    if (noticeEl) noticeEl.style.display = 'flex';
+    return;
+  }
+
+  const commandPayload = { action };
+
+  if (action === 'create_user_profile') {
+    const name = document.getElementById('usermgmt-name')?.value.trim();
+    const rateLimit = document.getElementById('usermgmt-profile-ratelimit')?.value.trim();
+    const sharedUsers = document.getElementById('usermgmt-shared-users')?.value;
+    const description = document.getElementById('usermgmt-description')?.value.trim();
+    if (!name) { showEl('usermgmt-notice', 'Tên profile là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    commandPayload.name = name;
+    if (rateLimit) commandPayload.rate_limit = rateLimit;
+    if (sharedUsers) commandPayload.shared_users = Number(sharedUsers);
+    if (description) commandPayload.description = description;
+  } else if (action === 'create_account') {
+    const username = document.getElementById('usermgmt-username')?.value.trim();
+    const password = document.getElementById('usermgmt-password')?.value;
+    const profile = document.getElementById('usermgmt-user-profile')?.value.trim();
+    const rateLimit = document.getElementById('usermgmt-ratelimit')?.value.trim();
+    const comment = document.getElementById('usermgmt-comment')?.value.trim();
+    if (!username) { showEl('usermgmt-notice', 'Username là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    if (!password) { showEl('usermgmt-notice', 'Password là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    if (!profile) { showEl('usermgmt-notice', 'Profile là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    commandPayload.username = username;
+    commandPayload.password = password;
+    commandPayload.profile = profile;
+    if (rateLimit) commandPayload.rate_limit = rateLimit;
+    if (comment) commandPayload.comment = comment;
+  } else if (action === 'edit_user') {
+    const username = document.getElementById('usermgmt-username')?.value.trim();
+    const profile = document.getElementById('usermgmt-user-profile')?.value.trim();
+    const rateLimit = document.getElementById('usermgmt-ratelimit')?.value.trim();
+    const comment = document.getElementById('usermgmt-comment')?.value.trim();
+    if (!username) { showEl('usermgmt-notice', 'Username là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    commandPayload.username = username;
+    if (profile) commandPayload.profile = profile;
+    if (rateLimit) commandPayload.rate_limit = rateLimit;
+    if (comment) commandPayload.comment = comment;
+  } else if (action === 'delete_user') {
+    const username = document.getElementById('usermgmt-username')?.value.trim();
+    if (!username) { showEl('usermgmt-notice', 'Username là bắt buộc.', 'alert-warn'); if (noticeEl) noticeEl.style.display = 'flex'; return; }
+    commandPayload.username = username;
+  }
+
+  if (!btn || !noticeEl) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Đang gửi';
+  noticeEl.style.display = 'none';
+
+  try {
+    const res = await apiFetch('/api/commands', {
+      method: 'POST',
+      body: { tenant_code: tenant, vessel_code: vessel, edge_code: edge, command_type: 'hotspot_cmd', command_payload: commandPayload }
+    });
+    const id = res?.command?.id || res.id || '?';
+    showEl('usermgmt-notice', `Lệnh gửi thành công! Job ID: ${id}`, 'alert-success');
+    noticeEl.style.display = 'flex';
+    toast('hotspot_cmd gửi thành công ✓', 'success');
+    await loadHotspotDashboard();
+  } catch (err) {
+    showEl('usermgmt-notice', `Lỗi: ${err.message}`, 'alert-danger');
+    noticeEl.style.display = 'flex';
+    toast(`Lỗi: ${err.message}`, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send"></i> Gửi lệnh';
+  }
+}
+
+// ─── QUOTA SYNC ───────────────────────────────────────────────────────────────
+let quotaRules = [];
+
+function loadQuotaPage() {
+  updateQuotaTargetLabel();
+  renderQuotaRules();
+  document.getElementById('quota-mode-badge').textContent = 'ready';
+  document.getElementById('quota-mode-badge').className = 'pill pill-blue';
+}
+
+function updateQuotaTargetLabel() {
+  const t = document.getElementById('quota-tenant')?.value.trim() || '—';
+  const v = document.getElementById('quota-vessel')?.value.trim() || '—';
+  const e = document.getElementById('quota-edge')?.value.trim() || '—';
+  const el = document.getElementById('quota-target-label');
+  if (el) el.textContent = `${t} / ${v} / ${e}`;
+  updateQuotaPreview();
+}
+
+function addQuotaRule() {
+  quotaRules.push({ username: '', uplink: 'starlink', quota_gb: 10, speed_up_kbps: 2048, speed_dn_kbps: 4096, month: 'every' });
+  renderQuotaRules();
+  updateQuotaPreview();
+}
+
+function removeQuotaRule(idx) {
+  quotaRules.splice(idx, 1);
+  renderQuotaRules();
+  updateQuotaPreview();
+}
+
+function updateQuotaRuleField(idx, field, value) {
+  if (!quotaRules[idx]) return;
+  quotaRules[idx][field] = field === 'quota_gb' || field === 'speed_up_kbps' || field === 'speed_dn_kbps' ? Number(value) : value;
+  updateQuotaPreview();
+}
+
+function renderQuotaRules() {
+  const container = document.getElementById('quota-rules-container');
+  const empty = document.getElementById('quota-rules-empty');
+  const countEl = document.getElementById('quota-rule-count');
+  if (countEl) countEl.textContent = quotaRules.length;
+  if (!container) return;
+  if (!quotaRules.length) {
+    if (empty) empty.style.display = 'block';
+    const existing = container.querySelectorAll('.quota-rule-row');
+    existing.forEach(el => el.remove());
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  const existing = container.querySelectorAll('.quota-rule-row');
+  existing.forEach(el => el.remove());
+  quotaRules.forEach((rule, i) => {
+    const div = document.createElement('div');
+    div.className = 'quota-rule-row';
+    div.style.cssText = 'padding:16px;border-bottom:1px solid var(--glass-border);';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text2);">Rule #${i+1}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeQuotaRule(${i})"><i class="bi bi-trash"></i></button>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Username</label>
+          <input class="form-control" value="${escapeHtml(rule.username)}" oninput="updateQuotaRuleField(${i},'username',this.value)" placeholder="nguyen-van-a" />
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Uplink</label>
+          <select class="form-control" onchange="updateQuotaRuleField(${i},'uplink',this.value)">
+            <option value="starlink" ${rule.uplink==='starlink'?'selected':''}>starlink</option>
+            <option value="vsat" ${rule.uplink==='vsat'?'selected':''}>vsat</option>
+            <option value="lte" ${rule.uplink==='lte'?'selected':''}>lte</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Quota (GB)</label>
+          <input class="form-control" type="number" value="${rule.quota_gb}" oninput="updateQuotaRuleField(${i},'quota_gb',this.value)" min="0.1" step="0.5" />
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Tháng (every / YYYY-MM)</label>
+          <input class="form-control" value="${escapeHtml(rule.month)}" oninput="updateQuotaRuleField(${i},'month',this.value)" placeholder="every hoặc 2026-05" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Upload (Kbps)</label>
+          <input class="form-control" type="number" value="${rule.speed_up_kbps}" oninput="updateQuotaRuleField(${i},'speed_up_kbps',this.value)" min="64" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Download (Kbps)</label>
+          <input class="form-control" type="number" value="${rule.speed_dn_kbps}" oninput="updateQuotaRuleField(${i},'speed_dn_kbps',this.value)" min="64" />
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function clearQuotaRules() {
+  if (!quotaRules.length) return;
+  if (!confirm('Xóa toàn bộ rules?')) return;
+  quotaRules = [];
+  renderQuotaRules();
+  updateQuotaPreview();
+}
+
+function updateQuotaPreview() {
+  const el = document.getElementById('quota-preview');
+  if (!el) return;
+  const t = document.getElementById('quota-tenant')?.value.trim() || 'tnr13';
+  const v = document.getElementById('quota-vessel')?.value.trim() || 'vsl-001';
+  const e = document.getElementById('quota-edge')?.value.trim() || 'edge-001';
+  const rules = quotaRules.filter(r => r.username);
+  el.textContent = JSON.stringify({
+    tenant_code: t, vessel_code: v, edge_code: e,
+    command_type: 'quota_sync',
+    command_payload: { rules }
+  }, null, 2);
+}
+
+async function sendQuotaSync() {
+  const noticeEl = document.getElementById('quota-notice');
+  const tenant = document.getElementById('quota-tenant')?.value.trim();
+  const vessel = document.getElementById('quota-vessel')?.value.trim();
+  const edge = document.getElementById('quota-edge')?.value.trim();
+
+  const validRules = quotaRules.filter(r => r.username && r.uplink && r.quota_gb > 0);
+  if (!validRules.length) {
+    showEl('quota-notice', 'Cần ít nhất 1 rule hợp lệ (username, uplink, quota_gb).', 'alert-warn');
+    if (noticeEl) noticeEl.style.display = 'flex';
+    return;
+  }
+  if (!tenant || !vessel || !edge) {
+    showEl('quota-notice', 'Tenant, vessel, edge là bắt buộc.', 'alert-warn');
+    if (noticeEl) noticeEl.style.display = 'flex';
+    return;
+  }
+
+  if (noticeEl) noticeEl.style.display = 'none';
+  document.getElementById('quota-mode-badge').textContent = 'sending…';
+  document.getElementById('quota-mode-badge').className = 'pill pill-amber';
+
+  try {
+    const res = await apiFetch('/api/commands', {
+      method: 'POST',
+      body: { tenant_code: tenant, vessel_code: vessel, edge_code: edge, command_type: 'quota_sync', command_payload: { rules: validRules } }
+    });
+    const id = res?.command?.id || res.id || '?';
+    showEl('quota-notice', `quota_sync gửi thành công! Job ID: ${id}`, 'alert-success');
+    if (noticeEl) noticeEl.style.display = 'flex';
+    const resultEl = document.getElementById('quota-result-label');
+    if (resultEl) resultEl.textContent = id;
+    document.getElementById('quota-mode-badge').textContent = 'sent';
+    document.getElementById('quota-mode-badge').className = 'pill pill-green';
+    toast(`quota_sync gửi thành công ✓ (${validRules.length} rules)`, 'success');
+  } catch (err) {
+    showEl('quota-notice', `Lỗi: ${err.message}`, 'alert-danger');
+    if (noticeEl) noticeEl.style.display = 'flex';
+    document.getElementById('quota-mode-badge').textContent = 'error';
+    document.getElementById('quota-mode-badge').className = 'pill pill-red';
+    toast(`quota_sync thất bại: ${err.message}`, 'danger');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', init);
 window.addEventListener('hashchange', () => {
   if (document.getElementById('login-page').style.display !== 'none') return;
@@ -4697,6 +4669,8 @@ window.addEventListener('hashchange', () => {
       ? 'commands'
       : hash.includes('hotspot-section')
         ? 'hotspot'
+      : hash.includes('quota-section')
+        ? 'quota'
       : hash.includes('policy-section')
         ? 'policy'
       : hash.includes('traffic-section')
