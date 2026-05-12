@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Marine Pro — Fleet Ops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -14,16 +14,16 @@ tailwind.config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
-        boxdark:  '#24303F',
-        'boxdark-2': '#1A222C',
-        strokedark: '#2E3A47',
-        'form-strokedark': '#3d4d60',
-        'form-input': '#1d2a39',
-        primary:  '#3C50E0',
+        boxdark:  '#111928',
+        'boxdark-2': '#0d1526',
+        strokedark: '#1D2939',
+        'form-strokedark': '#344054',
+        'form-input': '#101828',
+        primary:  '#465fff',
         secondary:'#80CAEE',
         meta3:    '#10B981',
         meta6:    '#FBBF24',
@@ -48,9 +48,62 @@ tailwind.config = {
 }
 </script>
 <style>
+  /* ── Design tokens ── */
+  :root {
+    --bg-body: #0f1729;
+    --bg-sidebar: #111c34;
+    --bg-card: #1a2542;
+    --bg-card-hover: #1f2c4c;
+    --bg-elevated: #243056;
+    --bg-input: #1a2542;
+    --border: #2a3556;
+    --border-light: #344168;
+    --border-strong: #3b4a73;
+    --text-primary: #e4e9f4;
+    --text-secondary: #9ca8c4;
+    --text-muted: #6b7794;
+    --text-faint: #4a5578;
+    --primary: #5750f1;
+    --primary-light: #7b75f5;
+    --primary-bg: rgba(87, 80, 241, 0.12);
+    --success: #22ad5c;
+    --success-bg: rgba(34, 173, 92, 0.12);
+    --warning: #fbbf24;
+    --warning-bg: rgba(251, 191, 36, 0.12);
+    --danger: #f23030;
+    --danger-bg: rgba(242, 48, 48, 0.12);
+    --info: #2294ff;
+    --info-bg: rgba(34, 148, 255, 0.12);
+    --purple: #a855f7;
+    --purple-bg: rgba(168, 85, 247, 0.12);
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow: 0 4px 12px rgba(0,0,0,0.25);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.35);
+    /* Legacy variable aliases (used in JS template strings) */
+    --glass-border: #2a3556;
+    --text2: #9ca8c4;
+    --text3: #6b7794;
+    --accent2: #5750f1;
+    --green: #22ad5c;
+    --amber: #fbbf24;
+    --red: #f23030;
+    --accent3: #2294ff;
+  }
+
   /* ── Base ── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Space Grotesk', system-ui, sans-serif; background: #1C2434; color: #AEB7C0; }
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg-body); color: var(--text-secondary); }
+  body::before {
+    content: ""; position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(87,80,241,0.08), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34,148,255,0.05), transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
   .font-mono { font-family: 'JetBrains Mono', monospace; }
 
   /* ── Animations ── */
@@ -58,6 +111,11 @@ tailwind.config = {
   @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
   @keyframes spin    { to{transform:rotate(360deg)} }
   @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @keyframes connPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,173,92,.6)} 60%{box-shadow:0 0 0 5px rgba(34,173,92,0)} }
+  @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
+  @keyframes sidebarGlow { 0%,100%{opacity:.5} 50%{opacity:1} }
+  @keyframes bgDot { 0%{background-position:0 0} 100%{background-position:40px 40px} }
+  @keyframes btnShine { 0%{left:-80%} 100%{left:130%} }
 
   .page { display: none; }
   .page.active { display: block; animation: fadeIn 0.25s ease; }
@@ -65,130 +123,169 @@ tailwind.config = {
   /* ── Scrollbar ── */
   .main::-webkit-scrollbar { width: 5px; }
   .main::-webkit-scrollbar-track { background: transparent; }
-  .main::-webkit-scrollbar-thumb { background: #2E3A47; border-radius: 10px; }
+  .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
   /* ── Spinner ── */
-  .spinner { display:inline-block;width:14px;height:14px;border:2px solid rgba(60,80,224,.2);border-top-color:#3C50E0;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle; }
+  .spinner { display:inline-block;width:14px;height:14px;border:2px solid var(--primary-bg);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle; }
 
   /* ── Sidebar Navigation ── */
+  .nav-group-label {
+    font-size: 10px; color: var(--text-faint); letter-spacing: 1.6px;
+    text-transform: uppercase; font-weight: 700;
+    padding: 8px 12px 8px; margin-top: 4px; margin-bottom: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    display: block; pointer-events: none;
+  }
   .nav-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: 8px; cursor: pointer;
-    color: #8A99AF; font-size: 13px; font-weight: 500;
-    transition: all .18s ease; border: none; border-left: 3px solid transparent;
+    padding: 10px 12px; border-radius: var(--radius); cursor: pointer;
+    color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    transition: all .18s ease; border: none;
     background: none; width: 100%; text-align: left; position: relative;
   }
-  .nav-item:hover { background: rgba(255,255,255,.05); color: #C9D1E0; border-left-color: transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+  .nav-item:hover i { color: var(--primary-light); }
   .nav-item.active {
-    background: linear-gradient(90deg, rgba(60,80,224,.18) 0%, rgba(60,80,224,.06) 100%);
-    color: #fff; border-left: 3px solid #3C50E0;
-    box-shadow: inset 0 0 0 1px rgba(60,80,224,.15);
+    background: var(--primary-bg);
+    color: var(--primary-light);
+    font-weight: 600;
   }
-  .nav-item.active i { color: #3C50E0; }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: -14px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 22px; background: var(--primary); border-radius: 0 3px 3px 0;
+  }
+  .nav-item.active i { color: var(--primary-light); }
   .nav-item i { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; transition: color .18s; }
 
   /* ── Buttons ── */
   .btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
-    cursor: pointer; border: 1px solid transparent; transition: all .18s ease;
-    font-family: inherit; white-space: nowrap; letter-spacing: .01em;
+    padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border-light);
+    background: var(--bg-elevated); color: var(--text-secondary);
+    transition: all .15s ease; font-family: inherit; white-space: nowrap;
   }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
-  .btn-primary {
-    background: linear-gradient(135deg, #3C50E0, #3347c8);
-    color: #fff; border-color: #3C50E0;
-    box-shadow: 0 4px 14px rgba(60,80,224,.35);
-  }
-  .btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #4560f0, #3C50E0);
-    box-shadow: 0 6px 20px rgba(60,80,224,.5); transform: translateY(-1px);
-  }
-  .btn-ghost { background: #1E2A38; color: #AEB7C0; border-color: #2E3A47; }
-  .btn-ghost:hover:not(:disabled) { background: #2A3749; color: #E0E6F0; border-color: #3d4d60; }
-  .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
-  .btn-danger { background: rgba(240,56,70,.1); color: #F03846; border-color: rgba(240,56,70,.3); }
-  .btn-danger:hover:not(:disabled) { background: rgba(240,56,70,.2); box-shadow: 0 4px 12px rgba(240,56,70,.2); }
-  .btn-success { background: rgba(16,185,129,.1); color: #10B981; border-color: rgba(16,185,129,.3); }
-  .btn-success:hover:not(:disabled) { background: rgba(16,185,129,.2); box-shadow: 0 4px 12px rgba(16,185,129,.2); }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary-light); }
+  .btn-ghost { background: rgba(255,255,255,.04); color: var(--text-secondary); border-color: var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,.07); color: var(--text-primary); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: var(--radius-sm); }
+  .btn-danger { background: var(--danger-bg); color: var(--danger); border-color: rgba(242,48,48,.3); }
+  .btn-danger:hover:not(:disabled) { background: rgba(242,48,48,.2); }
+  .btn-success { background: var(--success-bg); color: var(--success); border-color: rgba(34,173,92,.3); }
+  .btn-success:hover:not(:disabled) { background: rgba(34,173,92,.2); }
 
   /* ── Form Controls ── */
   .form-control {
-    width: 100%; padding: 10px 13px;
-    background: #1A2537; border: 1px solid #2E3A47;
-    border-radius: 8px; color: #C9D1E0; font-size: 13px; font-family: inherit;
+    width: 100%; padding: 10px 14px;
+    background: var(--bg-input); border: 1px solid var(--border-light);
+    border-radius: var(--radius); color: var(--text-primary); font-size: 13px; font-family: inherit;
     transition: border-color .18s, box-shadow .18s; outline: none;
   }
-  .form-control:focus { border-color: #3C50E0; box-shadow: 0 0 0 3px rgba(60,80,224,.15); }
-  .form-control::placeholder { color: #4d5e72; }
+  .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(87,80,241,0.15); }
+  .form-control::placeholder { color: var(--text-faint); }
   select.form-control {
     appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238A99AF'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7794'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 13px center; padding-right: 34px;
   }
-  .form-label { display:block;font-size:11px;font-weight:700;color:#6B7A8D;margin-bottom:7px;text-transform:uppercase;letter-spacing:.7px;font-family:'JetBrains Mono',monospace; }
+  .form-label { display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:1px;font-family:'JetBrains Mono',monospace; }
   .form-group { margin-bottom: 18px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
   /* ── Pills / Badges ── */
-  .pill { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.3px; }
-  .pill::before { content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0; }
-  .pill-green { background:rgba(16,185,129,.12);color:#10B981;border:1px solid rgba(16,185,129,.25); }
-  .pill-amber { background:rgba(251,191,36,.12);color:#FBBF24;border:1px solid rgba(251,191,36,.25); }
-  .pill-red   { background:rgba(240,56,70,.12);color:#F03846;border:1px solid rgba(240,56,70,.25); }
-  .pill-blue  { background:rgba(37,154,230,.12);color:#259AE6;border:1px solid rgba(37,154,230,.25); }
-  .pill-gray  { background:rgba(255,255,255,.05);color:#8A99AF;border:1px solid #2E3A47; }
+  .pill { display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:0.2px; }
+  .dot-tiny { width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;flex-shrink:0; }
+  /* New semantic pill names */
+  .pill-success { background:var(--success-bg);color:var(--success); }
+  .pill-danger  { background:var(--danger-bg);color:var(--danger); }
+  .pill-warning { background:var(--warning-bg);color:var(--warning); }
+  .pill-info    { background:var(--info-bg);color:var(--info); }
+  .pill-primary { background:var(--primary-bg);color:var(--primary-light); }
+  /* Legacy pill names kept for backwards compatibility */
+  .pill-green { background:var(--success-bg);color:var(--success); }
+  .pill-amber { background:var(--warning-bg);color:var(--warning); }
+  .pill-red   { background:var(--danger-bg);color:var(--danger); }
+  .pill-blue  { background:var(--info-bg);color:var(--info); }
+  .pill-gray  { background:rgba(255,255,255,.06);color:var(--text-secondary); }
 
   /* ── Cards ── */
   .card {
-    background: #24303F; border: 1px solid #2E3A47; border-radius: 14px;
-    box-shadow: 0 4px 20px rgba(0,0,0,.2);
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); overflow: hidden;
+    transition: box-shadow .22s ease, border-color .22s ease;
   }
-  .card-body { padding: 22px; }
+  .card:hover { box-shadow: var(--shadow-lg); border-color: var(--border-light); }
+  .card-body { padding: 18px 22px; }
   .card-header {
-    padding: 15px 22px; border-bottom: 1px solid #2E3A47;
+    padding: 18px 22px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
-  .card-title { font-size: 14px; font-weight: 700; color: #E0E6F0; display: flex; align-items: center; gap: 8px; }
-  .card-subtitle { font-size: 11px; color: #6B7A8D; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+  .card-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
 
   /* ── Tables ── */
   .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   .tbl th {
-    color: #6B7A8D; font-weight: 700; font-size: 10.5px; text-transform: uppercase;
-    letter-spacing: .8px; padding: 11px 16px; border-bottom: 1px solid #2E3A47;
-    text-align: left; font-family: 'JetBrains Mono', monospace;
-    background: rgba(0,0,0,.12);
+    color: var(--text-muted); font-weight: 700; font-size: 11px;
+    padding: 12px 22px; border-bottom: 1px solid var(--border);
+    text-align: left; text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(255,255,255,.02);
   }
-  .tbl td { padding: 12px 16px; border-bottom: 1px solid rgba(46,58,71,.4); color: #AEB7C0; vertical-align: middle; }
+  .tbl td { padding: 14px 22px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: middle; }
+  .tbl tbody tr:nth-child(odd) td { background: transparent; }
+  .tbl tbody tr:nth-child(even) td { background: transparent; }
   .tbl tr:last-child td { border-bottom: none; }
   .tbl tr.row-click { transition: background .15s; }
-  .tbl tr.row-click:hover { background: rgba(60,80,224,.06); cursor: pointer; }
-  .tbl tr.row-selected td { background: rgba(60,80,224,.08); border-left: 2px solid #3C50E0; }
+  .tbl tr.row-click:hover td { background: rgba(255,255,255,.02) !important; cursor: pointer; }
+  .tbl tr.row-selected td { background: var(--primary-bg) !important; }
+  /* Pulsing online pill dot */
+  .pill-green.pulse-online::before { animation: connPulse 2s ease-in-out infinite; }
 
-  /* ── Stat Cards ── */
+  /* ── Stat Cards (KPI) ── */
   .stat-card {
-    background: #24303F; border: 1px solid #2E3A47; border-radius: 14px;
-    padding: 20px 22px; position: relative; overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,.2);
-    transition: transform .2s ease, box-shadow .2s ease;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-xl); padding: 22px;
+    position: relative; overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
   }
-  .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(0,0,0,.3); }
+  .stat-card:hover { border-color: var(--border-light); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
   .stat-card::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #3C50E0 0%, #259AE6 100%);
-    border-radius: 14px 14px 0 0;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
-  .stat-card:has(.stat-green)::after  { background: linear-gradient(90deg, #10B981, #34d399); }
-  .stat-card:has(.stat-amber)::after  { background: linear-gradient(90deg, #FBBF24, #f59e0b); }
-  .stat-card:has(.stat-red)::after    { background: linear-gradient(90deg, #F03846, #fb7185); }
-  .stat-label { font-size: 11px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; font-weight: 600; }
-  .stat-value { font-size: 28px; font-weight: 800; color: #E0E6F0; line-height: 1; }
-  .stat-note  { font-size: 11px; color: #4d5e72; margin-top: 8px; }
-  .stat-accent { color: #3C50E0; }
-  .stat-green  { color: #10B981; }
-  .stat-amber  { color: #FBBF24; }
-  .stat-red    { color: #F03846; }
+  .stat-card:has(.stat-green)::after  { background: linear-gradient(90deg, var(--success), #34d399); }
+  .stat-card:has(.stat-amber)::after  { background: linear-gradient(90deg, var(--warning), #fde68a); }
+  .stat-card:has(.stat-red)::after    { background: linear-gradient(90deg, var(--danger), #fca5a5); }
+  /* KPI Icon box */
+  .stat-icon {
+    position: absolute; top: 18px; right: 18px;
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .stat-icon-blue  { background: var(--primary-bg); color: var(--primary-light); }
+  .stat-icon-green { background: var(--success-bg); color: var(--success); }
+  .stat-icon-amber { background: var(--warning-bg); color: var(--warning); }
+  .stat-icon-red   { background: var(--danger-bg); color: var(--danger); }
+  .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; padding-right: 52px; }
+  .stat-value { font-size: 32px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -1px; }
+  .stat-note  { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+  .stat-accent { color: var(--primary-light); }
+  .stat-green  { color: var(--success); }
+  .stat-amber  { color: var(--warning); }
+  .stat-red    { color: var(--danger); }
+  /* Trend badge */
+  .trend { display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px; }
+  .trend-up   { background:var(--success-bg);color:var(--success); }
+  .trend-down { background:var(--danger-bg);color:var(--danger); }
+  /* Mini sparkline at card bottom */
+  .stat-sparkline { display: flex; align-items: flex-end; gap: 3px; height: 24px; margin-top: 12px; opacity: .55; }
+  .stat-sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 3px; background: currentColor; transition: height .4s ease; }
+  /* Metric chip */
+  .metric-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary); }
 
   /* ── Layout Grid ── */
   .grid   { display: grid; gap: 18px; }
@@ -196,52 +293,68 @@ tailwind.config = {
   .grid-3 { grid-template-columns: repeat(3, 1fr); }
   .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
+  /* ── Stats grid (edge detail) ── */
+  .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); }
+  .stat-cell { background:var(--bg-card); padding:20px 22px; }
+  .stat-cell .stat-label { padding-right: 0; margin-bottom: 12px; }
+  .progress { height:6px; background:var(--bg-elevated); border-radius:100px; overflow:hidden; margin-top:4px; }
+  .progress-fill { height:100%; border-radius:100px; }
+  .progress-primary { background:linear-gradient(90deg,var(--primary),var(--primary-light)); }
+  .progress-success { background:linear-gradient(90deg,#16a34a,#22c55e); }
+  .progress-warning { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
+
   /* ── Alerts ── */
-  .alert { padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
-  .alert-warn    { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); color: #FBBF24; }
-  .alert-danger  { background: rgba(240,56,70,.08); border: 1px solid rgba(240,56,70,.2); color: #F87171; }
-  .alert-info    { background: rgba(37,154,230,.08); border: 1px solid rgba(37,154,230,.2); color: #80CAEE; }
-  .alert-success { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: #34d399; }
+  .alert { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .alert-warn    { background: var(--warning-bg); border: 1px solid rgba(251,191,36,.25); color: var(--warning); }
+  .alert-danger  { background: var(--danger-bg); border: 1px solid rgba(242,48,48,.25); color: var(--danger); }
+  .alert-info    { background: var(--info-bg); border: 1px solid rgba(34,148,255,.25); color: var(--info); }
+  .alert-success { background: var(--success-bg); border: 1px solid rgba(34,173,92,.25); color: var(--success); }
 
   /* ── Toast ── */
   .toast-stack { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
   .toast-item {
-    background: #2A3749; border: 1px solid #3d4d60; border-radius: 12px;
+    background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: var(--radius-lg);
     padding: 14px 18px; font-size: 13px; max-width: 340px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.5); animation: slideIn .25s ease;
+    box-shadow: var(--shadow-lg); animation: slideIn .25s ease;
     display: flex; align-items: flex-start; gap: 12px;
+    border-left: 4px solid var(--border);
   }
-  .toast-dismiss { margin-left: auto; cursor: pointer; color: #6B7A8D; font-size: 18px; flex-shrink: 0; transition: color .15s; }
-  .toast-dismiss:hover { color: #fff; }
+  .toast-item.toast-success { border-left-color: var(--success); }
+  .toast-item.toast-danger  { border-left-color: var(--danger); }
+  .toast-item.toast-warn    { border-left-color: var(--warning); }
+  .toast-item.toast-info    { border-left-color: var(--primary); }
+  .toast-dismiss { margin-left: auto; cursor: pointer; color: var(--text-muted); font-size: 18px; flex-shrink: 0; transition: color .15s; }
+  .toast-dismiss:hover { color: var(--text-primary); }
 
   /* ── Misc Utilities ── */
-  .kicker { font-size: 10px; color: #6B7A8D; text-transform: uppercase; letter-spacing: 1.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: block; font-weight: 700; }
+  .kicker { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: block; font-weight: 700; }
   .mono   { font-family: 'JetBrains Mono', monospace; }
-  .num-badge { display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;background:rgba(60,80,224,.18);color:#6473f0;border-radius:100px;font-size:10px;font-weight:800;font-family:'JetBrains Mono',monospace;border:1px solid rgba(60,80,224,.25); }
-  .divider { height: 1px; background: linear-gradient(90deg, transparent, #2E3A47 30%, #2E3A47 70%, transparent); margin: 18px 0; }
-  .empty { text-align: center; padding: 48px 20px; color: #4d5e72; }
-  .empty i { font-size: 36px; display: block; margin-bottom: 12px; opacity: .5; }
-  .empty p  { font-size: 13px; }
+  .num-badge { display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 6px;background:var(--primary-bg);color:var(--primary-light);border-radius:100px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;border:1px solid rgba(87,80,241,.2); }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border) 30%, var(--border) 70%, transparent); margin: 18px 0; }
+  .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+  .empty i { font-size: 36px; display: block; margin-bottom: 12px; opacity: .4; }
+  .empty p  { font-size: 13px; color: var(--text-muted); }
+  .empty::before { content: '···'; display: block; font-size: 28px; letter-spacing: 6px; color: var(--primary-bg); margin-bottom: 4px; }
 
-  /* ── Status Banner ── */
-  .status-banner {
+  /* ── Page status banner ── */
+  .status-banner, .page-status-banner {
     display: flex; align-items: center; gap: 12px;
     padding: 14px 18px;
-    background: linear-gradient(135deg, rgba(30,42,56,.8) 0%, rgba(26,34,44,.95) 100%);
-    border: 1px solid #2E3A47; border-radius: 12px; margin-bottom: 22px; flex-wrap: wrap;
-    box-shadow: 0 2px 12px rgba(0,0,0,.2);
+    background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 22px; flex-wrap: wrap;
+    position: relative; z-index: 1;
   }
-  .status-banner-label { font-size: 12px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; margin-right: auto; }
+  .status-banner-label { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-right: auto; }
 
   /* ── Chip ── */
-  .chip { display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;background:rgba(255,255,255,.06);color:#AEB7C0;border:1px solid #2E3A47; }
+  .chip { display:inline-block;padding:3px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;background:var(--bg-elevated);color:var(--text-secondary);border:1px solid var(--border); }
 
   /* ── Traffic bars ── */
   .traffic-bar-wrap { display: flex; align-items: center; gap: 10px; }
-  .traffic-bar-bg   { flex: 1; height: 6px; background: #1A2537; border-radius: 4px; overflow: hidden; }
-  .traffic-bar      { height: 100%; border-radius: 4px; transition: width .5s ease; }
-  .bar-rx { background: linear-gradient(90deg, #3C50E0, #259AE6); }
-  .bar-tx { background: linear-gradient(90deg, #10B981, #34d399); }
+  .traffic-bar-bg   { flex: 1; height: 8px; background: rgba(255,255,255,.05); border-radius: 4px; overflow: visible; position: relative; }
+  .traffic-bar      { height: 100%; border-radius: 4px; transition: width .5s ease; position: relative; }
+  .bar-rx { background: linear-gradient(90deg, var(--primary), var(--primary-light)); }
+  .bar-tx { background: linear-gradient(90deg, var(--success), #34d399); }
 
   /* ── Charts ── */
   .live-chart { width: 100%; height: 200px; display: block; }
@@ -251,34 +364,91 @@ tailwind.config = {
 
   /* ── Detail sections ── */
   .detail-section { margin-bottom: 22px; }
-  .detail-section-title { font-size: 11px; color: #6B7A8D; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid #2E3A47; }
-  .live-chart-shell { display: grid; gap: 12px; padding: 14px; background: rgba(0,0,0,.18); border: 1px solid #2E3A47; border-radius: 12px; }
+  .detail-section-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .live-chart-shell { display: grid; gap: 12px; padding: 14px; background: rgba(0,0,0,.12); border: 1px solid var(--border); border-radius: var(--radius-lg); }
   .live-chart-meta  { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .live-sample-trail { display: grid; gap: 10px; }
-  .live-sample-item { padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); transition: background .15s; }
-  .live-sample-item:hover { background: rgba(255,255,255,.05); }
+  .live-sample-item { padding: 12px 14px; border-radius: var(--radius); background: var(--bg-elevated); border: 1px solid var(--border); transition: background .15s; }
+  .live-sample-item:hover { background: var(--bg-card-hover); }
   .live-sample-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .live-sample-time { font-size: 11px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; }
+  .live-sample-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
   .live-sample-grid { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; }
 
   /* ── Login ── */
-  .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; background: radial-gradient(ellipse at 60% 20%, rgba(60,80,224,.08) 0%, transparent 60%); }
-  .login-card { width: 100%; max-width: 400px; }
+  #login-page { display:none; min-height:100vh; flex-direction:row; background:var(--bg-body); }
+  @media(min-width:900px) { #login-brand-panel { display:flex !important; } }
+
+  /* ── Connection dots ── */
+  .conn-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--bg-sidebar); }
+  .dot-good { background: var(--success); animation: connPulse 2.2s ease-in-out infinite; }
+  .dot-warn { background: var(--warning); }
+  .dot-bad  { background: var(--danger); }
+  .dot-idle { background: var(--text-secondary); }
 
   /* ── Misc ── */
-  input[type=checkbox] { accent-color: #3C50E0; width: 14px; height: 14px; }
+  input[type=checkbox] { accent-color: var(--primary); width: 14px; height: 14px; }
   .edge-detail-panel { margin-top: 18px; }
   .pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding-top: 14px; }
-  .pagination span { font-size: 12px; color: #6B7A8D; font-family: 'JetBrains Mono', monospace; }
+  .pagination span { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 
-  /* ── Top bar ── */
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; gap: 14px; flex-wrap: wrap; }
-  .page-title h1 { font-size: 22px; font-weight: 800; color: #E8EDF5; letter-spacing: -.3px; }
-  .page-title p  { font-size: 12px; color: #6B7A8D; margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
-  .topbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  /* ── Global Header ── */
+  .global-header {
+    position: sticky; top: 0; z-index: 100; height: 68px; flex-shrink: 0;
+    background: rgba(15,23,41,0.92); backdrop-filter: blur(16px) saturate(1.2);
+    border-bottom: 1px solid var(--border-light);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03);
+    display: flex; align-items: center; padding: 0 32px; gap: 16px;
+  }
+  .hdr-breadcrumb { display:flex;align-items:center;gap:8px;flex:1;min-width:0; }
+  .hdr-root { font-size:12px;color:var(--text-muted); }
+  .hdr-sep  { font-size:10px;color:var(--text-faint); }
+  .hdr-page { font-size:15px;font-weight:700;color:var(--text-primary); }
+  .hdr-actions { display:flex;align-items:center;gap:10px; }
+  .hdr-icon-btn {
+    width:38px;height:38px;border-radius:10px;
+    background:var(--bg-card);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--text-muted);transition:all .15s;font-size:16px;
+  }
+  .hdr-icon-btn:hover { background:var(--bg-card-hover);color:var(--text-primary); }
+  .hdr-user {
+    display:flex;align-items:center;gap:8px;
+    padding:6px 14px 6px 6px;border-radius:12px;
+    background:var(--bg-card);border:1px solid var(--border);
+    cursor:pointer;transition:background .15s;
+  }
+  .hdr-user:hover { background:var(--bg-card-hover); }
+  .hdr-avatar {
+    width:32px;height:32px;border-radius:50%;
+    background:linear-gradient(135deg,var(--primary),var(--purple));
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:#fff;flex-shrink:0;
+    position:relative;
+  }
+  .hdr-avatar::after {
+    content:''; position:absolute; bottom:1px; right:1px;
+    width:8px;height:8px;border-radius:50%;
+    background:var(--success);border:1.5px solid var(--bg-card);
+  }
+
+  /* ── Top bar (per page, now hidden — global header replaces) ── */
+  .topbar { display: none; }
+  .page-title h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+  .topbar + * { margin-top: 0; }
+
+  /* ── Page header (new) ── */
+  .page-header {
+    display:flex;align-items:flex-start;justify-content:space-between;
+    padding: 0 0 18px 0; margin-bottom: 22px; gap: 14px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-header h1 { font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px; }
+  .page-header p  { font-size:12px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
+  .page-header-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:4px; }
 
   /* ── Quota ── */
-  .quota-rule-row { padding: 16px; border-bottom: 1px solid #2E3A47; transition: background .15s; }
+  .quota-rule-row { padding: 16px; border-bottom: 1px solid var(--border); transition: background .15s; }
   .quota-rule-row:hover { background: rgba(255,255,255,.02); }
 
   /* ── Responsive ── */
@@ -286,40 +456,69 @@ tailwind.config = {
   @media(max-width:600px) { .sidebar{display:none} .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
 </style>
 </head>
-<body class="bg-[#1C2434] text-[#AEB7C0]" style="background: linear-gradient(160deg, #1C2434 0%, #1A2030 100%); min-height: 100vh;">
+<body class="bg-[#0f1729] text-[#9ca8c4]" style="background: #0f1729; min-height: 100vh;">
 
-<!-- ─── LOGIN ──────────────────────────────────────────────────────────────── -->
-<div id="login-page" class="login-wrap" style="display:none;">
-  <div class="login-card">
-    <div style="text-align:center;margin-bottom:28px;">
-      <div style="width:56px;height:56px;background:linear-gradient(135deg,#3347c8,#3C50E0);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin:0 auto 12px;">⚓</div>
-      <h2 style="font-size:20px;font-weight:700;color:#fff;">Marine Pro</h2>
-      <p class="font-mono" style="font-size:12px;color:#8A99AF;margin-top:4px;">FLEET OPS · SECURE ACCESS</p>
-    </div>
-    <div class="card card-body">
+<!-- ─── LOGIN (TailAdmin split-screen) ─────────────────────────────────────── -->
+<div id="login-page" style="display:none;">
+  <!-- Left: Form -->
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;">
+    <div style="width:100%;max-width:400px;">
+      <div style="margin-bottom:36px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;">
+          <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
+          <span style="font-size:16px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.3px;">Marine Pro</span>
+        </div>
+        <h1 style="font-size:26px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:8px;">Sign In</h1>
+        <p style="font-size:14px;color:var(--text-muted);">Enter your credentials to access the Fleet Ops portal.</p>
+      </div>
       <div id="login-notice" style="display:none;" class="alert alert-info"></div>
       <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
         <i class="bi bi-shield-check"></i>
-        <div><strong>Auth header saved</strong><br/><span style="font-size:12px;">Credentials stored in this browser.</span></div>
+        <div><strong>Credentials saved</strong><br/><span style="font-size:12px;">Stored in this browser.</span></div>
       </div>
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input id="login-user" class="form-control" placeholder="admin" autocomplete="username" />
+        <input id="login-user" class="form-control" placeholder="admin" autocomplete="username" style="height:44px;" />
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input id="login-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" />
+        <input id="login-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" style="height:44px;" />
       </div>
       <div id="login-err" style="display:none;" class="alert alert-danger"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
-        <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
-        <button class="btn btn-primary" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Save &amp; continue</button>
+      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;height:44px;font-size:14px;border-radius:10px;margin-top:8px;">
+        <i class="bi bi-box-arrow-in-right"></i> Sign In
+      </button>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;">
+        <button class="btn btn-ghost btn-sm" onclick="clearAuth()" style="flex:1;justify-content:center;">Clear saved</button>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')" style="flex:1;justify-content:center;">
+          <i class="bi bi-skip-forward"></i> Skip auth
+        </button>
       </div>
     </div>
-    <div style="text-align:center;margin-top:12px;">
-      <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')">
-        <i class="bi bi-skip-forward"></i> Continue without auth
-      </button>
+  </div>
+  <!-- Right: Brand panel -->
+  <div style="flex:1;background:linear-gradient(160deg,#0d1526 0%,#111c34 50%,#0a1020 100%);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
+    <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
+    <div style="position:relative;text-align:center;max-width:340px;">
+      <div style="width:72px;height:72px;background:rgba(70,95,255,.15);border:1px solid rgba(70,95,255,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;">⚓</div>
+      <h2 style="font-size:24px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:12px;">Fleet Command Center</h2>
+      <p style="font-size:14px;color:var(--text-muted);line-height:1.6;">Real-time monitoring and management for maritime vessel edge devices.</p>
+      <div style="display:flex;gap:10px;margin-top:32px;justify-content:center;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--primary-light);">99.9%</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Uptime</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--success);">Live</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Telemetry</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:var(--warning);">MQTT</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Protocol</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -328,19 +527,20 @@ tailwind.config = {
 <div id="app" style="display:none;display:flex;height:100vh;overflow:hidden;">
 
   <!-- Sidebar -->
-  <aside class="sidebar" style="width:240px;min-width:240px;background:#1E2A38;border-right:1px solid #2E3A47;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;box-shadow:4px 0 24px rgba(0,0,0,.25);">
+  <aside class="sidebar" style="width:260px;min-width:260px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
     <!-- Brand -->
-    <div style="padding:20px 16px;border-bottom:1px solid #2E3A47;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(60,80,224,.08) 0%,transparent 100%);">
-      <div style="width:40px;height:40px;background:linear-gradient(135deg,#3347c8,#3C50E0);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(60,80,224,.4);">⚓</div>
+    <div style="padding:22px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
       <div>
-        <div style="font-size:14px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase;">Marine Pro</div>
-        <div class="font-mono" style="font-size:10px;color:#3C50E0;letter-spacing:2px;text-transform:uppercase;margin-top:1px;">Fleet Ops</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text-primary);letter-spacing:0.3px;">MARINE PRO</div>
+        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
       </div>
     </div>
 
     <!-- Nav -->
-    <nav style="flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;">
-      <div style="font-size:10px;color:#8A99AF;letter-spacing:1.5px;text-transform:uppercase;padding:8px 8px 4px;font-family:'JetBrains Mono',monospace;">Menu chính</div>
+    <nav style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;overflow-x:visible;">
+      <!-- Section: MAIN MENU -->
+      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Main Menu</div>
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
         <i class="bi bi-speedometer2"></i> Executive Summary
       </button>
@@ -350,22 +550,25 @@ tailwind.config = {
       <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
         <i class="bi bi-terminal-fill"></i> Command History
       </button>
+      <!-- Section: FLEET MANAGEMENT -->
+      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Fleet Management</div>
       <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
         <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
       </button>
       <button class="nav-item" id="nav-quota" onclick="showPage('quota')">
-        <i class="bi bi-speedometer"></i> Quota Sync
+        <i class="bi bi-arrow-repeat"></i> Quota Sync
       </button>
       <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
-        <i class="bi bi-sliders"></i> Policy Center
+        <i class="bi bi-shield-fill"></i> Policy Center
       </button>
       <button class="nav-item" id="nav-traffic" onclick="showPage('traffic')">
-        <i class="bi bi-graph-up"></i> Traffic View
+        <i class="bi bi-graph-up-arrow"></i> Traffic View
       </button>
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
         <i class="bi bi-box-seam-fill"></i> Package Catalog
       </button>
-      <div style="font-size:10px;color:#8A99AF;letter-spacing:1.5px;text-transform:uppercase;padding:8px 8px 4px;margin-top:8px;font-family:'JetBrains Mono',monospace;">Hệ thống</div>
+      <!-- Section: SYSTEM -->
+      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
       <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
         <i class="bi bi-gear-fill"></i> Tenant Settings
       </button>
@@ -374,22 +577,20 @@ tailwind.config = {
       </button>
     </nav>
 
-    <!-- Footer connection status -->
-    <div style="padding:14px;border-top:1px solid #2E3A47;">
-      <div style="background:rgba(60,80,224,.05);border:1px solid rgba(60,80,224,.15);border-radius:12px;padding:12px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#3347c8,#3C50E0);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
-            M
-            <span id="sidebar-dot" style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:#8A99AF;border:1.5px solid #24303F;"></span>
-          </div>
-          <div style="flex:1;overflow:hidden;">
-            <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
-            <div id="sidebar-conn-label" style="font-size:11px;color:#8A99AF;">Idle</div>
-          </div>
+    <!-- User card (bottom) -->
+    <div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5750f1,#a855f7);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
+          M
+          <span id="sidebar-dot" style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--text-secondary);border:2px solid var(--bg-card);transition:background .3s;"></span>
         </div>
-        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
-          <span class="pill pill-gray" id="sidebar-conn-status">idle</span>
-          <span class="pill pill-gray" id="sidebar-rate" style="display:none;"></span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
+          <div id="sidebar-conn-label" style="font-size:11px;color:var(--text-muted);margin-top:1px;">Idle</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          <span class="pill pill-gray" id="sidebar-conn-status" style="font-size:10px;padding:2px 8px;">idle</span>
+          <span class="pill pill-gray" id="sidebar-rate" style="display:none;font-size:10px;padding:2px 8px;"></span>
         </div>
       </div>
     </div>
@@ -398,15 +599,39 @@ tailwind.config = {
   <!-- Content -->
   <main class="main" style="flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;">
 
-    <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
-    <div class="page active" id="page-dashboard" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title">
-          <h1>Fleet Command Center</h1>
-          <p>NOC · Real-time monitoring · Auto-refresh 60s</p>
+    <!-- ─── GLOBAL HEADER ──────────────────────────────────────────────────── -->
+    <header class="global-header">
+      <div class="hdr-breadcrumb">
+        <span class="hdr-root">Marine Pro</span>
+        <i class="bi bi-chevron-right hdr-sep"></i>
+        <h2 class="hdr-page" id="hdr-page-title">Fleet Command Center</h2>
+      </div>
+      <div class="hdr-actions">
+        <span class="pill pill-gray" id="hdr-conn-pill" style="font-size:11px;"></span>
+        <button class="hdr-icon-btn" title="Notifications"><i class="bi bi-bell"></i></button>
+        <button class="hdr-icon-btn" title="Refresh" onclick="loadDashboard ? loadDashboard() : null"><i class="bi bi-arrow-clockwise"></i></button>
+        <div class="hdr-user" onclick="showPage('login')">
+          <div class="hdr-avatar">A</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.2;">Admin</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.2;">Fleet Ops</div>
+          </div>
+          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--text-muted);margin-left:2px;"></i>
         </div>
-        <div class="topbar-actions">
-          <div id="dash-mode-badge" class="pill pill-gray">loading</div>
+      </div>
+    </header>
+
+    <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
+    <div class="page active" id="page-dashboard" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--primary-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:16px;border:1px solid rgba(87,80,241,0.25);"><i class="bi bi-speedometer2"></i></div>
+            <h1>Fleet Command Center</h1>
+          </div>
+          <p>NOC real-time monitoring &middot; Auto-refresh 60s &middot; <span id="dash-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
           <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot</button>
           <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
@@ -414,10 +639,11 @@ tailwind.config = {
           </button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
-      <div class="status-banner" id="dash-status-banner">
+      <div class="page-status-banner" id="dash-status-banner">
         <span class="kicker" style="margin-bottom:0;">Portal status</span>
-        <span id="dash-conn-label" style="font-size:13px;color:#fff;">Checking backend…</span>
+        <span id="dash-conn-label" style="font-size:13px;color:var(--text-primary);font-weight:600;">Checking backend…</span>
         <span class="status-banner-label"></span>
         <span class="pill pill-gray" id="dash-conn-pill">idle</span>
       </div>
@@ -449,7 +675,7 @@ tailwind.config = {
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title"><i class="bi bi-router-fill" style="color:#3C50E0;"></i> Fleet snapshot</div>
+              <div class="card-title"><i class="bi bi-router-fill" style="color:var(--primary-light);"></i> Fleet snapshot</div>
               <div class="card-subtitle" id="edges-source">Loading…</div>
             </div>
             <span class="num-badge" id="edges-count">0</span>
@@ -466,7 +692,7 @@ tailwind.config = {
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title"><i class="bi bi-terminal-fill" style="color:#FBBF24;"></i> Command jobs</div>
+              <div class="card-title"><i class="bi bi-terminal-fill" style="color:var(--warning);"></i> Command jobs</div>
               <div class="card-subtitle" id="commands-source">Loading…</div>
             </div>
             <div style="display:flex;gap:6px;">
@@ -487,7 +713,7 @@ tailwind.config = {
       <div class="card" id="edge-detail-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
           <div>
-            <div class="card-title"><i class="bi bi-cpu-fill" style="color:#3C50E0;"></i> <span id="edge-detail-title">Edge detail</span></div>
+            <div class="card-title"><i class="bi bi-cpu-fill" style="color:var(--primary-light);"></i> <span id="edge-detail-title">Edge detail</span></div>
             <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="closeEdgeDetail()"><i class="bi bi-x"></i> Close</button>
@@ -501,7 +727,7 @@ tailwind.config = {
       <div class="card" id="cmd-create-card" style="display:none;">
         <div class="card-header">
           <div>
-            <div class="card-title"><i class="bi bi-send-fill" style="color:#10B981;"></i> Send command</div>
+            <div class="card-title"><i class="bi bi-send-fill" style="color:var(--success);"></i> Send command</div>
             <div class="card-subtitle">Dispatch commands to the selected edge.</div>
           </div>
         </div>
@@ -612,29 +838,62 @@ tailwind.config = {
     </div>
 
     <!-- ─── ALERT CENTER ───────────────────────────────────────────────────── -->
-    <div class="page" id="page-alerts" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Alert Center</h1><p>Fleet-wide alerts · warning and critical tracking</p></div>
-        <div class="topbar-actions">
-          <div id="alert-mode-badge" class="pill pill-gray">loading</div>
+    <div class="page" id="page-alerts" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--danger-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--danger);font-size:16px;border:1px solid rgba(242,48,48,0.25);"><i class="bi bi-bell-fill"></i></div>
+            <h1>Alert Center</h1>
+          </div>
+          <p>Fleet-wide alerts &middot; warning and critical tracking &middot; <span id="alert-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+        </div>
+        <div class="page-header-actions">
           <select id="alert-severity-filter" class="form-control" style="width:150px;" onchange="loadAlertsCenter()">
             <option value="all">All severities</option>
             <option value="critical">Critical</option>
             <option value="warning">Warning</option>
             <option value="info">Info</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#AEB7C0;cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;">
             <input id="alert-unread-only" type="checkbox" checked onchange="loadAlertsCenter()" />
             Unread only
           </label>
           <button class="btn btn-primary btn-sm" onclick="loadAlertsCenter()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
-        <div class="stat-card"><div class="stat-label">Total alerts</div><div class="stat-value stat-accent" id="alert-total">—</div><div class="stat-note">Collected from edge details</div></div>
-        <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value stat-red" id="alert-critical">—</div><div class="stat-note">Needs immediate attention</div></div>
-        <div class="stat-card"><div class="stat-label">Warnings</div><div class="stat-value stat-amber" id="alert-warning">—</div><div class="stat-note">Follow up when possible</div></div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-blue"><i class="bi bi-bell-fill"></i></div>
+          <div class="stat-label">Total Alerts</div>
+          <div class="stat-value stat-accent" id="alert-total">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>fleet-wide</span>
+            <span class="stat-note" style="margin-top:0;">all edges</span>
+          </div>
+          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-red"><i class="bi bi-exclamation-octagon-fill"></i></div>
+          <div class="stat-label">Critical</div>
+          <div class="stat-value stat-red" id="alert-critical">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>high priority</span>
+            <span class="stat-note" style="margin-top:0;">immediate action</span>
+          </div>
+          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:32%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          <div class="stat-label">Warnings</div>
+          <div class="stat-value stat-amber" id="alert-warning">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>review soon</span>
+            <span class="stat-note" style="margin-top:0;">follow up</span>
+          </div>
+          <div class="stat-sparkline stat-amber"><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div></div>
+        </div>
       </div>
 
       <div id="alert-error" style="display:none;" class="alert alert-danger">
@@ -642,7 +901,7 @@ tailwind.config = {
       </div>
       <div class="card">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-bell-fill" style="color:#FBBF24;"></i> Active alerts</div><div class="card-subtitle" id="alert-source">Loading…</div></div>
+          <div><div class="card-title"><i class="bi bi-bell-fill" style="color:var(--warning);"></i> Active alerts</div><div class="card-subtitle" id="alert-source">Loading…</div></div>
           <span class="num-badge" id="alert-count">0</span>
         </div>
         <div style="padding:0;">
@@ -653,27 +912,60 @@ tailwind.config = {
     </div>
 
     <!-- ─── COMMAND HISTORY ────────────────────────────────────────────────── -->
-    <div class="page" id="page-commands" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Command History</h1><p>Review command jobs · retry failed commands</p></div>
-        <div class="topbar-actions">
-          <div id="cmd-history-mode-badge" class="pill pill-gray">loading</div>
+    <div class="page" id="page-commands" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--warning-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--warning);font-size:16px;border:1px solid rgba(251,191,36,0.25);"><i class="bi bi-terminal-fill"></i></div>
+            <h1>Command History</h1>
+          </div>
+          <p>Review command jobs &middot; retry failed commands &middot; <span id="cmd-history-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="prevHistoryCmdPage()" id="cmd-history-prev" disabled><i class="bi bi-chevron-left"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="nextHistoryCmdPage()" id="cmd-history-next"><i class="bi bi-chevron-right"></i></button>
           <button class="btn btn-primary btn-sm" onclick="loadCommandHistory()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
       <div class="grid grid-3" style="margin-bottom:16px;" id="command-stats">
-        <div class="stat-card"><div class="stat-label">Total jobs</div><div class="stat-value stat-accent" id="cmd-history-total">—</div><div class="stat-note">Current page only</div></div>
-        <div class="stat-card"><div class="stat-label">Sent</div><div class="stat-value stat-green" id="cmd-history-sent">—</div><div class="stat-note">Queued to MQTT</div></div>
-        <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value stat-red" id="cmd-history-failed">—</div><div class="stat-note">Can retry directly</div></div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-blue"><i class="bi bi-list-check"></i></div>
+          <div class="stat-label">Total Jobs</div>
+          <div class="stat-value stat-accent" id="cmd-history-total">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>this page</span>
+            <span class="stat-note" style="margin-top:0;">paginated view</span>
+          </div>
+          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle-fill"></i></div>
+          <div class="stat-label">Sent / Delivered</div>
+          <div class="stat-value stat-green" id="cmd-history-sent">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>queued</span>
+            <span class="stat-note" style="margin-top:0;">to MQTT</span>
+          </div>
+          <div class="stat-sparkline stat-green"><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:80%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:90%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:88%;"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-red"><i class="bi bi-x-circle-fill"></i></div>
+          <div class="stat-label">Failed</div>
+          <div class="stat-value stat-red" id="cmd-history-failed">—</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>needs retry</span>
+            <span class="stat-note" style="margin-top:0;">can retry</span>
+          </div>
+          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:38%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:56%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:22%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:44%;"></div><div class="stat-sparkline-bar" style="height:20%;"></div></div>
+        </div>
       </div>
       <div id="cmd-history-error" style="display:none;" class="alert alert-danger">
         <i class="bi bi-exclamation-triangle"></i><span id="cmd-history-error-msg"></span>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-list-check" style="color:#3C50E0;"></i> Jobs</div><div class="card-subtitle" id="cmd-history-source">Loading…</div></div>
+          <div><div class="card-title"><i class="bi bi-list-check" style="color:var(--primary-light);"></i> Jobs</div><div class="card-subtitle" id="cmd-history-source">Loading…</div></div>
           <span class="num-badge" id="cmd-history-count">0</span>
         </div>
         <div style="padding:0;">
@@ -683,7 +975,7 @@ tailwind.config = {
       </div>
       <div class="card" id="cmd-history-detail-card" style="display:none;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-card-text" style="color:#10B981;"></i> Command detail</div><div class="card-subtitle" id="cmd-history-detail-subtitle">Select a job to inspect</div></div>
+          <div><div class="card-title"><i class="bi bi-card-text" style="color:var(--success);"></i> Command detail</div><div class="card-subtitle" id="cmd-history-detail-subtitle">Select a job to inspect</div></div>
           <button class="btn btn-ghost btn-sm" onclick="closeCommandDetail()"><i class="bi bi-x"></i> Close</button>
         </div>
         <div class="card-body" id="cmd-history-detail-body"><div class="empty"><span class="spinner"></span> Loading…</div></div>
@@ -691,26 +983,32 @@ tailwind.config = {
     </div>
 
     <!-- ─── HOTSPOT MANAGEMENT ─────────────────────────────────────────────── -->
-    <div class="page" id="page-hotspot" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Hotspot Management</h1><p>Quản lý tài khoản thuyền viên · JSON bridge · Snapshot đồng bộ</p></div>
-        <div class="topbar-actions">
-          <div id="hotspot-mode-badge" class="pill pill-gray">loading</div>
+    <div class="page" id="page-hotspot" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--success-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--success);font-size:16px;border:1px solid rgba(34,173,92,0.25);"><i class="bi bi-person-badge-fill"></i></div>
+            <h1>Hotspot Management</h1>
+          </div>
+          <p>Crew account management &middot; JSON bridge &middot; Snapshot sync &middot; <span id="hotspot-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="loadHotspotDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-4" style="margin-bottom:16px;" id="hotspot-stats">
-        <div class="stat-card"><div class="stat-label">Bridge log</div><div class="stat-value stat-accent" id="hotspot-ops-total">—</div><div class="stat-note">Command jobs sent</div></div>
-        <div class="stat-card"><div class="stat-label">Directory users</div><div class="stat-value stat-green" id="hotspot-directory-total">—</div><div class="stat-note">Synced from snapshots</div></div>
-        <div class="stat-card"><div class="stat-label">Online users</div><div class="stat-value stat-amber" id="hotspot-active-total">—</div><div class="stat-note">Currently connected</div></div>
-        <div class="stat-card"><div class="stat-label">Last sync</div><div class="stat-value stat-accent" style="font-size:16px;" id="hotspot-last-sync">—</div><div class="stat-note">Most recent reply</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-diagram-3-fill"></i></div><div class="stat-label">Bridge log</div><div class="stat-value stat-accent" id="hotspot-ops-total">—</div><div class="stat-note">Command jobs sent</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-green"><i class="bi bi-person-lines-fill"></i></div><div class="stat-label">Directory users</div><div class="stat-value stat-green" id="hotspot-directory-total">—</div><div class="stat-note">Synced from snapshots</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-amber"><i class="bi bi-broadcast-pin"></i></div><div class="stat-label">Online users</div><div class="stat-value stat-amber" id="hotspot-active-total">—</div><div class="stat-note">Currently connected</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-clock-history"></i></div><div class="stat-label">Last sync</div><div class="stat-value stat-accent" style="font-size:16px;" id="hotspot-last-sync">—</div><div class="stat-note">Most recent reply</div></div>
       </div>
 
       <!-- User Management (hotspot_cmd) -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-people-fill" style="color:#10B981;"></i> Quản lý thuyền viên</div>
+          <div><div class="card-title"><i class="bi bi-people-fill" style="color:var(--success);"></i> Quản lý thuyền viên</div>
           <div class="card-subtitle">Tạo / sửa / xóa tài khoản và profile hotspot trực tiếp trên Pi4</div></div>
         </div>
         <div class="card-body">
@@ -763,7 +1061,7 @@ tailwind.config = {
       <!-- JSON Bridge -->
       <div class="card" id="hotspot-create-card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-diagram-3-fill" style="color:#3C50E0;"></i> JSON bridge request (RouterOS nâng cao)</div>
+          <div><div class="card-title"><i class="bi bi-diagram-3-fill" style="color:var(--primary-light);"></i> JSON bridge request (RouterOS nâng cao)</div>
           <div class="card-subtitle">Gửi lệnh RouterOS API thô. Dùng cho VLAN, DHCP, Hotspot server…</div></div>
         </div>
         <div class="card-body">
@@ -811,7 +1109,7 @@ tailwind.config = {
           </div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary btn-sm" id="hotspot-action-submit" onclick="sendHotspotAction()"><i class="bi bi-send"></i> Send bridge request</button>
@@ -823,7 +1121,7 @@ tailwind.config = {
       <div class="grid grid-2" style="margin-bottom:16px;">
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title"><i class="bi bi-person-lines-fill" style="color:#10B981;"></i> Router directory</div><div class="card-subtitle" id="hotspot-directory-source">Loading…</div></div>
+            <div><div class="card-title"><i class="bi bi-person-lines-fill" style="color:var(--success);"></i> Router directory</div><div class="card-subtitle" id="hotspot-directory-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-directory-count">0</span>
           </div>
           <div style="padding:0;">
@@ -833,7 +1131,7 @@ tailwind.config = {
         </div>
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title"><i class="bi bi-broadcast-pin" style="color:#FBBF24;"></i> Active users</div><div class="card-subtitle" id="hotspot-active-source">Loading…</div></div>
+            <div><div class="card-title"><i class="bi bi-broadcast-pin" style="color:var(--warning);"></i> Active users</div><div class="card-subtitle" id="hotspot-active-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-active-count">0</span>
           </div>
           <div style="padding:0;">
@@ -846,7 +1144,7 @@ tailwind.config = {
       <!-- Ops log -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-person-badge-fill" style="color:#3C50E0;"></i> Hotspot operations</div><div class="card-subtitle" id="hotspot-ops-source">Loading…</div></div>
+          <div><div class="card-title"><i class="bi bi-person-badge-fill" style="color:var(--primary-light);"></i> Hotspot operations</div><div class="card-subtitle" id="hotspot-ops-source">Loading…</div></div>
           <span class="num-badge" id="hotspot-ops-count">0</span>
         </div>
         <div style="padding:0;">
@@ -857,15 +1155,21 @@ tailwind.config = {
     </div>
 
     <!-- ─── QUOTA SYNC ──────────────────────────────────────────────────────── -->
-    <div class="page" id="page-quota" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Quota Sync</h1><p>Đồng bộ hạn mức data theo user / uplink / tháng xuống Pi4</p></div>
-        <div class="topbar-actions">
-          <div id="quota-mode-badge" class="pill pill-gray">idle</div>
-          <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Thêm rule</button>
-          <button class="btn btn-primary btn-sm" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Gửi quota_sync</button>
+    <div class="page" id="page-quota" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--info-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--info);font-size:16px;border:1px solid rgba(34,148,255,0.25);"><i class="bi bi-arrow-repeat"></i></div>
+            <h1>Quota Sync</h1>
+          </div>
+          <p>Sync data quotas per user / uplink / month to Pi4 &middot; <span id="quota-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">idle</span></p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Add rule</button>
+          <button class="btn btn-primary btn-sm" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Send quota_sync</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
         <div class="stat-card"><div class="stat-label">Số rules</div><div class="stat-value stat-accent" id="quota-rule-count">0</div><div class="stat-note">Chuẩn bị gửi</div></div>
@@ -876,7 +1180,7 @@ tailwind.config = {
       <div id="quota-notice" style="display:none;" class="alert"></div>
 
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><div class="card-title"><i class="bi bi-crosshair" style="color:#3C50E0;"></i> Edge đích</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-crosshair" style="color:var(--primary-light);"></i> Edge đích</div></div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
             <div class="form-group" style="margin-bottom:0;"><label class="form-label">Tenant code</label><input id="quota-tenant" class="form-control" value="tnr13" oninput="updateQuotaTargetLabel()" /></div>
@@ -888,20 +1192,20 @@ tailwind.config = {
 
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-list-ul" style="color:#FBBF24;"></i> Quota rules</div>
+          <div class="card-title"><i class="bi bi-list-ul" style="color:var(--warning);"></i> Quota rules</div>
           <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Thêm</button>
         </div>
         <div id="quota-rules-container">
-          <div class="empty" id="quota-rules-empty" style="padding:24px;">
+          <div class="empty" id="quota-rules-empty" style="padding:22px 28px;">
             <i class="bi bi-database-slash"></i><p>Chưa có rule nào. Nhấn "Thêm rule" để bắt đầu.</p>
           </div>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:#8A99AF;"></i> Payload preview</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:var(--text-secondary);"></i> Payload preview</div></div>
         <div class="card-body">
-          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:80px;">{}</pre>
+          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:80px;">{}</pre>
         </div>
       </div>
 
@@ -912,15 +1216,21 @@ tailwind.config = {
     </div>
 
     <!-- ─── POLICY CENTER ───────────────────────────────────────────────────── -->
-    <div class="page" id="page-policy" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Policy Center</h1><p>Compose uplink policy payloads and dispatch as command jobs</p></div>
-        <div class="topbar-actions">
-          <div id="policy-mode-badge" class="pill pill-gray">idle</div>
+    <div class="page" id="page-policy" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--purple-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--purple);font-size:16px;border:1px solid rgba(168,85,247,0.25);"><i class="bi bi-shield-fill"></i></div>
+            <h1>Policy Center</h1>
+          </div>
+          <p>Compose uplink policy payloads and dispatch as command jobs &middot; <span id="policy-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">idle</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="fillPolicyFromSelectedEdge()"><i class="bi bi-arrow-return-right"></i> Use selected edge</button>
           <button class="btn btn-primary btn-sm" onclick="applyPolicy()"><i class="bi bi-send"></i> Apply policy</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
         <div class="stat-card"><div class="stat-label">Policy target</div><div class="stat-value stat-accent" style="font-size:16px;" id="policy-target">—</div><div class="stat-note">Tenant / vessel / edge</div></div>
@@ -933,7 +1243,7 @@ tailwind.config = {
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title"><i class="bi bi-sliders2" style="color:#3C50E0;"></i> Uplink policy</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-sliders2" style="color:var(--primary-light);"></i> Uplink policy</div></div>
         <div class="card-body">
           <div class="form-row">
             <div class="form-group"><label class="form-label">Tenant code</label><input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" /></div>
@@ -959,7 +1269,7 @@ tailwind.config = {
           <div class="form-group"><label class="form-label">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid #2E3A47;color:#AEB7C0;font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="fillPolicyFromSelectedEdge()">Use selected edge</button>
@@ -971,11 +1281,16 @@ tailwind.config = {
     </div>
 
     <!-- ─── TRAFFIC VIEW ────────────────────────────────────────────────────── -->
-    <div class="page" id="page-traffic" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Traffic View</h1><p>Daily and monthly telemetry summary</p></div>
-        <div class="topbar-actions">
-          <div id="traffic-mode-badge" class="pill pill-gray">idle</div>
+    <div class="page" id="page-traffic" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--primary-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:16px;border:1px solid rgba(87,80,241,0.25);"><i class="bi bi-graph-up-arrow"></i></div>
+            <h1>Traffic View</h1>
+          </div>
+          <p>Daily and monthly telemetry summary &middot; <span id="traffic-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">idle</span></p>
+        </div>
+        <div class="page-header-actions">
           <select id="traffic-period" class="form-control" style="width:130px;" onchange="loadTrafficView()">
             <option value="day">Daily</option>
             <option value="month">Monthly</option>
@@ -984,16 +1299,17 @@ tailwind.config = {
           <button class="btn btn-ghost btn-sm" onclick="loadTrafficView()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card"><div class="stat-label">Average RX</div><div class="stat-value stat-accent" id="traffic-avg-rx">—</div><div class="stat-note">Across selected vessel window</div></div>
-        <div class="stat-card"><div class="stat-label">Average TX</div><div class="stat-value stat-green" id="traffic-avg-tx">—</div><div class="stat-note">Across selected vessel window</div></div>
-        <div class="stat-card"><div class="stat-label">Quota remaining</div><div class="stat-value stat-amber" id="traffic-quota-remaining">—</div><div class="stat-note">Active assignment</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-arrow-down-circle-fill"></i></div><div class="stat-label">Average RX</div><div class="stat-value stat-accent" id="traffic-avg-rx">—</div><div class="stat-note">Across selected vessel window</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-green"><i class="bi bi-arrow-up-circle-fill"></i></div><div class="stat-label">Average TX</div><div class="stat-value stat-green" id="traffic-avg-tx">—</div><div class="stat-note">Across selected vessel window</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-amber"><i class="bi bi-database-fill"></i></div><div class="stat-label">Quota remaining</div><div class="stat-value stat-amber" id="traffic-quota-remaining">—</div><div class="stat-note">Active assignment</div></div>
       </div>
       <div class="grid grid-3" style="margin-bottom:16px;">
-        <div class="stat-card"><div class="stat-label">Monthly total</div><div class="stat-value stat-accent" id="traffic-month-total">—</div><div class="stat-note">From /api/traffic/summary</div></div>
-        <div class="stat-card"><div class="stat-label">Monthly RX</div><div class="stat-value stat-green" id="traffic-month-rx">—</div><div class="stat-note">Aggregated for selected month</div></div>
-        <div class="stat-card"><div class="stat-label">Monthly TX</div><div class="stat-value stat-amber" id="traffic-month-tx">—</div><div class="stat-note">Aggregated for selected month</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-graph-up-arrow"></i></div><div class="stat-label">Monthly total</div><div class="stat-value stat-accent" id="traffic-month-total">—</div><div class="stat-note">From /api/traffic/summary</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-green"><i class="bi bi-arrow-bar-down"></i></div><div class="stat-label">Monthly RX</div><div class="stat-value stat-green" id="traffic-month-rx">—</div><div class="stat-note">Aggregated for selected month</div></div>
+        <div class="stat-card"><div class="stat-icon stat-icon-amber"><i class="bi bi-arrow-bar-up"></i></div><div class="stat-label">Monthly TX</div><div class="stat-value stat-amber" id="traffic-month-tx">—</div><div class="stat-note">Aggregated for selected month</div></div>
       </div>
 
       <div id="traffic-error" style="display:none;" class="alert alert-danger">
@@ -1001,7 +1317,7 @@ tailwind.config = {
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div><div class="card-title"><i class="bi bi-graph-up-arrow" style="color:#3C50E0;"></i> Traffic summary</div><div class="card-subtitle" id="traffic-source">Loading…</div></div>
+          <div><div class="card-title"><i class="bi bi-graph-up-arrow" style="color:var(--primary-light);"></i> Traffic summary</div><div class="card-subtitle" id="traffic-source">Loading…</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input id="traffic-vessel" class="form-control" style="width:140px;" value="vsl-001" placeholder="vessel code" />
             <input id="traffic-days" class="form-control" style="width:100px;" type="number" min="1" max="365" value="30" />
@@ -1017,14 +1333,14 @@ tailwind.config = {
       </div>
       <div class="grid grid-2">
         <div class="card">
-          <div class="card-header"><div class="card-title"><i class="bi bi-diagram-3" style="color:#10B981;"></i> Daily buckets</div></div>
+          <div class="card-header"><div class="card-title"><i class="bi bi-diagram-3" style="color:var(--success);"></i> Daily buckets</div></div>
           <div style="padding:0;">
             <table class="tbl"><thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
             <tbody id="traffic-daily-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><div class="card-title"><i class="bi bi-calendar-month" style="color:#FBBF24;"></i> Monthly buckets</div></div>
+          <div class="card-header"><div class="card-title"><i class="bi bi-calendar-month" style="color:var(--warning);"></i> Monthly buckets</div></div>
           <div style="padding:0;">
             <table class="tbl"><thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
             <tbody id="traffic-monthly-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
@@ -1034,15 +1350,21 @@ tailwind.config = {
     </div>
 
     <!-- ─── PACKAGE CATALOG ─────────────────────────────────────────────────── -->
-    <div class="page" id="page-packages" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Package Catalog</h1><p>Quản lý gói cước · Phân công · Báo cáo sử dụng</p></div>
-        <div class="topbar-actions">
-          <div id="pkg-mode-badge" class="pill pill-gray">loading</div>
+    <div class="page" id="page-packages" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--primary-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:16px;border:1px solid rgba(87,80,241,0.25);"><i class="bi bi-box-seam-fill"></i></div>
+            <h1>Package Catalog</h1>
+          </div>
+          <p>Manage packages &middot; Assign to vessels &middot; Usage reporting &middot; <span id="pkg-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="togglePkgForm()"><i class="bi bi-plus-lg"></i> New package</button>
           <button class="btn btn-primary btn-sm" onclick="loadPackages()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
 
       <div class="grid grid-3" style="margin-bottom:16px;">
         <div class="stat-card"><div class="stat-label">Total packages</div><div class="stat-value stat-accent" id="pkg-total">—</div><div class="stat-note" id="pkg-source-note">Loading…</div></div>
@@ -1057,7 +1379,7 @@ tailwind.config = {
       <!-- New package form -->
       <div class="card" id="pkg-form-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-plus-circle-fill" style="color:#10B981;"></i> <span id="pkg-form-title">Create package</span></div>
+          <div class="card-title"><i class="bi bi-plus-circle-fill" style="color:var(--success);"></i> <span id="pkg-form-title">Create package</span></div>
           <button class="btn btn-ghost btn-sm" onclick="togglePkgForm(false)"><i class="bi bi-x"></i></button>
         </div>
         <div class="card-body">
@@ -1085,8 +1407,8 @@ tailwind.config = {
       <!-- Package list -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-box-seam-fill" style="color:#3C50E0;"></i> Packages</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#AEB7C0;cursor:pointer;">
+          <div class="card-title"><i class="bi bi-box-seam-fill" style="color:var(--primary-light);"></i> Packages</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
             <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
           </label>
         </div>
@@ -1098,7 +1420,7 @@ tailwind.config = {
 
       <!-- Assign package -->
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><div class="card-title"><i class="bi bi-person-plus-fill" style="color:#FBBF24;"></i> Assign package</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-person-plus-fill" style="color:var(--warning);"></i> Assign package</div></div>
         <div class="card-body">
           <div id="assign-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
@@ -1118,7 +1440,7 @@ tailwind.config = {
       <!-- Usage report -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><i class="bi bi-bar-chart-fill" style="color:#10B981;"></i> Usage report</div>
+          <div class="card-title"><i class="bi bi-bar-chart-fill" style="color:var(--success);"></i> Usage report</div>
           <button class="btn btn-ghost btn-sm" onclick="exportUsage()"><i class="bi bi-download"></i> Export CSV</button>
         </div>
         <div class="card-body">
@@ -1146,22 +1468,28 @@ tailwind.config = {
     </div>
 
     <!-- ─── TENANT SETTINGS ─────────────────────────────────────────────────── -->
-    <div class="page" id="page-settings" style="padding:24px;">
-      <div class="topbar">
-        <div class="page-title"><h1>Tenant Settings</h1><p>Local operator settings for alerts webhook and tenant scope</p></div>
-        <div class="topbar-actions">
-          <div id="settings-mode-badge" class="pill pill-gray">local</div>
+    <div class="page" id="page-settings" style="padding:22px 28px;">
+      <div class="page-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-gear-fill"></i></div>
+            <h1>Tenant Settings</h1>
+          </div>
+          <p>Local operator settings for alerts webhook and tenant scope &middot; <span id="settings-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">local</span></p>
+        </div>
+        <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="resetTenantSettings()"><i class="bi bi-arrow-counterclockwise"></i> Reset</button>
           <button class="btn btn-primary btn-sm" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
         </div>
       </div>
+      <div class="topbar" style="display:none;"></div>
       <div class="grid grid-3" style="margin-bottom:16px;">
         <div class="stat-card"><div class="stat-label">Webhook</div><div class="stat-value stat-accent" id="settings-webhook-state">disabled</div><div class="stat-note">POST alert payloads</div></div>
         <div class="stat-card"><div class="stat-label">Tenant</div><div class="stat-value stat-green" id="settings-tenant-state">tnr13</div><div class="stat-note">Applied to forms and filters</div></div>
         <div class="stat-card"><div class="stat-label">Unread alerts</div><div class="stat-value stat-amber" id="settings-unread-state">0</div><div class="stat-note">Tracked locally in browser</div></div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title"><i class="bi bi-gear-fill" style="color:#3C50E0;"></i> Webhook notifications</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-gear-fill" style="color:var(--primary-light);"></i> Webhook notifications</div></div>
         <div class="card-body">
           <div id="settings-notice" style="display:none;" class="alert"></div>
           <div class="form-group"><label class="form-label">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
@@ -1183,9 +1511,18 @@ tailwind.config = {
     </div>
 
     <!-- ─── AUTH SETTINGS ───────────────────────────────────────────────────── -->
-    <div class="page" id="page-login" style="padding:24px;">
-      <div style="max-width:400px;margin:0 auto;padding-top:40px;">
-        <div class="topbar"><div class="page-title"><h1>Auth Settings</h1><p>HTTP Basic Auth · Browser storage</p></div></div>
+    <div class="page" id="page-login" style="padding:22px 28px;">
+      <div class="page-header" style="margin-bottom:14px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-key-fill"></i></div>
+            <h1>Auth Settings</h1>
+          </div>
+          <p>HTTP Basic Auth &middot; Browser credential storage</p>
+        </div>
+      </div>
+      <div style="max-width:400px;margin:0 auto;padding-top:10px;">
+        <div class="topbar" style="display:none;"></div>
         <div class="card card-body">
           <div id="login-inline-notice" style="display:none;" class="alert alert-info"></div>
           <div id="login-inline-saved" style="display:none;" class="alert alert-success">
@@ -1285,7 +1622,12 @@ let trafficWindow = {
 };
 
 function showPage(name) {
-  if (name === 'login' && document.getElementById('login-page').style.display !== 'none') return;
+  if (name === 'login') {
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    refreshLoginPage();
+    return;
+  }
 
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -1299,6 +1641,17 @@ function showPage(name) {
   if (nav) nav.classList.add('active');
 
   currentPage = name;
+  // Update global header breadcrumb
+  const pageTitles = {
+    dashboard:'Fleet Command Center', alerts:'Alert Center',
+    commands:'Command History', hotspot:'Hotspot Management',
+    quota:'Quota Sync', policy:'Policy Center',
+    traffic:'Traffic View', packages:'Package Catalog',
+    settings:'Tenant Settings', login:'Auth Settings'
+  };
+  const hdrTitle = document.getElementById('hdr-page-title');
+  if (hdrTitle) hdrTitle.textContent = pageTitles[name] || name;
+
   if (name !== 'commands') {
     stopCommandDetailPoll();
   }
@@ -1879,7 +2232,7 @@ function renderLiveEdgeTrend() {
   const values = points.flatMap((point) => [point.rx, point.tx]).filter((value) => Number.isFinite(value));
   if (!points.length || !values.length) {
     ctx.fillStyle = 'rgba(148,163,184,0.9)';
-    ctx.font = '12px Space Grotesk, system-ui, sans-serif';
+    ctx.font = '12px Outfit, system-ui, sans-serif';
     ctx.fillText('Waiting for live samples…', pad.left, height / 2);
     if (summaryEl) summaryEl.textContent = 'peak —';
     if (countEl) countEl.textContent = '0 samples';
@@ -2346,19 +2699,53 @@ function renderDashboard() {
   const warnEdges = edges.filter(e => !e.online && e.error_count_24h > 0).length;
   const activePkgs = packages.filter(p => p.is_active !== false).length;
 
+  const offlineEdges = edges.length - onlineEdges;
   const stats = [
-    { label: 'Total edges', value: edges.length, tone: 'accent', note: mode === 'live' ? 'from /api/mcu/edges' : 'fallback data' },
-    { label: 'Online edges', value: onlineEdges, tone: onlineEdges > 0 ? 'green' : 'red', note: `${warnEdges} with warnings` },
-    { label: 'Recent commands', value: commands.length, tone: 'amber', note: `page ${Math.floor(cmdOffset/CMD_PAGE)+1}` },
-    { label: 'Active packages', value: activePkgs, tone: 'accent', note: 'Phase 3 catalog' }
+    {
+      label: 'Total Edges', value: edges.length,
+      tone: 'accent', icon: 'bi-router-fill', iconCls: 'stat-icon-blue',
+      trend: edges.length > 0 ? `${edges.length} registered` : 'none',
+      trendDir: 'up', note: mode === 'live' ? 'live from API' : 'fallback data',
+      sparkHeights: [30,45,35,60,50,75,55,80,65,72,58,85]
+    },
+    {
+      label: 'Online Edges', value: onlineEdges,
+      tone: onlineEdges > 0 ? 'green' : 'red', icon: 'bi-activity', iconCls: onlineEdges > 0 ? 'stat-icon-green' : 'stat-icon-red',
+      trend: onlineEdges > 0 ? `${Math.round(onlineEdges/Math.max(edges.length,1)*100)}% fleet up` : 'all offline',
+      trendDir: onlineEdges > 0 ? 'up' : 'down', note: `${warnEdges} with warnings`,
+      sparkHeights: [40,60,45,70,55,80,65,90,70,78,62,88]
+    },
+    {
+      label: 'Recent Commands', value: commands.length,
+      tone: 'amber', icon: 'bi-terminal-fill', iconCls: 'stat-icon-amber',
+      trend: `page ${Math.floor(cmdOffset/CMD_PAGE)+1}`,
+      trendDir: 'up', note: 'dispatched this session',
+      sparkHeights: [20,35,25,50,40,55,45,60,38,52,42,58]
+    },
+    {
+      label: 'Active Packages', value: activePkgs,
+      tone: 'accent', icon: 'bi-box-seam-fill', iconCls: 'stat-icon-blue',
+      trend: activePkgs > 0 ? `${activePkgs} assignable` : 'none active',
+      trendDir: activePkgs > 0 ? 'up' : 'down', note: 'Phase 3 catalog',
+      sparkHeights: [25,40,30,55,42,65,50,72,55,68,52,78]
+    }
   ];
 
   const statsEl = document.getElementById('dash-stats');
   if (statsEl) statsEl.innerHTML = stats.map(s => `
     <div class="stat-card">
+      <div class="stat-icon ${s.iconCls}"><i class="bi ${s.icon}"></i></div>
       <div class="stat-label">${s.label}</div>
       <div class="stat-value stat-${s.tone}">${s.value}</div>
-      <div class="stat-note">${s.note}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <span class="trend ${s.trendDir === 'up' ? 'trend-up' : 'trend-down'}">
+          <i class="bi ${s.trendDir === 'up' ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i>${s.trend}
+        </span>
+        <span class="stat-note" style="margin-top:0;">${s.note}</span>
+      </div>
+      <div class="stat-sparkline stat-${s.tone}">
+        ${s.sparkHeights.map(h => `<div class="stat-sparkline-bar" style="height:${h}%;"></div>`).join('')}
+      </div>
     </div>`).join('');
 
   // Edges table
@@ -2372,13 +2759,29 @@ function renderDashboard() {
       edgesBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-router"></i><p>No edges registered</p></div></td></tr>';
     } else {
       edgesBody.innerHTML = edges.map(e => {
-        const st = e.online ? 'Online' : e.error_count_24h > 0 ? 'Warning' : 'Offline';
-        const pillCls = e.online ? 'pill-green' : e.error_count_24h > 0 ? 'pill-amber' : 'pill-red';
+        const isOnline = !!e.online;
+        const isWarn = !isOnline && e.error_count_24h > 0;
+        const st = isOnline ? 'Online' : isWarn ? 'Degraded' : 'Offline';
+        const pillCls = isOnline ? 'pill-success' : isWarn ? 'pill-warning' : 'pill-danger';
+        const dotColor = isOnline ? 'var(--success)' : isWarn ? 'var(--warning)' : 'var(--danger)';
+        const wanIp = e.public_wan_ip
+          ? `<span class="chip mono" style="font-size:11px;">${e.public_wan_ip}</span>`
+          : '<span style="color:var(--text-faint);font-size:12px;">—</span>';
         return `<tr class="row-click" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})">
-          <td><span class="mono" style="font-size:12px;">${e.tenant_code}/${e.vessel_code}/${e.edge_code}</span></td>
-          <td><span class="pill ${pillCls}">${st}</span></td>
-          <td style="color:var(--text2);">${e.public_wan_ip || '—'}</td>
-          <td style="color:var(--text3);font-size:12px;">${fmtTime(e.last_seen_at)}</td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${e.edge_code}</span>
+              <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${e.tenant_code}/${e.vessel_code}</span>
+            </div>
+          </td>
+          <td>
+            <span class="pill ${pillCls}" style="gap:5px;">
+              <span style="width:6px;height:6px;border-radius:50%;background:${dotColor};display:inline-block;${isOnline ? 'animation:connPulse 2s ease-in-out infinite;' : ''}"></span>
+              ${st}
+            </span>
+          </td>
+          <td>${wanIp}</td>
+          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(e.last_seen_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -2395,12 +2798,14 @@ function renderDashboard() {
       cmdBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs found</p></div></td></tr>';
     } else {
       cmdBody.innerHTML = commands.map(c => {
-        const sc = { sent: 'pill-blue', delivered: 'pill-green', failed: 'pill-red', pending: 'pill-amber' }[c.status] || 'pill-gray';
+        const status = c.status || 'unknown';
+        const sc = { sent: 'pill-info', delivered: 'pill-success', failed: 'pill-danger', pending: 'pill-warning' }[status] || 'pill-gray';
+        const si = { sent: 'bi-send-fill', delivered: 'bi-check-circle-fill', failed: 'bi-x-circle-fill', pending: 'bi-hourglass-split' }[status] || 'bi-circle';
         return `<tr>
-          <td style="font-size:12px;" class="mono">${c.edge_code || '—'}</td>
-          <td><span class="chip">${c.command_type}</span></td>
-          <td><span class="pill ${sc}">${c.status}</span></td>
-          <td style="color:var(--text3);font-size:12px;">${fmtTime(c.created_at)}</td>
+          <td><span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${c.edge_code || '—'}</span></td>
+          <td><span class="chip mono" style="font-size:11px;">${c.command_type}</span></td>
+          <td><span class="pill ${sc}" style="gap:5px;"><i class="bi ${si}" style="font-size:10px;"></i>${status}</span></td>
+          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(c.created_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -2972,18 +3377,21 @@ function renderAlertsCenter() {
   }
 
   body.innerHTML = alertList.map((alert) => {
-    const pillClass = String(alert.severity).toLowerCase() === 'critical'
-      ? 'pill-red'
-      : String(alert.severity).toLowerCase() === 'warning'
-        ? 'pill-amber'
-        : 'pill-blue';
+    const sev = String(alert.severity || 'info').toLowerCase();
+    const pillClass = sev === 'critical' ? 'pill-danger' : sev === 'warning' ? 'pill-warning' : 'pill-info';
+    const sevIcon = sev === 'critical' ? 'bi-exclamation-octagon-fill' : sev === 'warning' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill';
     const read = isAlertRead(alert.id);
     return `
       <tr class="row-click ${read ? '' : 'row-selected'}" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})">
-        <td class="mono" style="font-size:12px;">${alert.edge_key || '—'}${read ? '' : ' · unread'}</td>
-        <td><span class="pill ${pillClass}">${alert.severity || 'info'}</span></td>
-        <td>${alert.message || JSON.stringify(alert)}</td>
-        <td style="color:var(--text3);font-size:12px;">${fmtTime(alert.created_at)}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${(alert.edge_key || '—').split('/').pop()}</span>
+            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${alert.edge_key || '—'}${read ? '' : ' <span style="color:var(--primary-light);">· unread</span>'}</span>
+          </div>
+        </td>
+        <td><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${sevIcon}" style="font-size:10px;"></i>${alert.severity || 'info'}</span></td>
+        <td style="color:var(--text-secondary);max-width:320px;">${alert.message || JSON.stringify(alert)}</td>
+        <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(alert.created_at)}</span></td>
       </tr>`;
   }).join('');
 }
@@ -3105,14 +3513,21 @@ function renderCommandHistory(jobs) {
   }
 
   body.innerHTML = list.map((job) => {
-    const pillClass = { sent: 'pill-blue', delivered: 'pill-green', failed: 'pill-red', pending: 'pill-amber' }[job.status] || 'pill-gray';
-    const canRetry = job.status === 'failed';
+    const status = job.status || 'unknown';
+    const pillClass = { sent: 'pill-info', delivered: 'pill-success', failed: 'pill-danger', pending: 'pill-warning' }[status] || 'pill-gray';
+    const statusIcon = { sent: 'bi-send-fill', delivered: 'bi-check-circle-fill', failed: 'bi-x-circle-fill', pending: 'bi-hourglass-split' }[status] || 'bi-circle';
+    const canRetry = status === 'failed';
     return `
       <tr class="row-click">
-        <td class="mono" style="font-size:12px;" onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})">${job.edge_code || '—'}</td>
-        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="chip">${job.command_type || '—'}</span></td>
-        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="pill ${pillClass}">${job.status || '—'}</span></td>
-        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})" style="color:var(--text3);font-size:12px;">${fmtTime(job.created_at)}</td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})">
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${job.edge_code || '—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${job.tenant_code || ''}/${job.vessel_code || ''}</span>
+          </div>
+        </td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="chip mono" style="font-size:11px;">${job.command_type || '—'}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${statusIcon}" style="font-size:10px;"></i>${status}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(job.created_at)}</span></td>
         <td style="text-align:right;">
           <button class="btn ${canRetry ? 'btn-success' : 'btn-ghost'} btn-sm" ${canRetry ? '' : 'disabled'} onclick="retryCommandJob(${JSON.stringify(JSON.stringify(job))})">
             <i class="bi bi-arrow-repeat"></i> Retry
@@ -4097,7 +4512,7 @@ function renderTrafficCanvas(summary) {
 
   if (!summary.length) {
     ctx.fillStyle = 'rgba(148,163,184,0.9)';
-    ctx.font = '12px Space Grotesk, system-ui, sans-serif';
+    ctx.font = '12px Outfit, system-ui, sans-serif';
     ctx.fillText('No telemetry samples found', 20, height / 2);
     if (peek) peek.textContent = 'peak —';
     if (count) count.textContent = '0 buckets';
@@ -4322,7 +4737,7 @@ function toast(msg, type = 'info') {
   const icons = { success: 'bi-check-circle-fill', danger: 'bi-exclamation-circle-fill', warn: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
 
   const el = document.createElement('div');
-  el.className = 'toast-item';
+  el.className = `toast-item toast-${type}`;
   el.id = 'toast-' + id;
   el.innerHTML = `
     <i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};font-size:16px;flex-shrink:0;"></i>
