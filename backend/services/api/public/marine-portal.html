@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -148,86 +148,58 @@ tailwind.config = {
     --shadow-focus-error:   0 0 0 4px rgba(240,68,56,0.10);
     --shadow-focus-success: 0 0 0 4px rgba(18,183,106,0.12);
 
-    /* ── Dark overrides for light semantic colors (pill/alert/trend/active-menu) ── */
-    --color-brand-50:        rgba(70,95,255,0.15);
-    --color-brand-100:       rgba(70,95,255,0.22);
-    --color-success-50:      rgba(18,183,106,0.14);
-    --color-success-100:     rgba(18,183,106,0.22);
-    --color-error-50:        rgba(240,68,56,0.14);
-    --color-error-100:       rgba(240,68,56,0.22);
-    --color-warning-50:      rgba(247,144,9,0.14);
-    --color-warning-100:     rgba(247,144,9,0.22);
-    --color-blue-light-50:   rgba(11,165,236,0.14);
-    --color-blue-light-100:  rgba(11,165,236,0.22);
-    --color-gray-100:        rgba(255,255,255,0.07);
-    --color-gray-700:        rgba(255,255,255,0.70);
-    /* Semantic TEXT colors brightened for dark background readability */
-    --color-brand-text:      #7592ff;
-    --color-success-600:     #34d399;
-    --color-success-700:     #6ee7b7;
-    --color-error-600:       #f87171;
-    --color-error-700:       #fca5a5;
-    --color-warning-600:     #fbbf24;
-    --color-warning-700:     #fde68a;
-    --color-blue-light-600:  #38bdf8;
-
-    /* ── Theme-bound aliases — DARK (this app is always dark) ── */
-    --mp-bg:            #0f1729;
-    --mp-surface:       #1a2542;
-    --mp-surface-2:     #18222f;
-    --mp-surface-muted: rgba(255,255,255,0.03);
-    --mp-border:        rgba(255,255,255,0.08);
-    --mp-border-strong: rgba(255,255,255,0.14);
-    --mp-fg:            rgba(255,255,255,0.86);
-    --mp-fg-strong:     #ffffff;
-    --mp-fg-mute:       var(--color-gray-400);
-    --mp-fg-soft:       var(--color-gray-500);
+    /* ── Theme-bound aliases — LIGHT (tokens.css verbatim) ── */
+    --mp-bg:            var(--color-gray-50);
+    --mp-surface:       var(--color-white);
+    --mp-surface-2:     var(--color-gray-25);
+    --mp-surface-muted: var(--color-gray-50);
+    --mp-border:        var(--color-gray-200);
+    --mp-border-strong: var(--color-gray-300);
+    --mp-fg:            var(--color-gray-800);
+    --mp-fg-strong:     var(--color-gray-900);
+    --mp-fg-mute:       var(--color-gray-500);
+    --mp-fg-soft:       var(--color-gray-400);
     --mp-primary:       var(--color-brand-500);
     --mp-primary-hover: var(--color-brand-600);
-    --mp-row-hover:     rgba(255,255,255,0.03);
-    --mp-thead-bg:      rgba(255,255,255,0.02);
-    --mp-kbd-bg:        rgba(255,255,255,0.06);
-    --mp-icon-btn-bg:   rgba(255,255,255,0.04);
+    --mp-row-hover:     var(--color-gray-25);
+    --mp-thead-bg:      var(--color-gray-50);
+    --mp-kbd-bg:        var(--color-gray-50);
+    --mp-icon-btn-bg:   var(--color-white);
     --mp-shadow-card:   var(--shadow-theme-xs);
 
-    /* Dark shadows (override light values above) */
-    --shadow-theme-xs: 0 1px 2px 0 rgba(0,0,0,0.35);
-    --shadow-theme-sm: 0 1px 3px 0 rgba(0,0,0,0.40), 0 1px 2px 0 rgba(0,0,0,0.30);
-    --shadow-focus-ring: 0 0 0 4px rgba(70,95,255,0.28);
-
     /* ── Legacy aliases — kept for JS template strings ── */
-    --bg-body:      #0f1729;
-    --bg-sidebar:   #111c34;
-    --bg-card:      #1a2542;
-    --bg-card-hover:#1f2c4c;
-    --bg-elevated:  #243056;
-    --bg-input:     #1a2542;
-    --border:             rgba(255,255,255,0.08);
-    --border-light:       rgba(255,255,255,0.11);
-    --border-strong:      rgba(255,255,255,0.14);
-    --text-primary:  #ffffff;
-    --text-secondary:rgba(255,255,255,0.86);
-    --text-muted:    var(--color-gray-400);
-    --text-faint:    var(--color-gray-500);
+    --bg-body:      var(--color-gray-50);
+    --bg-sidebar:   var(--color-white);
+    --bg-card:      var(--color-white);
+    --bg-card-hover:var(--color-gray-50);
+    --bg-elevated:  var(--color-gray-100);
+    --bg-input:     var(--color-white);
+    --border:             var(--color-gray-200);
+    --border-light:       var(--color-gray-200);
+    --border-strong:      var(--color-gray-300);
+    --text-primary:  var(--color-gray-900);
+    --text-secondary:var(--color-gray-700);
+    --text-muted:    var(--color-gray-500);
+    --text-faint:    var(--color-gray-400);
     --primary:       var(--color-brand-500);
     --primary-light: var(--color-brand-400);
-    --primary-bg:    rgba(70,95,255,0.12);
+    --primary-bg:    var(--color-brand-50);
     --success:       var(--color-success-500);
-    --success-bg:    rgba(18,183,106,0.12);
+    --success-bg:    var(--color-success-50);
     --warning:       var(--color-warning-500);
-    --warning-bg:    rgba(247,144,9,0.12);
+    --warning-bg:    var(--color-warning-50);
     --danger:        var(--color-error-500);
-    --danger-bg:     rgba(240,68,56,0.12);
+    --danger-bg:     var(--color-error-50);
     --info:          var(--color-blue-light-500);
-    --info-bg:       rgba(11,165,236,0.12);
-    --purple:        #a855f7;
-    --purple-bg:     rgba(168,85,247,0.12);
+    --info-bg:       var(--color-blue-light-50);
+    --purple:        #7a5af8;
+    --purple-bg:     rgba(122,90,248,0.10);
     --radius:        var(--radius-lg);
     --shadow:        var(--shadow-theme-sm);
     --shadow-lg:     var(--shadow-theme-lg);
-    --glass-border:  rgba(255,255,255,0.08);
-    --text2:         rgba(255,255,255,0.86);
-    --text3:         var(--color-gray-400);
+    --glass-border:  var(--color-gray-200);
+    --text2:         var(--color-gray-700);
+    --text3:         var(--color-gray-500);
     --accent2:       var(--color-brand-500);
     --green:         var(--color-success-500);
     --amber:         var(--color-warning-500);
