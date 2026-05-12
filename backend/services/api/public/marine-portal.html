@@ -804,7 +804,7 @@ tailwind.config = {
   @media(max-width:600px) { .sidebar{display:none} .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
 </style>
 </head>
-<body class="bg-[#0f1729] text-[#9ca8c4]" style="background: #0f1729; min-height: 100vh;">
+<body style="min-height: 100vh;">
 
 <!-- ─── LOGIN (TailAdmin split-screen) ─────────────────────────────────────── -->
 <div id="login-page" style="display:none;">
@@ -845,7 +845,7 @@ tailwind.config = {
     </div>
   </div>
   <!-- Right: Brand panel -->
-  <div style="flex:1;background:linear-gradient(160deg,#0d1526 0%,#111c34 50%,#0a1020 100%);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
+  <div style="flex:1;background:linear-gradient(160deg,var(--color-brand-800,#0d1526) 0%,var(--color-brand-700,#111c34) 50%,var(--color-brand-900,#0a1020) 100%);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
     <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
     <div style="position:relative;text-align:center;max-width:340px;">
       <div style="width:72px;height:72px;background:rgba(70,95,255,.15);border:1px solid rgba(70,95,255,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;">⚓</div>
@@ -957,6 +957,7 @@ tailwind.config = {
       <div class="hdr-actions">
         <span class="pill pill-gray" id="hdr-conn-pill" style="font-size:11px;"></span>
         <button class="hdr-icon-btn" title="Notifications"><i class="bi bi-bell"></i></button>
+        <button class="hdr-icon-btn" title="Toggle dark mode" onclick="document.documentElement.classList.toggle('dark')"><i class="bi bi-moon"></i></button>
         <button class="hdr-icon-btn" title="Refresh" onclick="loadDashboard ? loadDashboard() : null"><i class="bi bi-arrow-clockwise"></i></button>
         <div class="hdr-user" onclick="showPage('login')">
           <div class="hdr-avatar">A</div>
