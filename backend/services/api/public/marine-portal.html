@@ -526,59 +526,43 @@ tailwind.config = {
   .tbl .cell-mute   { color: var(--mp-fg-mute); }
   .pill-green.pulse-online::before { animation: connPulse 2s ease-in-out infinite; }
 
-  /* ── Stat Cards (KPI — cards.css pattern) ── */
+  /* ── Stat Cards (UI Kit pattern) ── */
   .stat-card {
     background: var(--mp-surface); border: 1px solid var(--mp-border);
-    border-radius: var(--radius-2xl); padding: 24px;
-    position: relative; overflow: hidden;
-    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    border-radius: var(--radius-2xl);
+    display: flex; flex-direction: column; gap: 14px; padding: 18px 20px;
+    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .stat-card:hover { border-color: var(--mp-border-strong); transform: translateY(-2px); box-shadow: var(--shadow-theme-md); }
-  .stat-card::after {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--color-brand-500), var(--color-brand-400));
-    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  }
-  .stat-card:has(.stat-green)::after  { background: linear-gradient(90deg, var(--color-success-500), var(--color-success-300)); }
-  .stat-card:has(.stat-amber)::after  { background: linear-gradient(90deg, var(--color-warning-500), var(--color-warning-300)); }
-  .stat-card:has(.stat-red)::after    { background: linear-gradient(90deg, var(--color-error-500), var(--color-error-300)); }
+  .stat-card:hover { border-color: var(--mp-border-strong); box-shadow: var(--shadow-theme-md); }
+  .stat-card-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .stat-card-value { font-size: 30px; font-weight: 700; line-height: 1; color: var(--mp-fg-strong); letter-spacing: -0.02em; }
+  .stat-card-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stat-card-sub { font-size: 12px; color: var(--mp-fg-mute); }
+  .icon-tile { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .icon-tile--brand   { background: var(--color-brand-50);        color: var(--color-brand-600); }
+  .icon-tile--success { background: var(--color-success-50);      color: var(--color-success-600); }
+  .icon-tile--warning { background: var(--color-warning-50);      color: var(--color-warning-600); }
+  .icon-tile--error   { background: var(--color-error-50);        color: var(--color-error-600); }
+  .icon-tile--info    { background: var(--color-blue-light-50,#e0f2fe); color: var(--color-blue-light-600,#0284c7); }
 
-  /* stat-card__icon (TailAdmin pattern) */
-  .stat-card__icon {
-    width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--mp-surface-muted); border-radius: var(--radius-xl);
-    color: var(--mp-fg-strong);
-  }
-  .stat-card__row {
-    display: flex; align-items: flex-end; justify-content: space-between; margin-top: 20px;
-  }
-  .stat-card__label { font-size: var(--text-theme-sm); color: var(--mp-fg-mute); }
-  .stat-card__value {
-    margin-top: 8px; font-size: var(--text-title-sm); line-height: var(--lh-title-sm);
-    font-weight: 700; color: var(--mp-fg-strong); letter-spacing: -0.01em;
-  }
-
-  /* Legacy KPI helpers (used by JS renderDashboard) */
+  /* Legacy KPI helpers (used by other JS stat renders) */
   .stat-icon {
-    position: absolute; top: 18px; right: 18px;
-    width: 48px; height: 48px; border-radius: var(--radius-xl);
+    width: 44px; height: 44px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0; background: var(--mp-surface-muted);
+    font-size: 18px; flex-shrink: 0;
   }
-  .stat-icon-blue  { background: rgba(70,95,255,0.15);   color: var(--color-brand-300); }
-  .stat-icon-green { background: rgba(18,183,106,0.15);  color: var(--color-success-300); }
-  .stat-icon-amber { background: rgba(247,144,9,0.15);   color: var(--color-warning-300); }
-  .stat-icon-red   { background: rgba(240,68,56,0.15);   color: var(--color-error-300); }
-  .stat-label { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 10px; padding-right: 56px; }
-  .stat-value { font-size: 32px; font-weight: 700; color: var(--mp-fg-strong); line-height: 1; letter-spacing: -1px; }
-  .stat-note  { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); margin-top: 8px; }
-  .stat-accent { color: var(--color-brand-400); }
-  .stat-green  { color: var(--color-success-300); }
-  .stat-amber  { color: var(--color-warning-300); }
-  .stat-red    { color: var(--color-error-300); }
-  .stat-sparkline { display: flex; align-items: flex-end; gap: 3px; height: 24px; margin-top: 12px; opacity: .5; }
-  .stat-sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 3px; background: currentColor; transition: height .4s ease; }
+  .stat-icon-blue  { background: var(--color-brand-50);   color: var(--color-brand-600); }
+  .stat-icon-green { background: var(--color-success-50); color: var(--color-success-600); }
+  .stat-icon-amber { background: var(--color-warning-50); color: var(--color-warning-600); }
+  .stat-icon-red   { background: var(--color-error-50);   color: var(--color-error-600); }
+  .stat-label { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--mp-fg-strong); line-height: 1; letter-spacing: -1px; }
+  .stat-note  { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); }
+  .stat-accent { color: var(--color-brand-600); }
+  .stat-green  { color: var(--color-success-600); }
+  .stat-amber  { color: var(--color-warning-600); }
+  .stat-red    { color: var(--color-error-600); }
+  .kicker { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--mp-fg-mute); }
   .metric-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;background:var(--mp-surface-muted);border:1px solid var(--mp-border);color:var(--mp-fg); }
 
   /* ── Layout Grid ── */
@@ -1224,34 +1208,37 @@ tailwind.config = {
 
       <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
         <div class="stat-card">
-          <div class="stat-icon stat-icon-blue"><i class="bi bi-bell-fill"></i></div>
-          <div class="stat-label">Total Alerts</div>
-          <div class="stat-value stat-accent" id="alert-total">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>fleet-wide</span>
-            <span class="stat-note" style="margin-top:0;">all edges</span>
+          <div class="stat-card-head">
+            <span class="kicker">Total Alerts</span>
+            <div class="icon-tile icon-tile--brand"><i class="bi bi-bell"></i></div>
           </div>
-          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+          <div class="stat-card-value" id="alert-total">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> fleet-wide</span>
+            <span class="stat-card-sub">all edges</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-red"><i class="bi bi-exclamation-octagon-fill"></i></div>
-          <div class="stat-label">Critical</div>
-          <div class="stat-value stat-red" id="alert-critical">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>high priority</span>
-            <span class="stat-note" style="margin-top:0;">immediate action</span>
+          <div class="stat-card-head">
+            <span class="kicker">Critical</span>
+            <div class="icon-tile icon-tile--error"><i class="bi bi-exclamation-octagon"></i></div>
           </div>
-          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:32%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div></div>
+          <div class="stat-card-value" id="alert-critical">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--error"><i class="bi bi-arrow-down"></i> high priority</span>
+            <span class="stat-card-sub">immediate action</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-triangle-fill"></i></div>
-          <div class="stat-label">Warnings</div>
-          <div class="stat-value stat-amber" id="alert-warning">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>review soon</span>
-            <span class="stat-note" style="margin-top:0;">follow up</span>
+          <div class="stat-card-head">
+            <span class="kicker">Warnings</span>
+            <div class="icon-tile icon-tile--warning"><i class="bi bi-exclamation-triangle"></i></div>
           </div>
-          <div class="stat-sparkline stat-amber"><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div></div>
+          <div class="stat-card-value" id="alert-warning">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--warning"><i class="bi bi-arrow-up"></i> review soon</span>
+            <span class="stat-card-sub">follow up</span>
+          </div>
         </div>
       </div>
 
@@ -1289,34 +1276,37 @@ tailwind.config = {
       <div class="topbar" style="display:none;"></div>
       <div class="grid grid-3" style="margin-bottom:16px;" id="command-stats">
         <div class="stat-card">
-          <div class="stat-icon stat-icon-blue"><i class="bi bi-list-check"></i></div>
-          <div class="stat-label">Total Jobs</div>
-          <div class="stat-value stat-accent" id="cmd-history-total">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>this page</span>
-            <span class="stat-note" style="margin-top:0;">paginated view</span>
+          <div class="stat-card-head">
+            <span class="kicker">Total Jobs</span>
+            <div class="icon-tile icon-tile--brand"><i class="bi bi-list-check"></i></div>
           </div>
-          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-total">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> this page</span>
+            <span class="stat-card-sub">paginated view</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle-fill"></i></div>
-          <div class="stat-label">Sent / Delivered</div>
-          <div class="stat-value stat-green" id="cmd-history-sent">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>queued</span>
-            <span class="stat-note" style="margin-top:0;">to MQTT</span>
+          <div class="stat-card-head">
+            <span class="kicker">Sent / Delivered</span>
+            <div class="icon-tile icon-tile--success"><i class="bi bi-check-circle"></i></div>
           </div>
-          <div class="stat-sparkline stat-green"><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:80%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:90%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:88%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-sent">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> queued</span>
+            <span class="stat-card-sub">to MQTT</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-red"><i class="bi bi-x-circle-fill"></i></div>
-          <div class="stat-label">Failed</div>
-          <div class="stat-value stat-red" id="cmd-history-failed">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>needs retry</span>
-            <span class="stat-note" style="margin-top:0;">can retry</span>
+          <div class="stat-card-head">
+            <span class="kicker">Failed</span>
+            <div class="icon-tile icon-tile--error"><i class="bi bi-x-circle"></i></div>
           </div>
-          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:38%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:56%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:22%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:44%;"></div><div class="stat-sparkline-bar" style="height:20%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-failed">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--error"><i class="bi bi-arrow-down"></i> needs retry</span>
+            <span class="stat-card-sub">can retry</span>
+          </div>
         </div>
       </div>
       <div id="cmd-history-error" style="display:none;" class="alert alert-danger">
@@ -3062,48 +3052,43 @@ function renderDashboard() {
   const stats = [
     {
       label: 'Total Edges', value: edges.length,
-      tone: 'accent', icon: 'bi-router-fill', iconCls: 'stat-icon-blue',
+      icon: 'bi-hdd-network', tileCls: 'icon-tile--brand',
       trend: edges.length > 0 ? `${edges.length} registered` : 'none',
-      trendDir: 'up', note: mode === 'live' ? 'live from API' : 'fallback data',
-      sparkHeights: [30,45,35,60,50,75,55,80,65,72,58,85]
+      trendDir: 'up', note: mode === 'live' ? 'live from API' : 'fallback data'
     },
     {
       label: 'Online Edges', value: onlineEdges,
-      tone: onlineEdges > 0 ? 'green' : 'red', icon: 'bi-activity', iconCls: onlineEdges > 0 ? 'stat-icon-green' : 'stat-icon-red',
+      icon: 'bi-broadcast-pin', tileCls: 'icon-tile--success',
       trend: onlineEdges > 0 ? `${Math.round(onlineEdges/Math.max(edges.length,1)*100)}% fleet up` : 'all offline',
-      trendDir: onlineEdges > 0 ? 'up' : 'down', note: `${warnEdges} with warnings`,
-      sparkHeights: [40,60,45,70,55,80,65,90,70,78,62,88]
+      trendDir: onlineEdges > 0 ? 'up' : 'down', note: `${warnEdges} with warnings`
     },
     {
       label: 'Recent Commands', value: commands.length,
-      tone: 'amber', icon: 'bi-terminal-fill', iconCls: 'stat-icon-amber',
+      icon: 'bi-terminal', tileCls: 'icon-tile--warning',
       trend: `page ${Math.floor(cmdOffset/CMD_PAGE)+1}`,
-      trendDir: 'up', note: 'dispatched this session',
-      sparkHeights: [20,35,25,50,40,55,45,60,38,52,42,58]
+      trendDir: 'up', note: 'dispatched this session'
     },
     {
       label: 'Active Packages', value: activePkgs,
-      tone: 'accent', icon: 'bi-box-seam-fill', iconCls: 'stat-icon-blue',
+      icon: 'bi-box-seam', tileCls: 'icon-tile--info',
       trend: activePkgs > 0 ? `${activePkgs} assignable` : 'none active',
-      trendDir: activePkgs > 0 ? 'up' : 'down', note: 'Phase 3 catalog',
-      sparkHeights: [25,40,30,55,42,65,50,72,55,68,52,78]
+      trendDir: activePkgs > 0 ? 'up' : 'down', note: 'Phase 3 catalog'
     }
   ];
 
   const statsEl = document.getElementById('dash-stats');
   if (statsEl) statsEl.innerHTML = stats.map(s => `
     <div class="stat-card">
-      <div class="stat-icon ${s.iconCls}"><i class="bi ${s.icon}"></i></div>
-      <div class="stat-label">${s.label}</div>
-      <div class="stat-value stat-${s.tone}">${s.value}</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <span class="trend ${s.trendDir === 'up' ? 'trend-up' : 'trend-down'}">
-          <i class="bi ${s.trendDir === 'up' ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i>${s.trend}
-        </span>
-        <span class="stat-note" style="margin-top:0;">${s.note}</span>
+      <div class="stat-card-head">
+        <span class="kicker">${s.label}</span>
+        <div class="icon-tile ${s.tileCls}"><i class="bi ${s.icon}"></i></div>
       </div>
-      <div class="stat-sparkline stat-${s.tone}">
-        ${s.sparkHeights.map(h => `<div class="stat-sparkline-bar" style="height:${h}%;"></div>`).join('')}
+      <div class="stat-card-value">${s.value}</div>
+      <div class="stat-card-foot">
+        <span class="pill ${s.trendDir === 'up' ? 'pill--success' : 'pill--error'}">
+          <i class="bi ${s.trendDir === 'up' ? 'bi-arrow-up' : 'bi-arrow-down'}"></i> ${s.trend}
+        </span>
+        <span class="stat-card-sub">${s.note}</span>
       </div>
     </div>`).join('');
 
