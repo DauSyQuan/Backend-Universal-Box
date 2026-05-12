@@ -48,6 +48,16 @@ tailwind.config = {
   }
 }
 </script>
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    root.classList.toggle('dark');
+    localStorage.setItem('mp-theme', root.classList.contains('dark') ? 'dark' : 'light');
+    const icon = document.querySelector('#theme-toggle i');
+    if (icon) icon.className = root.classList.contains('dark') ? 'bi bi-sun' : 'bi bi-moon-stars';
+  }
+  if (localStorage.getItem('mp-theme') === 'dark') document.documentElement.classList.add('dark');
+</script>
 <style>
   /* ── Marine Pro × TailAdmin — tokens.css (verbatim, dark mapped) ── */
   :root {
@@ -74,8 +84,8 @@ tailwind.config = {
     --color-gray-400:  #98a2b3;
     --color-gray-500:  #667085;
     --color-gray-600:  #475467;
-    --color-gray-700:  #344054;
-    --color-gray-800:  #1d2939;
+    --color-gray-700:  var(--mp-border-strong);
+    --color-gray-800:  var(--mp-border);
     --color-gray-900:  #101828;
     --color-gray-950:  #0c111d;
     --color-gray-dark: #1a2231;
@@ -416,7 +426,7 @@ tailwind.config = {
   .pill-amber   { background: var(--color-warning-50);      color: var(--color-warning-700); }
   .pill-red     { background: var(--color-error-50);        color: var(--color-error-600); }
   .pill-blue    { background: var(--color-blue-light-100);  color: var(--color-blue-light-600); }
-  .pill-gray    { background: rgba(255,255,255,0.08);       color: var(--mp-fg); }
+  .pill-gray    { background: var(--mp-row-hover);       color: var(--mp-fg); }
 
   /* Trend chip (ui-kit.css verbatim) */
   .trend {
@@ -776,12 +786,12 @@ tailwind.config = {
   .hdr-avatar::after {
     content:''; position:absolute; bottom:1px; right:1px;
     width:8px;height:8px;border-radius:50%;
-    background:var(--success);border:1.5px solid var(--bg-card);
+    background:var(--success);border:1.5px solid var(--mp-surface);
   }
 
   /* ── Top bar (per page, now hidden — global header replaces) ── */
   .topbar { display: none; }
-  .page-title h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+  .page-title h1 { font-size: 22px; font-weight: 700; color: var(--mp-fg-strong); }
   .topbar-actions { display: flex; gap: 8px; align-items: center; }
   .topbar + * { margin-top: 0; }
 
@@ -791,8 +801,8 @@ tailwind.config = {
     padding: 0 0 18px 0; margin-bottom: 22px; gap: 14px; flex-wrap: wrap;
     border-bottom: 1px solid var(--border);
   }
-  .page-header h1 { font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px; }
-  .page-header p  { font-size:12px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
+  .page-header h1 { font-size:20px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.3px; }
+  .page-header p  { font-size:12px;color:var(--mp-fg-mute);margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
   .page-header-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:4px; }
 
   /* ── Quota ── */
@@ -813,11 +823,11 @@ tailwind.config = {
     <div style="width:100%;max-width:400px;">
       <div style="margin-bottom:36px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
+          <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
           <span style="font-size:16px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.3px;">Marine Pro</span>
         </div>
-        <h1 style="font-size:26px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:8px;">Sign In</h1>
-        <p style="font-size:14px;color:var(--text-muted);">Enter your credentials to access the Fleet Ops portal.</p>
+        <h1 style="font-size:26px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:8px;">Sign In</h1>
+        <p style="font-size:14px;color:var(--mp-fg-mute);">Enter your credentials to access the Fleet Ops portal.</p>
       </div>
       <div id="login-notice" style="display:none;" class="alert alert-info"></div>
       <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
@@ -845,26 +855,26 @@ tailwind.config = {
     </div>
   </div>
   <!-- Right: Brand panel -->
-  <div style="flex:1;background:linear-gradient(160deg,var(--color-brand-800,#0d1526) 0%,var(--color-brand-700,#111c34) 50%,var(--color-brand-900,#0a1020) 100%);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
+  <div style="flex:1;background:var(--mp-surface);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
     <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
     <div style="position:relative;text-align:center;max-width:340px;">
       <div style="width:72px;height:72px;background:rgba(70,95,255,.15);border:1px solid rgba(70,95,255,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;">⚓</div>
-      <h2 style="font-size:24px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:12px;">Fleet Command Center</h2>
-      <p style="font-size:14px;color:var(--text-muted);line-height:1.6;">Real-time monitoring and management for maritime vessel edge devices.</p>
+      <h2 style="font-size:24px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:12px;">Fleet Command Center</h2>
+      <p style="font-size:14px;color:var(--mp-fg-mute);line-height:1.6;">Real-time monitoring and management for maritime vessel edge devices.</p>
       <div style="display:flex;gap:10px;margin-top:32px;justify-content:center;">
         <div style="text-align:center;">
           <div style="font-size:22px;font-weight:700;color:var(--primary-light);">99.9%</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Uptime</div>
+          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Uptime</div>
         </div>
         <div style="width:1px;background:var(--border);"></div>
         <div style="text-align:center;">
           <div style="font-size:22px;font-weight:700;color:var(--success);">Live</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Telemetry</div>
+          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Telemetry</div>
         </div>
         <div style="width:1px;background:var(--border);"></div>
         <div style="text-align:center;">
           <div style="font-size:22px;font-weight:700;color:var(--warning);">MQTT</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Protocol</div>
+          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Protocol</div>
         </div>
       </div>
     </div>
@@ -875,20 +885,20 @@ tailwind.config = {
 <div id="app" style="display:none;display:flex;height:100vh;overflow:hidden;">
 
   <!-- Sidebar -->
-  <aside class="sidebar" style="width:260px;min-width:260px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
+  <aside class="sidebar" style="width:260px;min-width:260px;background:var(--mp-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
     <!-- Brand -->
     <div style="padding:22px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;">
-      <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
+      <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
       <div>
-        <div style="font-size:15px;font-weight:800;color:var(--text-primary);letter-spacing:0.3px;">MARINE PRO</div>
-        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
+        <div style="font-size:15px;font-weight:800;color:var(--mp-fg-strong);letter-spacing:0.3px;">MARINE PRO</div>
+        <div style="font-size:10px;color:var(--mp-fg-mute);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
       </div>
     </div>
 
     <!-- Nav -->
     <nav style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;overflow-x:visible;">
       <!-- Section: MAIN MENU -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Main Menu</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Main Menu</div>
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
         <i class="bi bi-speedometer2"></i> Executive Summary
       </button>
@@ -899,7 +909,7 @@ tailwind.config = {
         <i class="bi bi-terminal-fill"></i> Command History
       </button>
       <!-- Section: FLEET MANAGEMENT -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Fleet Management</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Fleet Management</div>
       <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
         <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
       </button>
@@ -916,7 +926,7 @@ tailwind.config = {
         <i class="bi bi-box-seam-fill"></i> Package Catalog
       </button>
       <!-- Section: SYSTEM -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
       <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
         <i class="bi bi-gear-fill"></i> Tenant Settings
       </button>
@@ -927,14 +937,14 @@ tailwind.config = {
 
     <!-- User card (bottom) -->
     <div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5750f1,#a855f7);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--mp-surface);border:1px solid var(--border);border-radius:var(--radius-lg);">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
           M
-          <span id="sidebar-dot" style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--text-secondary);border:2px solid var(--bg-card);transition:background .3s;"></span>
+          <span id="sidebar-dot" style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--mp-fg);border:2px solid var(--mp-surface);transition:background .3s;"></span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
-          <div id="sidebar-conn-label" style="font-size:11px;color:var(--text-muted);margin-top:1px;">Idle</div>
+          <div style="font-size:13px;font-weight:600;color:var(--mp-fg-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
+          <div id="sidebar-conn-label" style="font-size:11px;color:var(--mp-fg-mute);margin-top:1px;">Idle</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
           <span class="pill pill-gray" id="sidebar-conn-status" style="font-size:10px;padding:2px 8px;">idle</span>
@@ -957,15 +967,15 @@ tailwind.config = {
       <div class="hdr-actions">
         <span class="pill pill-gray" id="hdr-conn-pill" style="font-size:11px;"></span>
         <button class="hdr-icon-btn" title="Notifications"><i class="bi bi-bell"></i></button>
-        <button class="hdr-icon-btn" title="Toggle dark mode" onclick="document.documentElement.classList.toggle('dark')"><i class="bi bi-moon"></i></button>
+        <button class="hdr-icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme"><i class="bi bi-moon-stars"></i></button>
         <button class="hdr-icon-btn" title="Refresh" onclick="loadDashboard ? loadDashboard() : null"><i class="bi bi-arrow-clockwise"></i></button>
         <div class="hdr-user" onclick="showPage('login')">
           <div class="hdr-avatar">A</div>
           <div>
-            <div style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.2;">Admin</div>
-            <div style="font-size:11px;color:var(--text-muted);line-height:1.2;">Fleet Ops</div>
+            <div style="font-size:13px;font-weight:600;color:var(--mp-fg-strong);line-height:1.2;">Admin</div>
+            <div style="font-size:11px;color:var(--mp-fg-mute);line-height:1.2;">Fleet Ops</div>
           </div>
-          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--text-muted);margin-left:2px;"></i>
+          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--mp-fg-mute);margin-left:2px;"></i>
         </div>
       </div>
     </header>
@@ -992,7 +1002,7 @@ tailwind.config = {
 
       <div class="page-status-banner" id="dash-status-banner">
         <span class="kicker" style="margin-bottom:0;">Portal status</span>
-        <span id="dash-conn-label" style="font-size:13px;color:var(--text-primary);font-weight:600;">Checking backend…</span>
+        <span id="dash-conn-label" style="font-size:13px;color:var(--mp-fg-strong);font-weight:600;">Checking backend…</span>
         <span class="status-banner-label"></span>
         <span class="pill pill-gray" id="dash-conn-pill">idle</span>
       </div>
@@ -1203,7 +1213,7 @@ tailwind.config = {
             <option value="warning">Warning</option>
             <option value="info">Info</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mp-fg);cursor:pointer;white-space:nowrap;">
             <input id="alert-unread-only" type="checkbox" checked onchange="loadAlertsCenter()" />
             Unread only
           </label>
@@ -1458,7 +1468,7 @@ tailwind.config = {
           </div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary btn-sm" id="hotspot-action-submit" onclick="sendHotspotAction()"><i class="bi bi-send"></i> Send bridge request</button>
@@ -1552,9 +1562,9 @@ tailwind.config = {
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:var(--text-secondary);"></i> Payload preview</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:var(--mp-fg);"></i> Payload preview</div></div>
         <div class="card-body">
-          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:80px;">{}</pre>
+          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:80px;">{}</pre>
         </div>
       </div>
 
@@ -1618,7 +1628,7 @@ tailwind.config = {
           <div class="form-group"><label class="form-label">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="fillPolicyFromSelectedEdge()">Use selected edge</button>
@@ -1757,7 +1767,7 @@ tailwind.config = {
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
           <div class="card-title"><i class="bi bi-box-seam-fill" style="color:var(--primary-light);"></i> Packages</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mp-fg);cursor:pointer;">
             <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
           </label>
         </div>
@@ -1821,7 +1831,7 @@ tailwind.config = {
       <div class="page-header">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-gear-fill"></i></div>
+            <div style="width:36px;height:36px;background:var(--mp-surface-muted);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--mp-fg);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-gear-fill"></i></div>
             <h1>Tenant Settings</h1>
           </div>
           <p>Local operator settings for alerts webhook and tenant scope &middot; <span id="settings-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">local</span></p>
@@ -1864,7 +1874,7 @@ tailwind.config = {
       <div class="page-header" style="margin-bottom:14px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-key-fill"></i></div>
+            <div style="width:36px;height:36px;background:var(--mp-surface-muted);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--mp-fg);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-key-fill"></i></div>
             <h1>Auth Settings</h1>
           </div>
           <p>HTTP Basic Auth &middot; Browser credential storage</p>
@@ -3115,12 +3125,12 @@ function renderDashboard() {
         const dotColor = isOnline ? 'var(--success)' : isWarn ? 'var(--warning)' : 'var(--danger)';
         const wanIp = e.public_wan_ip
           ? `<span class="chip mono" style="font-size:11px;">${e.public_wan_ip}</span>`
-          : '<span style="color:var(--text-faint);font-size:12px;">—</span>';
+          : '<span style="color:var(--mp-fg-soft);font-size:12px;">—</span>';
         return `<tr class="row-click" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})">
           <td>
             <div style="display:flex;flex-direction:column;gap:2px;">
-              <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${e.edge_code}</span>
-              <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${e.tenant_code}/${e.vessel_code}</span>
+              <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${e.edge_code}</span>
+              <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${e.tenant_code}/${e.vessel_code}</span>
             </div>
           </td>
           <td>
@@ -3130,7 +3140,7 @@ function renderDashboard() {
             </span>
           </td>
           <td>${wanIp}</td>
-          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(e.last_seen_at)}</span></td>
+          <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(e.last_seen_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -3151,10 +3161,10 @@ function renderDashboard() {
         const sc = { sent: 'pill-info', delivered: 'pill-success', failed: 'pill-danger', pending: 'pill-warning' }[status] || 'pill-gray';
         const si = { sent: 'bi-send-fill', delivered: 'bi-check-circle-fill', failed: 'bi-x-circle-fill', pending: 'bi-hourglass-split' }[status] || 'bi-circle';
         return `<tr>
-          <td><span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${c.edge_code || '—'}</span></td>
+          <td><span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${c.edge_code || '—'}</span></td>
           <td><span class="chip mono" style="font-size:11px;">${c.command_type}</span></td>
           <td><span class="pill ${sc}" style="gap:5px;"><i class="bi ${si}" style="font-size:10px;"></i>${status}</span></td>
-          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(c.created_at)}</span></td>
+          <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(c.created_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -3734,13 +3744,13 @@ function renderAlertsCenter() {
       <tr class="row-click ${read ? '' : 'row-selected'}" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})">
         <td>
           <div style="display:flex;flex-direction:column;gap:2px;">
-            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${(alert.edge_key || '—').split('/').pop()}</span>
-            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${alert.edge_key || '—'}${read ? '' : ' <span style="color:var(--primary-light);">· unread</span>'}</span>
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${(alert.edge_key || '—').split('/').pop()}</span>
+            <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${alert.edge_key || '—'}${read ? '' : ' <span style="color:var(--primary-light);">· unread</span>'}</span>
           </div>
         </td>
         <td><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${sevIcon}" style="font-size:10px;"></i>${alert.severity || 'info'}</span></td>
-        <td style="color:var(--text-secondary);max-width:320px;">${alert.message || JSON.stringify(alert)}</td>
-        <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(alert.created_at)}</span></td>
+        <td style="color:var(--mp-fg);max-width:320px;">${alert.message || JSON.stringify(alert)}</td>
+        <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(alert.created_at)}</span></td>
       </tr>`;
   }).join('');
 }
@@ -3870,13 +3880,13 @@ function renderCommandHistory(jobs) {
       <tr class="row-click">
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})">
           <div style="display:flex;flex-direction:column;gap:2px;">
-            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${job.edge_code || '—'}</span>
-            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${job.tenant_code || ''}/${job.vessel_code || ''}</span>
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${job.edge_code || '—'}</span>
+            <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${job.tenant_code || ''}/${job.vessel_code || ''}</span>
           </div>
         </td>
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="chip mono" style="font-size:11px;">${job.command_type || '—'}</span></td>
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${statusIcon}" style="font-size:10px;"></i>${status}</span></td>
-        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(job.created_at)}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(job.created_at)}</span></td>
         <td style="text-align:right;">
           <button class="btn ${canRetry ? 'btn-success' : 'btn-ghost'} btn-sm" ${canRetry ? '' : 'disabled'} onclick="retryCommandJob(${JSON.stringify(JSON.stringify(job))})">
             <i class="bi bi-arrow-repeat"></i> Retry
