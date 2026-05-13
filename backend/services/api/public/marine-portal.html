@@ -808,7 +808,7 @@ tailwind.config = {
       <div style="margin-bottom:36px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;">
           <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
-          <span style="font-size:16px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.3px;">Marine Pro</span>
+          <span style="font-size:16px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
         </div>
         <h1 style="font-size:26px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:8px;">Sign In</h1>
         <p style="font-size:14px;color:var(--mp-fg-mute);">Enter your credentials to access the Fleet Ops portal.</p>
@@ -882,40 +882,40 @@ tailwind.config = {
     <!-- Nav -->
     <nav style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;overflow-x:visible;">
       <!-- Section: MAIN MENU -->
-      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Main Menu</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Monitoring</div>
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
-        <i class="bi bi-speedometer2"></i> Executive Summary
+        <i class="bi bi-reception-4"></i> Fleet Overview
       </button>
       <button class="nav-item" id="nav-alerts" onclick="showPage('alerts')">
-        <i class="bi bi-bell-fill"></i> Alert Center
+        <i class="bi bi-exclamation-circle"></i> Alert Center
       </button>
       <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
-        <i class="bi bi-terminal-fill"></i> Command History
+        <i class="bi bi-list-task"></i> Command History
       </button>
       <!-- Section: FLEET MANAGEMENT -->
-      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Fleet Management</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Connectivity</div>
       <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
-        <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
+        <i class="bi bi-wifi"></i> Hotspot Accounts
       </button>
       <button class="nav-item" id="nav-quota" onclick="showPage('quota')">
-        <i class="bi bi-arrow-repeat"></i> Quota Sync
+        <i class="bi bi-sliders2"></i> Quota Sync
       </button>
       <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
-        <i class="bi bi-shield-fill"></i> Policy Center
+        <i class="bi bi-diagram-3"></i> Policy Center
       </button>
       <button class="nav-item" id="nav-traffic" onclick="showPage('traffic')">
-        <i class="bi bi-graph-up-arrow"></i> Traffic View
+        <i class="bi bi-bar-chart-line"></i> Traffic View
       </button>
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
-        <i class="bi bi-box-seam-fill"></i> Package Catalog
+        <i class="bi bi-archive"></i> Package Catalog
       </button>
       <!-- Section: SYSTEM -->
       <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
       <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
-        <i class="bi bi-gear-fill"></i> Tenant Settings
+        <i class="bi bi-gear"></i> Tenant Settings
       </button>
       <button class="nav-item" id="nav-login" onclick="showPage('login')">
-        <i class="bi bi-key-fill"></i> Auth Settings
+        <i class="bi bi-person-lock"></i> Auth Settings
       </button>
     </nav>
 
@@ -965,27 +965,32 @@ tailwind.config = {
     </header>
 
     <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
-    <div class="page active" id="page-dashboard" style="padding:22px 28px;">
-      <div class="page-header">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--primary-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:16px;border:1px solid rgba(87,80,241,0.25);"><i class="bi bi-speedometer2"></i></div>
-            <h1>Fleet Command Center</h1>
+    <div class="page active" id="page-dashboard" style="padding:24px 28px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:var(--color-brand-50);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--color-brand-600);font-size:22px;border:1px solid var(--color-brand-100);">
+            <i class="bi bi-reception-4"></i>
           </div>
-          <p>NOC real-time monitoring &middot; Auto-refresh 60s &middot; <span id="dash-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+          <div>
+            <h1 style="font-size:18px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.3px;line-height:1.2;">Fleet Command Center</h1>
+            <p style="font-size:12px;color:var(--mp-fg-mute);margin-top:3px;display:flex;align-items:center;gap:6px;">
+              <i class="bi bi-clock" style="font-size:11px;"></i> Auto-refresh 60s &nbsp;·&nbsp;
+              <span id="dash-mode-badge" class="pill pill-gray" style="font-size:10px;padding:1px 7px;">loading</span>
+            </p>
+          </div>
         </div>
-        <div class="page-header-actions">
-          <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
-          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot</button>
-          <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
-          </button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-ghost btn-sm" onclick="showPage('traffic')"><i class="bi bi-bar-chart-line"></i> Traffic</button>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-wifi"></i> Hotspot</button>
+          <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
-      <div class="topbar" style="display:none;"></div>
 
-      <div class="page-status-banner" id="dash-status-banner">
-        <span class="kicker" style="margin-bottom:0;">Portal status</span>
+      <!-- Connection banner -->
+      <div class="page-status-banner" id="dash-status-banner" style="margin-bottom:20px;">
+        <i class="bi bi-broadcast" style="font-size:15px;color:var(--mp-fg-mute);"></i>
         <span id="dash-conn-label" style="font-size:13px;color:var(--mp-fg-strong);font-weight:600;">Checking backend…</span>
         <span class="status-banner-label"></span>
         <span class="pill pill-gray" id="dash-conn-pill">idle</span>
@@ -996,36 +1001,55 @@ tailwind.config = {
         <span id="dash-error-msg"></span>
       </div>
 
-      <div class="grid grid-4" style="margin-bottom:16px;" id="dash-stats"></div>
+      <!-- KPI stat cards -->
+      <div class="grid grid-4" style="margin-bottom:20px;" id="dash-stats"></div>
 
-      <div class="grid grid-2" style="margin-bottom:16px;">
-        <div class="card card-body">
-          <span class="kicker">Backend status</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-health-pills">
+      <!-- Health + metrics row -->
+      <div class="grid grid-2" style="margin-bottom:20px;">
+        <div class="card card-body" style="gap:10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-heart-pulse" style="color:var(--color-success-600);font-size:15px;"></i>
+            <span class="kicker" style="margin-bottom:0;">Backend health</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="dash-health-pills">
             <span class="pill pill-gray">checking…</span>
           </div>
         </div>
-        <div class="card card-body">
-          <span class="kicker">System metrics</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-metrics-pills">
+        <div class="card card-body" style="gap:10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-speedometer" style="color:var(--color-brand-600);font-size:15px;"></i>
+            <span class="kicker" style="margin-bottom:0;">System metrics</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="dash-metrics-pills">
             <span class="pill pill-gray">n/a</span>
           </div>
         </div>
       </div>
 
-      <div class="grid grid-2" style="margin-bottom:16px;">
+      <!-- Fleet snapshot + Command jobs -->
+      <div class="grid grid-2" style="margin-bottom:20px;">
         <!-- Fleet snapshot -->
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-router-fill" style="color:var(--primary-light);"></i> Fleet snapshot</div>
-              <div class="card-subtitle" id="edges-source">Loading…</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="icon-tile icon-tile--brand" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+                <i class="bi bi-hdd-network"></i>
+              </div>
+              <div>
+                <div class="card-title">Vessel edges</div>
+                <div class="card-subtitle" id="edges-source">Loading…</div>
+              </div>
             </div>
             <span class="num-badge" id="edges-count">0</span>
           </div>
           <div style="padding:0;">
             <table class="tbl" id="edges-table">
-              <thead><tr><th>Edge</th><th>Status</th><th>WAN IP</th><th>Last seen</th></tr></thead>
+              <thead><tr>
+                <th><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th><i class="bi bi-circle-fill" style="margin-right:4px;opacity:.6;font-size:8px;"></i>Status</th>
+                <th><i class="bi bi-globe" style="margin-right:4px;opacity:.6;"></i>WAN IP</th>
+                <th><i class="bi bi-clock-history" style="margin-right:4px;opacity:.6;"></i>Last seen</th>
+              </tr></thead>
               <tbody id="edges-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
@@ -1034,9 +1058,14 @@ tailwind.config = {
         <!-- Command jobs -->
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-terminal-fill" style="color:var(--warning);"></i> Command jobs</div>
-              <div class="card-subtitle" id="commands-source">Loading…</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="icon-tile icon-tile--warning" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+                <i class="bi bi-send-check"></i>
+              </div>
+              <div>
+                <div class="card-title">Command jobs</div>
+                <div class="card-subtitle" id="commands-source">Loading…</div>
+              </div>
             </div>
             <div style="display:flex;gap:6px;">
               <button class="btn btn-ghost btn-sm" id="cmd-prev" onclick="prevCmdPage()" disabled><i class="bi bi-chevron-left"></i></button>
@@ -1045,7 +1074,12 @@ tailwind.config = {
           </div>
           <div style="padding:0;">
             <table class="tbl">
-              <thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th></tr></thead>
+              <thead><tr>
+                <th><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th><i class="bi bi-code-square" style="margin-right:4px;opacity:.6;"></i>Type</th>
+                <th><i class="bi bi-check2-circle" style="margin-right:4px;opacity:.6;"></i>Status</th>
+                <th><i class="bi bi-clock" style="margin-right:4px;opacity:.6;"></i>Time</th>
+              </tr></thead>
               <tbody id="commands-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
@@ -1055,9 +1089,14 @@ tailwind.config = {
       <!-- Edge detail panel -->
       <div class="card" id="edge-detail-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-cpu-fill" style="color:var(--primary-light);"></i> <span id="edge-detail-title">Edge detail</span></div>
-            <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--success" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-router"></i>
+            </div>
+            <div>
+              <div class="card-title"><span id="edge-detail-title">Edge detail</span></div>
+              <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
+            </div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="closeEdgeDetail()"><i class="bi bi-x"></i> Close</button>
         </div>
@@ -1069,9 +1108,14 @@ tailwind.config = {
       <!-- Send command -->
       <div class="card" id="cmd-create-card" style="display:none;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-send-fill" style="color:var(--success);"></i> Send command</div>
-            <div class="card-subtitle">Dispatch commands to the selected edge.</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--info" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-send"></i>
+            </div>
+            <div>
+              <div class="card-title">Send command</div>
+              <div class="card-subtitle">Dispatch commands to the selected edge.</div>
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -1992,7 +2036,7 @@ function showPage(name) {
   currentPage = name;
   // Update global header breadcrumb
   const pageTitles = {
-    dashboard:'Fleet Command Center', alerts:'Alert Center',
+    dashboard:'Fleet Overview', alerts:'Alert Center',
     commands:'Command History', hotspot:'Hotspot Management',
     quota:'Quota Sync', policy:'Policy Center',
     traffic:'Traffic View', packages:'Package Catalog',
