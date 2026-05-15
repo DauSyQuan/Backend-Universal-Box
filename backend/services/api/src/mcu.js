@@ -14,6 +14,7 @@ let sharedListenerReconnectAttempts = 0;
 let sharedListenerReconnectTimer = null;
 
 const ALLOWED_COMMAND_TYPES = new Set([
+  "ros_cmd",
   "policy_sync",
   "failback_vsat",
   "failover_starlink",
