@@ -2200,7 +2200,12 @@ async function apiFetch(path, opts = {}) {
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.error || j.message || errMsg; } catch {}
+      try {
+        const j = await res.json();
+        const e = j.error;
+        errMsg = typeof e === 'string' ? e
+               : (e?.message || j.message || JSON.stringify(e) || errMsg);
+      } catch {}
       throw new Error(errMsg);
     }
     return await res.json();
