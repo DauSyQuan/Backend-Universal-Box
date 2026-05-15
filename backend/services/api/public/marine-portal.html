@@ -1138,6 +1138,9 @@ tailwind.config = {
             <div class="form-group">
               <label class="form-label">Command type</label>
               <select id="cmd-type" class="form-control" onchange="updateCommandTypeFields()">
+                <optgroup label="RouterOS Direct">
+                  <option value="ros_cmd">ros_cmd — RouterOS API proxy</option>
+                </optgroup>
                 <optgroup label="Failover">
                   <option value="failover_starlink">failover_starlink</option>
                   <option value="failback_vsat">failback_vsat</option>
@@ -1150,6 +1153,50 @@ tailwind.config = {
                   <option value="radius_setup">radius_setup (One-time RADIUS)</option>
                 </optgroup>
               </select>
+            </div>
+          </div>
+          <!-- ros_cmd fields -->
+          <div id="cmd-ros-fields" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="kicker" style="margin-bottom:0;">Quick presets</span>
+              <select id="ros-preset" class="form-control" style="max-width:260px;" onchange="applyRosPreset()">
+                <option value="">— chọn preset —</option>
+                <optgroup label="Hotspot User">
+                  <option value="hs_user_add">Thêm user hotspot</option>
+                  <option value="hs_user_get">Lấy danh sách users</option>
+                  <option value="hs_user_remove">Xóa user (cần .id)</option>
+                  <option value="hs_active_get">Active sessions</option>
+                  <option value="hs_active_kick">Kick session (cần .id)</option>
+                </optgroup>
+                <optgroup label="Hotspot Setup">
+                  <option value="hs_profile_add">Tạo server profile</option>
+                  <option value="hs_server_add">Tạo hotspot server</option>
+                  <option value="hs_user_profile_add">Tạo user profile (QoS)</option>
+                </optgroup>
+                <optgroup label="Khác">
+                  <option value="ip_binding_add">IP Binding (bypass MAC)</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Path <span style="color:var(--mp-fg-mute);font-weight:400;">(RouterOS API path)</span></label>
+                <input id="ros-path" class="form-control mono" placeholder="/ip/hotspot/user" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Method</label>
+                <select id="ros-method" class="form-control">
+                  <option value="get">get</option>
+                  <option value="add">add</option>
+                  <option value="set">set</option>
+                  <option value="remove">remove</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Params <span style="color:var(--mp-fg-mute);font-weight:400;">(JSON object)</span></label>
+              <textarea id="ros-params" class="form-control mono" rows="5" placeholder='{"name": "nguyen-van-a", "password": "abc123", "profile": "crew"}'></textarea>
+              <span class="helper">Blocked paths: /system/shutdown · /system/reboot · /system/reset-configuration · /user</span>
             </div>
           </div>
           <!-- hotspot_cmd fields -->
@@ -1217,9 +1264,28 @@ tailwind.config = {
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary" id="cmd-submit-btn" onclick="sendCommand()">
-              <i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink
+              <i class="bi bi-terminal"></i> Execute ros_cmd
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- ros_cmd result viewer -->
+      <div class="card" id="ros-result-card" style="display:none;">
+        <div class="card-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--success" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-terminal-split"></i>
+            </div>
+            <div>
+              <div class="card-title">RouterOS result</div>
+              <div class="card-subtitle" id="ros-result-meta">—</div>
+            </div>
+          </div>
+          <span class="pill" id="ros-result-status-pill">—</span>
+        </div>
+        <div class="card-body">
+          <pre id="ros-result-pre" style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-all;background:var(--mp-surface-muted);border:1px solid var(--mp-border);border-radius:var(--radius-lg);padding:14px;max-height:400px;overflow:auto;color:var(--mp-fg-strong);"></pre>
         </div>
       </div>
     </div>
@@ -4183,22 +4249,45 @@ function closeEdgeDetail() {
   document.getElementById('edge-detail-card').style.display = 'none';
 }
 
+const ROS_PRESETS = {
+  hs_user_add:        { path: '/ip/hotspot/user',         method: 'add',    params: { name: 'nguyen-van-a', password: 'abc123', profile: 'crew', server: 'all', comment: '' } },
+  hs_user_get:        { path: '/ip/hotspot/user',         method: 'get',    params: {} },
+  hs_user_remove:     { path: '/ip/hotspot/user',         method: 'remove', params: { '.id': '*1' } },
+  hs_active_get:      { path: '/ip/hotspot/active',       method: 'get',    params: {} },
+  hs_active_kick:     { path: '/ip/hotspot/active',       method: 'remove', params: { '.id': '*A0000001' } },
+  hs_profile_add:     { path: '/ip/hotspot/profile',      method: 'add',    params: { name: 'hsprof1', 'hotspot-address': '192.168.40.1', 'dns-name': 'hotspot.local', 'login-by': 'http-chap,http-pap' } },
+  hs_server_add:      { path: '/ip/hotspot',              method: 'add',    params: { name: 'hs1', interface: 'ether5-USER', 'address-pool': 'dhcp_pool_lan', profile: 'hsprof1', disabled: 'no' } },
+  hs_user_profile_add:{ path: '/ip/hotspot/user/profile', method: 'add',    params: { name: 'crew', 'rate-limit': '2M/2M', 'shared-users': '1' } },
+  ip_binding_add:     { path: '/ip/hotspot/ip-binding',   method: 'add',    params: { 'mac-address': 'AA:BB:CC:DD:EE:FF', address: '192.168.40.50', type: 'bypassed' } },
+};
+
+function applyRosPreset() {
+  const preset = ROS_PRESETS[document.getElementById('ros-preset')?.value];
+  if (!preset) return;
+  const pathEl = document.getElementById('ros-path');
+  const methodEl = document.getElementById('ros-method');
+  const paramsEl = document.getElementById('ros-params');
+  if (pathEl) pathEl.value = preset.path;
+  if (methodEl) methodEl.value = preset.method;
+  if (paramsEl) paramsEl.value = JSON.stringify(preset.params, null, 2);
+}
+
 function updateCommandTypeFields() {
-  const type = document.getElementById('cmd-type')?.value || 'failover_starlink';
+  const type = document.getElementById('cmd-type')?.value || 'ros_cmd';
   const btn = document.getElementById('cmd-submit-btn');
   if (btn) {
     btn.innerHTML = {
-      failover_starlink: '<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
-      failback_vsat: '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
-      restore_automatic: '<i class="bi bi-arrow-repeat"></i> Restore automatic',
-      hotspot_cmd: '<i class="bi bi-person-badge-fill"></i> Gửi hotspot_cmd',
-      radius_setup: '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
+      ros_cmd:          '<i class="bi bi-terminal"></i> Execute ros_cmd',
+      failover_starlink:'<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
+      failback_vsat:    '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
+      restore_automatic:'<i class="bi bi-arrow-repeat"></i> Restore automatic',
+      hotspot_cmd:      '<i class="bi bi-wifi"></i> Gửi hotspot_cmd',
+      radius_setup:     '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
     }[type] || '<i class="bi bi-send"></i> Send command';
   }
-  const hotspotFields = document.getElementById('cmd-hotspot-fields');
-  const radiusFields = document.getElementById('cmd-radius-fields');
-  if (hotspotFields) hotspotFields.style.display = type === 'hotspot_cmd' ? 'block' : 'none';
-  if (radiusFields) radiusFields.style.display = type === 'radius_setup' ? 'block' : 'none';
+  document.getElementById('cmd-ros-fields').style.display     = type === 'ros_cmd'     ? 'block' : 'none';
+  document.getElementById('cmd-hotspot-fields').style.display = type === 'hotspot_cmd' ? 'block' : 'none';
+  document.getElementById('cmd-radius-fields').style.display  = type === 'radius_setup'? 'block' : 'none';
 }
 
 const HOTSPOT_TEMPLATE_PRESETS = {
@@ -4449,6 +4538,13 @@ async function sendCommand() {
   const edge = document.getElementById('cmd-edge').value.trim();
   const type = document.getElementById('cmd-type').value;
   const commandPayload = (() => {
+    if (type === 'ros_cmd') {
+      const path = document.getElementById('ros-path')?.value.trim() || '';
+      const method = document.getElementById('ros-method')?.value || 'get';
+      let params = {};
+      try { params = JSON.parse(document.getElementById('ros-params')?.value || '{}'); } catch { throw new Error('Params JSON không hợp lệ'); }
+      return { path, method, params };
+    }
     if (type === 'failover_starlink') return { preferred_uplink: 'starlink' };
     if (type === 'failback_vsat') return { preferred_uplink: 'vsat' };
     if (type === 'restore_automatic') return { preferred_uplink: 'automatic', mode: 'automatic' };
@@ -4506,12 +4602,49 @@ async function sendCommand() {
         command_payload: commandPayload
       }
     });
+    const cmdId = res?.command?.id || res?.id || res?.command_id || '?';
     if (noticeEl) {
-      showEl(noticeEl.id, `Command sent successfully! ID: ${res?.command?.id || res.id || res.command_id || res?.command_id || '?'}`, 'alert-success');
+      showEl(noticeEl.id, `Command sent! ID: ${cmdId} — chờ result từ Pi (~2-3s)`, 'alert-success');
     }
     noticeEl.style.display = 'flex';
     toast('Command sent ✓', 'success');
-    await loadDashboard(true);
+    if (type === 'ros_cmd') {
+      // Poll for result up to 15s
+      const rosResultCard = document.getElementById('ros-result-card');
+      const rosResultPre = document.getElementById('ros-result-pre');
+      const rosResultMeta = document.getElementById('ros-result-meta');
+      const rosStatusPill = document.getElementById('ros-result-status-pill');
+      if (rosResultCard) {
+        rosResultCard.style.display = 'block';
+        rosResultPre.textContent = 'Waiting for Pi result…';
+        rosResultMeta.textContent = `job ${cmdId}`;
+        rosStatusPill.className = 'pill pill-gray';
+        rosStatusPill.textContent = 'pending';
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          try {
+            const jobRes = await apiFetch(`/api/commands?limit=5`);
+            const jobs = jobRes?.jobs || jobRes?.data || [];
+            const job = jobs.find(j => j.id === cmdId);
+            if (job && (job.status === 'success' || job.status === 'failed')) {
+              clearInterval(poll);
+              rosStatusPill.className = job.status === 'success' ? 'pill pill--success' : 'pill pill--error';
+              rosStatusPill.textContent = job.status;
+              rosResultMeta.textContent = `job ${cmdId} · ${job.status} · ${new Date(job.result_at || job.updated_at || Date.now()).toLocaleTimeString()}`;
+              rosResultPre.textContent = JSON.stringify(job.result_payload ?? {}, null, 2);
+            } else if (attempts >= 15) {
+              clearInterval(poll);
+              rosStatusPill.className = 'pill pill--warning';
+              rosStatusPill.textContent = 'timeout';
+              rosResultPre.textContent = 'No result after 15s. Pi may be offline or command is still processing.';
+            }
+          } catch { /* ignore poll errors */ }
+        }, 1000);
+      }
+    } else {
+      await loadDashboard(true);
+    }
   } catch (err) {
     if (noticeEl) {
       showEl(noticeEl.id, `Failed: ${err.message}`, 'alert-danger');
