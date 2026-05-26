@@ -1436,7 +1436,7 @@
         <div class="fleet-stat-group" id="dash-stats">
           <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Edges</div></div>
           <div class="fleet-stat"><div class="fleet-stat-value online">—</div><div class="fleet-stat-label">Online</div></div>
-          <div class="fleet-stat"><div class="fleet-stat-value warn">—</div><div class="fleet-stat-label">Cmds</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value warn">—</div><div class="fleet-stat-label">Commands</div></div>
           <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Packages</div></div>
         </div>
         <div class="fleet-rail-sep"></div>
@@ -1569,7 +1569,7 @@
                   <option value="restore_automatic">restore_automatic</option>
                 </optgroup>
                 <optgroup label="Hotspot">
-                  <option value="hotspot_cmd">hotspot_cmd (Quản lý user)</option>
+                  <option value="hotspot_cmd">Quản lý user hotspot</option>
                 </optgroup>
                 <optgroup label="Cấu hình">
                   <option value="radius_setup">radius_setup (One-time RADIUS)</option>
@@ -2052,7 +2052,7 @@
         </div>
         <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" onclick="addQuotaRule()"><i class="bi bi-plus-lg"></i> Add rule</button>
-          <button class="btn btn-primary btn-sm" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Send quota_sync</button>
+          <button class="btn btn-primary btn-sm" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Sync quotas</button>
         </div>
       </div>
       <div class="topbar" style="display:none;"></div>
@@ -2099,7 +2099,7 @@
 
       <div style="display:flex;justify-content:flex-end;gap:8px;">
         <button class="btn btn-ghost" onclick="clearQuotaRules()"><i class="bi bi-trash"></i> Xóa tất cả</button>
-        <button class="btn btn-primary" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Gửi quota_sync</button>
+        <button class="btn btn-primary" onclick="sendQuotaSync()"><i class="bi bi-send"></i> Đồng bộ quota</button>
       </div>
     </div>
 
@@ -2464,7 +2464,7 @@ function saveBasicAuth(u, p) {
 
 function clearAuth() {
   localStorage.removeItem('marine_auth');
-  toast('Auth cleared', 'info');
+  toast('Credentials cleared — reload to reconnect', 'info');
   refreshLoginPage();
 }
 
@@ -2490,7 +2490,7 @@ function doLoginInline() {
   const p = document.getElementById('inline-pass').value;
   if (!u || !p) { showEl('inline-err', 'Username and password required.', 'alert-danger'); return; }
   saveBasicAuth(u, p);
-  toast('Auth saved ✓', 'success');
+  toast('API credentials saved ✓', 'success');
   refreshLoginPage();
   if (document.getElementById('app').style.display !== 'none') {
     showPage(initialPage);
@@ -3627,7 +3627,7 @@ function parseRateLimit(res) {
     rateLimit = { remaining: Number(rem), limit: lim ? Number(lim) : null };
     const el = document.getElementById('sidebar-rate');
     if (el) { el.textContent = `Rate ${rem}/${lim || '?'}`; el.style.display = 'inline-flex'; }
-    if (Number(rem) <= 5) toast(`Rate limit low: ${rem} requests left`, 'warn');
+    if (Number(rem) <= 5) toast(`API rate limit low: ${rem} requests remaining`, 'warn');
   }
 }
 
@@ -3791,7 +3791,7 @@ function renderDashboard() {
   // Edges table
   const edgesBody = document.getElementById('edges-body');
   const edgesSource = document.getElementById('edges-source');
-  if (edgesSource) edgesSource.textContent = mode === 'live' ? 'from /api/mcu/edges' : 'fallback preview data';
+  if (edgesSource) edgesSource.textContent = mode === 'live' ? 'Live data' : 'Demo mode — not connected to backend';
   document.getElementById('edges-count').textContent = edges.length;
 
   if (edgesBody) {
@@ -3830,7 +3830,7 @@ function renderDashboard() {
   // Commands table
   const cmdBody = document.getElementById('commands-body');
   const cmdSource = document.getElementById('commands-source');
-  if (cmdSource) cmdSource.textContent = `offset ${cmdOffset}, limit ${CMD_PAGE}`;
+  if (cmdSource) cmdSource.textContent = cmdOffset === 0 ? 'Recent jobs' : `Page ${Math.floor(cmdOffset / CMD_PAGE) + 1}`;
   document.getElementById('cmd-prev').disabled = cmdOffset === 0;
 
   if (cmdBody) {
@@ -4178,7 +4178,7 @@ function renderHotspotAccounts() {
     modeBadge.className = 'pill ' + (hotspotData.mode === 'live' ? 'pill-green' : hotspotData.mode === 'fallback' ? 'pill-amber' : 'pill-gray');
   }
   if (source) {
-    source.textContent = `from /api/hotspot/accounts · bridge log · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+    source.textContent = hotspotOffset === 0 ? 'Live · bridge operations log' : `Live · Page ${Math.floor(hotspotOffset / HOTSPOT_PAGE) + 1}`;
   }
   const totalEl = document.getElementById('hotspot-ops-total');
   if (totalEl) totalEl.textContent = list.length;
@@ -4226,7 +4226,7 @@ function renderHotspotUsers() {
   const countEl = document.getElementById('hotspot-directory-count');
   const totalEl = document.getElementById('hotspot-directory-total');
   if (source) {
-    source.textContent = `from /api/hotspot/users · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+    source.textContent = hotspotOffset === 0 ? 'Live · router directory' : `Live · Page ${Math.floor(hotspotOffset / HOTSPOT_PAGE) + 1}`;
   }
   if (countEl) countEl.textContent = list.length;
   if (totalEl) totalEl.textContent = list.length;
@@ -4258,7 +4258,7 @@ function renderHotspotActiveUsers() {
   const countEl = document.getElementById('hotspot-active-count');
   const totalEl = document.getElementById('hotspot-active-total');
   if (source) {
-    source.textContent = `from /api/hotspot/active-users · offset ${hotspotOffset}, limit ${HOTSPOT_PAGE}`;
+    source.textContent = hotspotOffset === 0 ? 'Live · active sessions' : `Live · Page ${Math.floor(hotspotOffset / HOTSPOT_PAGE) + 1}`;
   }
   if (countEl) countEl.textContent = list.length;
   if (totalEl) totalEl.textContent = list.length;
@@ -4356,7 +4356,7 @@ async function loadAlertsCenter() {
     modeBadge.className = 'pill pill-gray';
   }
   if (source) {
-    source.textContent = 'Collecting alerts from /api/alerts…';
+    source.textContent = 'Loading alerts…';
   }
 
   try {
@@ -4406,7 +4406,7 @@ function renderAlertsCenter() {
   document.getElementById('alert-critical').textContent = critical;
   document.getElementById('alert-warning').textContent = warning;
   document.getElementById('alert-count').textContent = total;
-  document.getElementById('alert-source').textContent = total ? 'from /api/alerts (events stream)' : 'No alerts found';
+  document.getElementById('alert-source').textContent = total ? 'Live · event stream' : 'No alerts found';
   updateUnreadCounter();
 
   const body = document.getElementById('alert-body');
@@ -4505,7 +4505,7 @@ async function loadCommandHistory() {
     modeBadge.className = 'pill pill-gray';
   }
   if (source) {
-    source.textContent = `offset ${historyCmdOffset}, limit ${HISTORY_CMD_PAGE}`;
+    source.textContent = historyCmdOffset === 0 ? 'Recent dispatches' : `Page ${Math.floor(historyCmdOffset / HISTORY_CMD_PAGE) + 1}`;
   }
   document.getElementById('cmd-history-error').style.display = 'none';
 
@@ -4658,7 +4658,7 @@ function renderCommandDetail(detail, fallbackJob) {
 async function retryCommandJob(jobJson) {
   const job = JSON.parse(jobJson);
   if (!job?.tenant_code || !job?.vessel_code || !job?.edge_code || !job?.command_type) {
-    toast('Cannot retry job — missing required fields', 'warn');
+    toast('Cannot retry — job is missing required fields', 'warn');
     return;
   }
 
@@ -4882,7 +4882,7 @@ function updateCommandTypeFields() {
       failover_starlink:'<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
       failback_vsat:    '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
       restore_automatic:'<i class="bi bi-arrow-repeat"></i> Restore automatic',
-      hotspot_cmd:      '<i class="bi bi-wifi"></i> Gửi hotspot_cmd',
+      hotspot_cmd:      '<i class="bi bi-wifi"></i> Gửi lệnh hotspot',
       radius_setup:     '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
     }[type] || '<i class="bi bi-send"></i> Send command';
   }
@@ -5096,7 +5096,7 @@ async function sendHotspotAction() {
   }
 
   if (!btn || !noticeEl) {
-    toast('Hotspot form unavailable', 'danger');
+    toast('Hotspot form not ready — try refreshing the page', 'danger');
     return;
   }
 
@@ -5194,7 +5194,7 @@ async function sendCommand() {
   }
 
   if (!btn || !noticeEl) {
-    toast('Command form unavailable', 'danger');
+    toast('Command form not ready — try refreshing the page', 'danger');
     return;
   }
 
@@ -5278,7 +5278,7 @@ async function loadPackages() {
     populateAssignSelect();
     document.getElementById('pkg-mode-badge').textContent = 'live';
     document.getElementById('pkg-mode-badge').className = 'pill pill-green';
-    document.getElementById('pkg-source-note').textContent = 'from /api/packages';
+    document.getElementById('pkg-source-note').textContent = 'Live · package catalog';
     document.getElementById('pkg-error').style.display = 'none';
   } catch (err) {
     pkgList = FALLBACK_PACKAGES;
@@ -5406,7 +5406,7 @@ async function togglePackage(id, makeActive) {
     toast(`Package ${makeActive ? 'activated' : 'archived'} ✓`, 'success');
     await loadPackages();
   } catch (err) {
-    toast(`Failed: ${err.message}`, 'danger');
+    toast(`Package toggle failed: ${err.message}`, 'danger');
   }
 }
 
@@ -6043,12 +6043,12 @@ async function sendUserMgmtCmd() {
     const id = res?.command?.id || res.id || '?';
     showEl('usermgmt-notice', `Lệnh gửi thành công! Job ID: ${id}`, 'alert-success');
     noticeEl.style.display = 'flex';
-    toast('hotspot_cmd gửi thành công ✓', 'success');
+    toast('Lệnh hotspot gửi thành công ✓', 'success');
     await loadHotspotDashboard();
   } catch (err) {
-    showEl('usermgmt-notice', `Lỗi: ${err.message}`, 'alert-danger');
+    showEl('usermgmt-notice', `Gửi thất bại: ${err.message}`, 'alert-danger');
     noticeEl.style.display = 'flex';
-    toast(`Lỗi: ${err.message}`, 'danger');
+    toast('Gửi lệnh hotspot thất bại ✗', 'danger');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-send"></i> Gửi lệnh';
@@ -6205,19 +6205,19 @@ async function sendQuotaSync() {
       body: { tenant_code: tenant, vessel_code: vessel, edge_code: edge, command_type: 'quota_sync', command_payload: { rules: validRules } }
     });
     const id = res?.command?.id || res.id || '?';
-    showEl('quota-notice', `quota_sync gửi thành công! Job ID: ${id}`, 'alert-success');
+    showEl('quota-notice', `Đồng bộ quota thành công! Job ID: ${id}`, 'alert-success');
     if (noticeEl) noticeEl.style.display = 'flex';
     const resultEl = document.getElementById('quota-result-label');
     if (resultEl) resultEl.textContent = id;
     document.getElementById('quota-mode-badge').textContent = 'sent';
     document.getElementById('quota-mode-badge').className = 'pill pill-green';
-    toast(`quota_sync gửi thành công ✓ (${validRules.length} rules)`, 'success');
+    toast(`Đồng bộ quota thành công ✓ (${validRules.length} rules)`, 'success');
   } catch (err) {
-    showEl('quota-notice', `Lỗi: ${err.message}`, 'alert-danger');
+    showEl('quota-notice', `Gửi thất bại: ${err.message}`, 'alert-danger');
     if (noticeEl) noticeEl.style.display = 'flex';
     document.getElementById('quota-mode-badge').textContent = 'error';
     document.getElementById('quota-mode-badge').className = 'pill pill-red';
-    toast(`quota_sync thất bại: ${err.message}`, 'danger');
+    toast('Đồng bộ quota thất bại ✗', 'danger');
   }
 }
 
