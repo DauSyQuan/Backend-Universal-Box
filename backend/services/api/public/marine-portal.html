@@ -602,6 +602,7 @@
   .empty { text-align: center; padding: 48px 20px; color: var(--mp-fg-mute); }
   .empty i { font-size: 36px; display: block; margin-bottom: 12px; opacity: .4; }
   .empty p  { font-size: var(--text-theme-sm); color: var(--mp-fg-mute); }
+  .empty small { display: block; font-size: 12px; color: var(--mp-fg-soft); margin-top: 6px; max-width: 300px; margin-left: auto; margin-right: auto; line-height: 1.55; }
 
   /* ── Page status banner ── */
   .status-banner, .page-status-banner {
@@ -3797,7 +3798,7 @@ function renderDashboard() {
 
   if (edgesBody) {
     if (!edges.length) {
-      edgesBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-router"></i><p>No edges registered</p></div></td></tr>';
+      edgesBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-router"></i><p>No edges registered</p><small>Edge devices register automatically when they connect via MQTT. Check your MCU device configuration and verify the broker is reachable.</small></div></td></tr>';
     } else {
       edgesBody.innerHTML = edges.map(e => {
         const isOnline = !!e.online;
@@ -3836,7 +3837,7 @@ function renderDashboard() {
 
   if (cmdBody) {
     if (!commands.length) {
-      cmdBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs found</p></div></td></tr>';
+      cmdBody.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs yet</p><small>Select an edge from the fleet list to open the command panel and dispatch your first command.</small></div></td></tr>';
     } else {
       cmdBody.innerHTML = commands.map(c => {
         const status = c.status || 'unknown';
@@ -4234,7 +4235,7 @@ function renderHotspotUsers() {
   updateHotspotLastSync();
   if (!body) return;
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-person-lines-fill"></i><p>No hotspot users found</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-person-lines-fill"></i><p>No hotspot users found</p><small>Select a vessel and click Refresh. The directory syncs from the router via the hotspot bridge.</small></div></td></tr>';
     return;
   }
 
@@ -4407,13 +4408,13 @@ function renderAlertsCenter() {
   document.getElementById('alert-critical').textContent = critical;
   document.getElementById('alert-warning').textContent = warning;
   document.getElementById('alert-count').textContent = total;
-  document.getElementById('alert-source').textContent = total ? 'Live · event stream' : 'No alerts found';
+  document.getElementById('alert-source').textContent = total ? 'Live · event stream' : 'All clear';
   updateUnreadCounter();
 
   const body = document.getElementById('alert-body');
   if (!body) return;
   if (!total) {
-    body.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-bell"></i><p>No alerts found</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="4"><div class="empty"><i class="bi bi-check-circle"></i><p>All clear</p><small>No alerts at this time. Critical and warning events from vessel edges will appear here.</small></div></td></tr>';
     return;
   }
 
@@ -4549,7 +4550,7 @@ function renderCommandHistory(jobs) {
   const body = document.getElementById('cmd-history-body');
   if (!body) return;
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-terminal"></i><p>No command jobs found</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="5"><div class="empty"><i class="bi bi-terminal"></i><p>No dispatched commands yet</p><small>Commands appear here after you dispatch them from the fleet overview. Select an edge and use Send Command to get started.</small></div></td></tr>';
     return;
   }
 
@@ -5298,7 +5299,7 @@ function renderPackages() {
 
   const body = document.getElementById('pkg-body');
   if (!pkgList.length) {
-    body.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="bi bi-box-seam"></i><p>No packages found</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="7"><div class="empty"><i class="bi bi-box-seam"></i><p>No packages yet</p><small>Create a package above to define data allowances, speed limits, and validity periods for vessel crew.</small></div></td></tr>';
     return;
   }
 
