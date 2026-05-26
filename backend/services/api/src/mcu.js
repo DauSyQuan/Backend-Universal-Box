@@ -14,6 +14,7 @@ let sharedListenerReconnectAttempts = 0;
 let sharedListenerReconnectTimer = null;
 
 const ALLOWED_COMMAND_TYPES = new Set([
+  "ros_cmd",
   "policy_sync",
   "failback_vsat",
   "failover_starlink",
@@ -506,7 +507,7 @@ function validateCommandPayload(commandType, commandPayload) {
       const username = String(commandPayload.username ?? "").trim();
       const password = String(commandPayload.password ?? "").trim();
       const profile = String(commandPayload.profile ?? "").trim();
-      const qos = String(commandPayload.qos ?? "").trim();
+      const qos = String(commandPayload.qos ?? commandPayload.rate_limit ?? commandPayload["rate-limit"] ?? "").trim();
       const interfaceName = String(commandPayload.interface ?? "").trim();
       const poolName = String(commandPayload.pool ?? commandPayload.pool_name ?? "").trim();
       const dnsName = String(commandPayload.dns ?? commandPayload.dns_name ?? "").trim();

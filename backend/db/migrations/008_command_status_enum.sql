@@ -5,4 +5,7 @@ exception
 end $$;
 
 alter table command_jobs
-  alter column status type command_status using status::command_status;
+  drop constraint if exists command_jobs_status_check;
+
+alter table command_jobs
+  alter column status type command_status using status::text::command_status;

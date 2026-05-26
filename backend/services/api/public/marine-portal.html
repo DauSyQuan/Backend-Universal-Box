@@ -1,53 +1,12 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Marine Pro — Fleet Ops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
-      colors: {
-        boxdark:  '#111928',
-        'boxdark-2': '#0d1526',
-        strokedark: '#1D2939',
-        'form-strokedark': '#344054',
-        'form-input': '#101828',
-        primary:  '#465fff',
-        secondary:'#80CAEE',
-        meta3:    '#10B981',
-        meta6:    '#FBBF24',
-        meta1:    '#F03846',
-        meta5:    '#259AE6',
-        bodydark: '#AEB7C0',
-        bodydark2:'#8A99AF',
-        graydark: '#333A48',
-      },
-      keyframes: {
-        slideIn: { from:{opacity:'0',transform:'translateX(16px)'}, to:{opacity:'1',transform:'translateX(0)'} },
-        fadeIn:  { from:{opacity:'0',transform:'translateY(4px)'}, to:{opacity:'1',transform:'translateY(0)'} },
-        spin:    { to:{transform:'rotate(360deg)'} },
-      },
-      animation: {
-        slideIn: 'slideIn 0.2s ease',
-        fadeIn:  'fadeIn 0.2s ease',
-        spin:    'spin 0.7s linear infinite',
-      },
-    }
-  }
-}
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css" />
 <style>
   /* ── Marine Pro × TailAdmin — tokens.css (verbatim, dark mapped) ── */
   :root {
@@ -229,7 +188,7 @@ tailwind.config = {
   @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
   @keyframes spin    { to{transform:rotate(360deg)} }
   @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
-  @keyframes connPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,173,92,.6)} 60%{box-shadow:0 0 0 5px rgba(34,173,92,0)} }
+  @keyframes connPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(1.55)} }
   @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
   @keyframes sidebarGlow { 0%,100%{opacity:.5} 50%{opacity:1} }
   @keyframes bgDot { 0%{background-position:0 0} 100%{background-position:40px 40px} }
@@ -416,7 +375,7 @@ tailwind.config = {
   .pill-amber   { background: var(--color-warning-50);      color: var(--color-warning-700); }
   .pill-red     { background: var(--color-error-50);        color: var(--color-error-600); }
   .pill-blue    { background: var(--color-blue-light-100);  color: var(--color-blue-light-600); }
-  .pill-gray    { background: rgba(255,255,255,0.08);       color: var(--mp-fg); }
+  .pill-gray    { background: var(--mp-row-hover);       color: var(--mp-fg); }
 
   /* Trend chip (ui-kit.css verbatim) */
   .trend {
@@ -511,65 +470,89 @@ tailwind.config = {
   .tbl tbody tr:hover td { background: var(--mp-row-hover); }
   .tbl tr.row-click { transition: background .15s; }
   .tbl tr.row-click:hover td { background: var(--mp-row-hover) !important; cursor: pointer; }
+  .tbl tr.row-click:focus { outline: 2px solid var(--mp-primary); outline-offset: -2px; }
+  .tbl tr.row-click:focus td { background: var(--mp-row-hover) !important; }
   .tbl tr.row-selected td { background: rgba(70,95,255,0.12) !important; }
   .tbl .cell-strong { color: var(--mp-fg-strong); font-weight: 500; }
   .tbl .cell-mute   { color: var(--mp-fg-mute); }
   .pill-green.pulse-online::before { animation: connPulse 2s ease-in-out infinite; }
 
-  /* ── Stat Cards (KPI — cards.css pattern) ── */
+  /* ── Stat Cards (UI Kit pattern) ── */
   .stat-card {
     background: var(--mp-surface); border: 1px solid var(--mp-border);
-    border-radius: var(--radius-2xl); padding: 24px;
-    position: relative; overflow: hidden;
-    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    border-radius: var(--radius-2xl);
+    display: flex; flex-direction: column; gap: 14px; padding: 18px 20px;
+    transition: border-color .2s ease, box-shadow .2s ease;
   }
-  .stat-card:hover { border-color: var(--mp-border-strong); transform: translateY(-2px); box-shadow: var(--shadow-theme-md); }
-  .stat-card::after {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--color-brand-500), var(--color-brand-400));
-    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  }
-  .stat-card:has(.stat-green)::after  { background: linear-gradient(90deg, var(--color-success-500), var(--color-success-300)); }
-  .stat-card:has(.stat-amber)::after  { background: linear-gradient(90deg, var(--color-warning-500), var(--color-warning-300)); }
-  .stat-card:has(.stat-red)::after    { background: linear-gradient(90deg, var(--color-error-500), var(--color-error-300)); }
+  .stat-card:hover { border-color: var(--mp-border-strong); box-shadow: var(--shadow-theme-md); }
+  .stat-card-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .stat-card-value { font-size: 30px; font-weight: 700; line-height: 1; color: var(--mp-fg-strong); letter-spacing: -0.02em; }
+  .stat-card-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stat-card-sub { font-size: 12px; color: var(--mp-fg-mute); }
+  .icon-tile { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .icon-tile--brand   { background: var(--color-brand-50);        color: var(--color-brand-600); }
+  .icon-tile--success { background: var(--color-success-50);      color: var(--color-success-600); }
+  .icon-tile--warning { background: var(--color-warning-50);      color: var(--color-warning-600); }
+  .icon-tile--error   { background: var(--color-error-50);        color: var(--color-error-600); }
+  .icon-tile--info    { background: var(--color-blue-light-50,#e0f2fe); color: var(--color-blue-light-600,#0284c7); }
 
-  /* stat-card__icon (TailAdmin pattern) */
-  .stat-card__icon {
-    width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--mp-surface-muted); border-radius: var(--radius-xl);
-    color: var(--mp-fg-strong);
-  }
-  .stat-card__row {
-    display: flex; align-items: flex-end; justify-content: space-between; margin-top: 20px;
-  }
-  .stat-card__label { font-size: var(--text-theme-sm); color: var(--mp-fg-mute); }
-  .stat-card__value {
-    margin-top: 8px; font-size: var(--text-title-sm); line-height: var(--lh-title-sm);
-    font-weight: 700; color: var(--mp-fg-strong); letter-spacing: -0.01em;
-  }
-
-  /* Legacy KPI helpers (used by JS renderDashboard) */
+  /* Legacy KPI helpers (used by other JS stat renders) */
   .stat-icon {
-    position: absolute; top: 18px; right: 18px;
-    width: 48px; height: 48px; border-radius: var(--radius-xl);
+    width: 44px; height: 44px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0; background: var(--mp-surface-muted);
+    font-size: 18px; flex-shrink: 0;
   }
-  .stat-icon-blue  { background: rgba(70,95,255,0.15);   color: var(--color-brand-300); }
-  .stat-icon-green { background: rgba(18,183,106,0.15);  color: var(--color-success-300); }
-  .stat-icon-amber { background: rgba(247,144,9,0.15);   color: var(--color-warning-300); }
-  .stat-icon-red   { background: rgba(240,68,56,0.15);   color: var(--color-error-300); }
-  .stat-label { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 10px; padding-right: 56px; }
-  .stat-value { font-size: 32px; font-weight: 700; color: var(--mp-fg-strong); line-height: 1; letter-spacing: -1px; }
-  .stat-note  { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); margin-top: 8px; }
-  .stat-accent { color: var(--color-brand-400); }
-  .stat-green  { color: var(--color-success-300); }
-  .stat-amber  { color: var(--color-warning-300); }
-  .stat-red    { color: var(--color-error-300); }
-  .stat-sparkline { display: flex; align-items: flex-end; gap: 3px; height: 24px; margin-top: 12px; opacity: .5; }
-  .stat-sparkline-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 3px; background: currentColor; transition: height .4s ease; }
+  .stat-icon-blue  { background: var(--color-brand-50);   color: var(--color-brand-600); }
+  .stat-icon-green { background: var(--color-success-50); color: var(--color-success-600); }
+  .stat-icon-amber { background: var(--color-warning-50); color: var(--color-warning-600); }
+  .stat-icon-red   { background: var(--color-error-50);   color: var(--color-error-600); }
+  .stat-label { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--mp-fg-strong); line-height: 1; letter-spacing: -1px; }
+  .stat-note  { font-size: var(--text-theme-xs); color: var(--mp-fg-mute); }
+  .stat-accent { color: var(--color-brand-600); }
+  .stat-green  { color: var(--color-success-600); }
+  .stat-amber  { color: var(--color-warning-600); }
+  .stat-red    { color: var(--color-error-600); }
+  .kicker { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--mp-fg-mute); }
   .metric-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;background:var(--mp-surface-muted);border:1px solid var(--mp-border);color:var(--mp-fg); }
+
+  /* ── Fleet status rail ── */
+  .fleet-status-rail {
+    display: flex; align-items: stretch; flex-wrap: wrap;
+    background: var(--mp-surface); border: 1px solid var(--mp-border);
+    border-radius: var(--radius-2xl); overflow: hidden; margin-bottom: 24px;
+  }
+  .fleet-stat-group { display: flex; align-items: stretch; flex-wrap: wrap; }
+  .fleet-stat {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 13px 20px 13px 18px; gap: 2px;
+    border-right: 1px solid var(--mp-border); min-width: 88px;
+  }
+  .fleet-stat-value {
+    font-size: 20px; font-weight: 700; line-height: 1;
+    color: var(--mp-fg-strong); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .fleet-stat-value.online { color: var(--success); }
+  .fleet-stat-value.warn   { color: var(--warning); }
+  .fleet-stat-value.danger { color: var(--danger); }
+  .fleet-stat-label {
+    font-size: 10px; color: var(--mp-fg-mute); font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .fleet-rail-sep { width: 1px; background: var(--mp-border); align-self: stretch; flex-shrink: 0; }
+  .fleet-pills-section {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 16px; flex-wrap: wrap; flex: 1; min-width: 180px;
+  }
+  .fleet-pills-section-label {
+    font-size: 9px; color: var(--mp-fg-mute); font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    white-space: nowrap; margin-right: 4px; flex-shrink: 0;
+  }
+  /* ── Asymmetric dashboard main grid ── */
+  .dash-main-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .dash-main-grid { grid-template-columns: 1fr; } }
 
   /* ── Layout Grid ── */
   .grid   { display: grid; gap: 18px; }
@@ -601,13 +584,12 @@ tailwind.config = {
     padding: 16px 18px; font-size: var(--text-theme-sm); max-width: 360px;
     box-shadow: var(--shadow-theme-lg); animation: slideIn .25s ease;
     display: flex; align-items: flex-start; gap: 12px;
-    border-left: 4px solid var(--mp-border);
   }
-  .toast-item.toast-success { border-left-color: var(--color-success-500); }
-  .toast-item.toast-danger  { border-left-color: var(--color-error-500); }
-  .toast-item.toast-warn    { border-left-color: var(--color-warning-500); }
-  .toast-item.toast-info    { border-left-color: var(--color-brand-500); }
-  .toast-dismiss { margin-left: auto; cursor: pointer; color: var(--mp-fg-mute); font-size: 18px; flex-shrink: 0; transition: color 160ms; }
+  .toast-item.toast-success { border-color: var(--color-success-500); }
+  .toast-item.toast-danger  { border-color: var(--color-error-500); }
+  .toast-item.toast-warn    { border-color: var(--color-warning-500); }
+  .toast-item.toast-info    { border-color: var(--color-brand-500); }
+  .toast-dismiss { margin-left: auto; cursor: pointer; color: var(--mp-fg-mute); font-size: 18px; flex-shrink: 0; transition: color 160ms; background: none; border: none; padding: 0; line-height: 1; display: flex; align-items: center; }
   .toast-dismiss:hover { color: var(--mp-fg-strong); }
 
   /* ── Misc Utilities (layout.css + misc) ── */
@@ -776,12 +758,12 @@ tailwind.config = {
   .hdr-avatar::after {
     content:''; position:absolute; bottom:1px; right:1px;
     width:8px;height:8px;border-radius:50%;
-    background:var(--success);border:1.5px solid var(--bg-card);
+    background:var(--success);border:1.5px solid var(--mp-surface);
   }
 
   /* ── Top bar (per page, now hidden — global header replaces) ── */
   .topbar { display: none; }
-  .page-title h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+  .page-title h1 { font-size: 22px; font-weight: 700; color: var(--mp-fg-strong); }
   .topbar-actions { display: flex; gap: 8px; align-items: center; }
   .topbar + * { margin-top: 0; }
 
@@ -791,8 +773,8 @@ tailwind.config = {
     padding: 0 0 18px 0; margin-bottom: 22px; gap: 14px; flex-wrap: wrap;
     border-bottom: 1px solid var(--border);
   }
-  .page-header h1 { font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px; }
-  .page-header p  { font-size:12px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
+  .page-header h1 { font-size:20px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.3px; }
+  .page-header p  { font-size:12px;color:var(--mp-fg-mute);margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
   .page-header-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:4px; }
 
   /* ── Quota ── */
@@ -801,70 +783,495 @@ tailwind.config = {
 
   /* ── Responsive ── */
   @media(max-width:900px) { .grid-3{grid-template-columns:repeat(2,1fr)} .grid-4{grid-template-columns:repeat(2,1fr)} }
-  @media(max-width:600px) { .sidebar{display:none} .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
+  @media(max-width:600px) { .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
+
+  /* ── Mobile nav ── */
+  .mobile-nav-toggle {
+    display: none; width: 40px; height: 40px; border-radius: var(--radius-md);
+    background: transparent; border: 1px solid var(--mp-border);
+    color: var(--mp-fg-mute); cursor: pointer; font-size: 18px;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    transition: background 160ms, color 160ms;
+  }
+  .mobile-nav-toggle:hover { background: var(--mp-surface-muted); color: var(--mp-fg); }
+  .sidebar-overlay {
+    display: none; position: fixed; inset: 0; z-index: 90;
+    background: rgba(0,0,0,0.55);
+  }
+  @media(max-width:600px) {
+    .mobile-nav-toggle { display: inline-flex; }
+    .sidebar {
+      position: fixed; top: 0; left: -280px; bottom: 0; z-index: 100;
+      width: 260px !important; min-width: 260px !important;
+      transition: left 240ms ease; box-shadow: none;
+    }
+    .sidebar.sidebar--open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
+    .sidebar-overlay.sidebar--open { display: block; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     DARK THEME — solid surfaces, no blur, precision over decoration
+     Scene: NOC operator at desk in dim control room, monitoring vessel
+     telemetry at 2am. Precision and density; no decorative noise.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  :root {
+    --mp-bg:            #0d1117;
+    --mp-surface:       #161b22;
+    --mp-surface-2:     #1c2128;
+    --mp-surface-muted: #10151c;
+
+    --mp-border:        #30363d;
+    --mp-border-strong: #3d444d;
+    --border:           #30363d;
+    --border-light:     #30363d;
+    --border-strong:    #3d444d;
+    --glass-border:     #30363d;
+
+    --mp-fg:        rgba(230,237,243,0.9);
+    --mp-fg-strong: #e6edf3;
+    --mp-fg-mute:   #8b949e;
+    --mp-fg-soft:   #6e7681;
+    --text-primary:   rgba(230,237,243,0.9);
+    --text-secondary: #8b949e;
+    --text-muted:     #6e7681;
+    --text-faint:     #484f58;
+    --text2:          #8b949e;
+    --text3:          #6e7681;
+
+    /* Brand — muted teal, legible at this lightness */
+    --mp-primary:       #39d0d8;
+    --mp-primary-hover: #2eb8bf;
+    --color-brand-25:   rgba(57,208,216,0.04);
+    --color-brand-50:   rgba(57,208,216,0.08);
+    --color-brand-100:  rgba(57,208,216,0.14);
+    --color-brand-200:  rgba(57,208,216,0.25);
+    --color-brand-300:  rgba(57,208,216,0.55);
+    --color-brand-400:  #4de8f0;
+    --color-brand-500:  #39d0d8;
+    --color-brand-600:  #2eb8bf;
+    --color-brand-700:  #22959b;
+    --color-brand-800:  #197279;
+    --color-brand-text: #39d0d8;
+    --primary:          #39d0d8;
+    --primary-light:    #39d0d8;
+    --primary-bg:       rgba(57,208,216,0.08);
+    --accent2:          #39d0d8;
+    --accent3:          #39d0d8;
+
+    /* Status */
+    --success:    #3fb950;
+    --success-bg: rgba(63,185,80,0.1);
+    --warning:    #d29922;
+    --warning-bg: rgba(210,153,34,0.1);
+    --danger:     #f85149;
+    --danger-bg:  rgba(248,81,73,0.1);
+    --info:       #39d0d8;
+    --info-bg:    rgba(57,208,216,0.08);
+    --purple:     #bc8cff;
+    --purple-bg:  rgba(188,140,255,0.1);
+    --green:      #3fb950;
+    --amber:      #d29922;
+    --red:        #f85149;
+
+    --color-success-50:   rgba(63,185,80,0.1);
+    --color-success-100:  rgba(63,185,80,0.18);
+    --color-success-300:  #3fb950;
+    --color-success-500:  #3fb950;
+    --color-success-600:  #3fb950;
+    --color-success-700:  #2ea043;
+    --color-error-50:     rgba(248,81,73,0.1);
+    --color-error-100:    rgba(248,81,73,0.18);
+    --color-error-500:    #f85149;
+    --color-error-600:    #f85149;
+    --color-error-700:    #da3633;
+    --color-warning-50:   rgba(210,153,34,0.1);
+    --color-warning-100:  rgba(210,153,34,0.18);
+    --color-warning-300:  #d29922;
+    --color-warning-500:  #d29922;
+    --color-warning-600:  #d29922;
+    --color-warning-700:  #b07a00;
+    --color-blue-light-50:  rgba(57,208,216,0.08);
+    --color-blue-light-100: rgba(57,208,216,0.15);
+    --color-blue-light-500: #39d0d8;
+    --color-blue-light-600: #2eb8bf;
+    --color-orange-50:  rgba(210,120,40,0.1);
+    --color-orange-400: #e3853f;
+    --color-orange-500: #d06a20;
+
+    --mp-row-hover:   rgba(255,255,255,0.03);
+    --mp-thead-bg:    rgba(255,255,255,0.02);
+    --mp-kbd-bg:      rgba(255,255,255,0.05);
+    --mp-icon-btn-bg: #1c2128;
+    --mp-shadow-card: 0 1px 3px rgba(0,0,0,0.5);
+
+    --bg-body:       #0d1117;
+    --bg-sidebar:    #161b22;
+    --bg-card:       #161b22;
+    --bg-card-hover: #1c2128;
+    --bg-elevated:   #21262d;
+    --bg-input:      #0d1117;
+
+    --shadow:          0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg:       0 8px 24px rgba(0,0,0,0.6);
+    --shadow-theme-xs: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-theme-sm: 0 2px 6px rgba(0,0,0,0.4);
+    --shadow-theme-md: 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-theme-lg: 0 8px 24px rgba(0,0,0,0.5);
+    --shadow-theme-xl: 0 16px 40px rgba(0,0,0,0.6);
+    --shadow-focus-ring: 0 0 0 3px rgba(57,208,216,0.22);
+  }
+
+  /* Body — solid dark, no animated gradient */
+  body { background: #0d1117; }
+  body::before { display: none; }
+
+  #app, #login-page { background: transparent; }
+
+  /* Sidebar — solid, no blur */
+  .sidebar {
+    background: #161b22;
+    border-right: 1px solid #30363d;
+  }
+
+  /* Global header — solid dark, subtle bottom border */
+  .global-header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    box-shadow: 0 1px 0 #30363d;
+  }
+
+  /* Cards, stat cards, table wrappers — solid surfaces */
+  .card, .stat-card, .tbl-wrap {
+    background: #161b22;
+    border: 1px solid #30363d;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .card:hover, .stat-card:hover {
+    border-color: #3d444d;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .card-header {
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid #30363d;
+  }
+
+  /* Table */
+  .tbl thead th {
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid #30363d;
+    color: #6e7681;
+  }
+  .tbl tbody td { border-bottom: 1px solid rgba(48,54,61,0.7); }
+  .tbl tr.row-selected td { background: rgba(57,208,216,0.08); }
+
+  /* Buttons */
+  .btn-primary, .btn--primary {
+    background: #39d0d8;
+    border: 1px solid #39d0d8;
+    color: #0d1117;
+    box-shadow: none;
+  }
+  .btn-primary:hover:not(:disabled), .btn--primary:hover:not(:disabled) {
+    background: #2eb8bf;
+    border-color: #2eb8bf;
+    box-shadow: none;
+  }
+  .btn--secondary {
+    background: #21262d;
+    border-color: #30363d;
+    color: rgba(230,237,243,0.9);
+  }
+  .btn--secondary:hover:not(:disabled) { background: #30363d; }
+  .btn-ghost, .btn--ghost {
+    background: transparent;
+    border-color: #30363d;
+    color: #8b949e;
+  }
+  .btn-ghost:hover:not(:disabled), .btn--ghost:hover:not(:disabled) {
+    background: #21262d;
+    color: rgba(230,237,243,0.9);
+  }
+  .btn-success {
+    background: rgba(63,185,80,0.1);
+    border-color: rgba(63,185,80,0.4);
+    color: #3fb950;
+  }
+  .btn-danger, .btn--danger {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid #f85149;
+    color: #f85149;
+  }
+
+  /* Pills */
+  .pill-success, .pill--success { background:rgba(63,185,80,0.12);  color:#3fb950; border:1px solid rgba(63,185,80,0.3); }
+  .pill-danger,  .pill--error   { background:rgba(248,81,73,0.12);  color:#f85149; border:1px solid rgba(248,81,73,0.3); }
+  .pill-warning, .pill--warning { background:rgba(210,153,34,0.12); color:#d29922; border:1px solid rgba(210,153,34,0.3); }
+  .pill-info                    { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-primary, .pill--brand   { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-green  { background:rgba(63,185,80,0.12);  color:#3fb950; border:1px solid rgba(63,185,80,0.3); }
+  .pill-amber  { background:rgba(210,153,34,0.12); color:#d29922; border:1px solid rgba(210,153,34,0.3); }
+  .pill-red    { background:rgba(248,81,73,0.12);  color:#f85149; border:1px solid rgba(248,81,73,0.3); }
+  .pill-blue   { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-gray, .pill--gray { background:rgba(255,255,255,0.06); color:#8b949e; border:1px solid #30363d; }
+
+  /* Nav items */
+  .nav-item:hover, .menu-item:hover {
+    background: rgba(255,255,255,0.05);
+    color: #e6edf3;
+  }
+  .nav-item.active, .menu-item--active {
+    background: rgba(57,208,216,0.1);
+    color: #39d0d8;
+  }
+  .nav-item.active::before { background: #39d0d8; box-shadow: none; }
+  .nav-item.active i { color: #39d0d8; animation: none; }
+  .nav-item:hover i  { color: #39d0d8; }
+
+  /* Form controls */
+  .form-control, .input {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: rgba(230,237,243,0.9);
+    box-shadow: none;
+  }
+  .form-control::placeholder, .input::placeholder { color: #484f58; }
+  .form-control:focus, .input:focus {
+    border-color: #39d0d8;
+    box-shadow: 0 0 0 3px rgba(57,208,216,0.18);
+  }
+  .form-control:disabled, .input:disabled {
+    background: #10151c;
+    color: rgba(110,118,129,0.6);
+  }
+  select.form-control, select.input { color-scheme: dark; }
+  select.form-control option, select.input option { background: #161b22; color: rgba(230,237,243,0.9); }
+
+  /* Toggle */
+  .toggle__track { background: #30363d; }
+  .toggle input:checked + .toggle__track { background: #39d0d8; }
+
+  /* Alerts */
+  .alert-warn    { background:rgba(210,153,34,0.1);  border-color:rgba(210,153,34,0.25);  color:#d29922; }
+  .alert-danger  { background:rgba(248,81,73,0.1);   border-color:rgba(248,81,73,0.25);   color:#f85149; }
+  .alert-info    { background:rgba(57,208,216,0.08); border-color:rgba(57,208,216,0.22);  color:#39d0d8; }
+  .alert-success { background:rgba(63,185,80,0.1);   border-color:rgba(63,185,80,0.25);   color:#3fb950; }
+
+  /* Toast — full border per severity, no side-stripe */
+  .toast-item {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    color: rgba(230,237,243,0.9);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .toast-item.toast-success { border-color: rgba(63,185,80,0.4);  }
+  .toast-item.toast-danger  { border-color: rgba(248,81,73,0.45); }
+  .toast-item.toast-warn    { border-color: rgba(210,153,34,0.4); }
+  .toast-item.toast-info    { border-color: rgba(57,208,216,0.3); }
+  .toast-dismiss { color: #6e7681; }
+  .toast-dismiss:hover { color: #e6edf3; }
+
+  /* Modal — solid dark */
+  .modal-backdrop { background: rgba(0,0,0,0.72); }
+  .modal {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+  }
+  .modal__header { border-bottom:1px solid #30363d; background:rgba(255,255,255,0.02); }
+  .modal__footer { border-top:1px solid #30363d;    background:rgba(255,255,255,0.02); }
+
+  /* Status banners */
+  .page-status-banner, .status-banner {
+    background: #161b22;
+    border: 1px solid #30363d;
+  }
+
+  /* Chip */
+  .chip { background:rgba(255,255,255,0.06); border:1px solid #30363d; color:#8b949e; }
+
+  /* Tabs */
+  .tabs { background:rgba(255,255,255,0.03); border-color:#30363d; }
+  .tabs__item--active { background:#21262d; color:#e6edf3; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .tabs-line { border-bottom-color:#30363d; }
+  .tabs-line__item--active { color:#39d0d8; border-bottom-color:#39d0d8; }
+
+  /* Pagination */
+  .pagination__btn { background:#21262d; border-color:#30363d; color:#8b949e; }
+  .pagination__btn:hover { background:#30363d; color:#e6edf3; }
+  .pagination__btn--active { background:#39d0d8; border-color:#39d0d8; color:#0d1117; }
+
+  /* Dropdown */
+  .menu-pop { background:#1c2128; border:1px solid #30363d; box-shadow:0 8px 24px rgba(0,0,0,0.5); }
+  .menu-pop__item:hover { background:rgba(255,255,255,0.05); }
+  .menu-pop__divider { background:#30363d; }
+
+  /* Header */
+  .hdr-user { background:rgba(255,255,255,0.04); border-color:#30363d; }
+  .hdr-user:hover { background:rgba(255,255,255,0.07); }
+  .hdr-icon-btn { background:#1c2128; border-color:#30363d; color:#6e7681; }
+  .hdr-icon-btn:hover { background:#30363d; color:#e6edf3; }
+  .hdr-avatar { background: linear-gradient(135deg,#39d0d8,#bc8cff); }
+  .icon-btn { background:#1c2128; border-color:#30363d; }
+  .icon-btn:hover { background:#30363d; }
+
+  /* Icon tiles */
+  .icon-tile--brand   { background:rgba(57,208,216,0.1);  color:#39d0d8; }
+  .icon-tile--success { background:rgba(63,185,80,0.1);   color:#3fb950; }
+  .icon-tile--warning { background:rgba(210,153,34,0.1);  color:#d29922; }
+  .icon-tile--error   { background:rgba(248,81,73,0.1);   color:#f85149; }
+  .icon-tile--info    { background:rgba(57,208,216,0.08); color:#39d0d8; }
+  .stat-icon-blue  { background:rgba(57,208,216,0.1);  color:#39d0d8; }
+  .stat-icon-green { background:rgba(63,185,80,0.1);   color:#3fb950; }
+  .stat-icon-amber { background:rgba(210,153,34,0.1);  color:#d29922; }
+  .stat-icon-red   { background:rgba(248,81,73,0.1);   color:#f85149; }
+
+  /* Trend chips */
+  .trend-up,   .trend--up   { background:rgba(63,185,80,0.1);  color:#3fb950; }
+  .trend-down, .trend--down { background:rgba(248,81,73,0.1);  color:#f85149; }
+
+  /* Progress */
+  .progress { background:rgba(255,255,255,0.07); }
+  .progress-primary { background:#39d0d8; }
+  .progress-success { background:#3fb950; }
+  .progress-warning { background:#d29922; }
+
+  /* Traffic bars */
+  .bar-rx { background:#39d0d8; }
+  .bar-tx { background:#3fb950; }
+  .traffic-bar-bg { background:rgba(255,255,255,0.06); }
+
+  /* Chart shells & live samples */
+  .live-chart-shell { background:rgba(255,255,255,0.02); border-color:#30363d; }
+  .live-sample-item { background:rgba(255,255,255,0.02); border-color:#30363d; }
+  .live-sample-item:hover { background:rgba(255,255,255,0.04); }
+
+  /* Stats grid */
+  .stats-grid { background:#30363d; }
+  .stat-cell  { background:#161b22; }
+
+  /* Misc */
+  .divider { background:#30363d; }
+  .page-header { border-bottom-color:#30363d; }
+  .detail-section-title { border-bottom-color:#30363d; }
+  .quota-rule-row { border-bottom-color:#30363d; }
+  .quota-rule-row:hover { background:rgba(255,255,255,0.03); }
+  .num-badge { background:rgba(57,208,216,0.1); color:#39d0d8; border-color:rgba(57,208,216,0.2); }
+  .metric-chip { background:rgba(255,255,255,0.05); border-color:#30363d; }
+  .kbd, .kbd-inline { background:rgba(255,255,255,0.05); border-color:#30363d; color:#6e7681; }
+  .conn-dot { border-color:#0d1117; }
+
+  /* Choice checkbox/radio */
+  .choice__box { border-color:#30363d; background:#0d1117; }
+  .choice input:checked + .choice__box { background:#39d0d8; border-color:#39d0d8; }
+
+  /* Scrollbar */
+  * { scrollbar-width: thin; scrollbar-color: #30363d transparent; }
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#30363d; border-radius:10px; }
+  ::-webkit-scrollbar-thumb:hover { background:#3d444d; }
+
+  /* Login brand panel — solid */
+  #login-brand-panel { background: #161b22; }
+  /* ═══════════════════════════════════════════════════════════════════ */
 </style>
 </head>
 <body style="min-height: 100vh;">
 
 <!-- ─── LOGIN (TailAdmin split-screen) ─────────────────────────────────────── -->
+<!-- ─── API SETUP PANEL ───────────────────────────────────────────────────── -->
+<div id="api-setup-page" style="display:none;min-height:100vh;background:var(--mp-bg);align-items:center;justify-content:center;flex-direction:column;">
+  <div style="width:100%;max-width:420px;padding:0 24px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
+      <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
+      <span style="font-size:16px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
+    </div>
+    <h1 style="font-size:22px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:8px;">Connect to backend</h1>
+    <p style="font-size:14px;color:var(--mp-fg-mute);margin-bottom:24px;">Enter the base URL of your Marine Pro API. Leave blank to use relative URLs (same host).</p>
+    <div class="form-group">
+      <label class="form-label" for="api-setup-url">Backend API URL</label>
+      <input id="api-setup-url" class="form-control" style="height:44px;" placeholder="http://localhost:3000" autocomplete="url" />
+    </div>
+    <div id="api-setup-err" style="display:none;" class="alert alert-danger" style="margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="connectApiSetup(true)">Use relative URL</button>
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="connectApiSetup(false)"><i class="bi bi-box-arrow-in-right"></i> Connect</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-page" style="display:none;">
   <!-- Left: Form -->
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;">
-    <div style="width:100%;max-width:400px;">
-      <div style="margin-bottom:36px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
-          <span style="font-size:16px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.3px;">Marine Pro</span>
-        </div>
-        <h1 style="font-size:26px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:8px;">Sign In</h1>
-        <p style="font-size:14px;color:var(--text-muted);">Enter your credentials to access the Fleet Ops portal.</p>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 40px;">
+    <div style="width:100%;max-width:380px;">
+
+      <!-- Brand mark -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:40px;">
+        <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
+        <span style="font-size:15px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
       </div>
+
+      <!-- Heading -->
+      <h1 style="font-size:26px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.4px;line-height:1.2;margin-bottom:6px;">Sign in</h1>
+      <p style="font-size:13px;color:var(--mp-fg-mute);margin-bottom:28px;">Fleet Ops portal. Your session is stored in this browser.</p>
+
       <div id="login-notice" style="display:none;" class="alert alert-info"></div>
       <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
         <i class="bi bi-shield-check"></i>
         <div><strong>Credentials saved</strong><br/><span style="font-size:12px;">Stored in this browser.</span></div>
       </div>
+
       <div class="form-group">
-        <label class="form-label">Username</label>
+        <label class="form-label" for="login-user">Username</label>
         <input id="login-user" class="form-control" placeholder="admin" autocomplete="username" style="height:44px;" />
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label" for="login-pass">Password</label>
         <input id="login-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" style="height:44px;" />
       </div>
       <div id="login-err" style="display:none;" class="alert alert-danger"></div>
-      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;height:44px;font-size:14px;border-radius:10px;margin-top:8px;">
-        <i class="bi bi-box-arrow-in-right"></i> Sign In
+
+      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;height:44px;font-size:14px;border-radius:10px;margin-top:20px;">
+        <i class="bi bi-box-arrow-in-right"></i> Sign in
       </button>
-      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;">
-        <button class="btn btn-ghost btn-sm" onclick="clearAuth()" style="flex:1;justify-content:center;">Clear saved</button>
-        <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')" style="flex:1;justify-content:center;">
-          <i class="bi bi-skip-forward"></i> Skip auth
-        </button>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+        <div style="flex:1;height:1px;background:var(--mp-border);"></div>
+        <span style="font-size:11px;color:var(--mp-fg-mute);letter-spacing:.04em;text-transform:uppercase;">or</span>
+        <div style="flex:1;height:1px;background:var(--mp-border);"></div>
       </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="clearAuth()" style="flex:1;justify-content:center;">Clear saved</button>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')" style="flex:1;justify-content:center;"><i class="bi bi-skip-forward"></i> Skip</button>
+      </div>
+
     </div>
   </div>
-  <!-- Right: Brand panel -->
-  <div style="flex:1;background:linear-gradient(160deg,var(--color-brand-800,#0d1526) 0%,var(--color-brand-700,#111c34) 50%,var(--color-brand-900,#0a1020) 100%);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
-    <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
-    <div style="position:relative;text-align:center;max-width:340px;">
-      <div style="width:72px;height:72px;background:rgba(70,95,255,.15);border:1px solid rgba(70,95,255,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;">⚓</div>
-      <h2 style="font-size:24px;font-weight:700;color:rgba(255,255,255,.92);margin-bottom:12px;">Fleet Command Center</h2>
-      <p style="font-size:14px;color:var(--text-muted);line-height:1.6;">Real-time monitoring and management for maritime vessel edge devices.</p>
-      <div style="display:flex;gap:10px;margin-top:32px;justify-content:center;">
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--primary-light);">99.9%</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Uptime</div>
+
+  <!-- Right: Brand panel (desktop only, via CSS) -->
+  <div style="flex:1;background:var(--mp-surface);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;border-left:1px solid var(--mp-border);" id="login-brand-panel">
+    <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.06) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
+    <div style="position:relative;max-width:320px;">
+      <div style="width:64px;height:64px;background:rgba(57,208,216,0.08);border:1px solid rgba(57,208,216,0.18);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:28px;">⚓</div>
+      <h2 style="font-size:22px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:10px;letter-spacing:-.3px;line-height:1.3;">Fleet Command<br>Center</h2>
+      <p style="font-size:13px;color:var(--mp-fg-mute);line-height:1.65;margin-bottom:32px;">Operational platform for maritime vessel edge devices on MQTT.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-reception-4" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Fleet health, telemetry, and WAN monitoring
         </div>
-        <div style="width:1px;background:var(--border);"></div>
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--success);">Live</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Telemetry</div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-wifi" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Hotspot accounts, data quotas, and package assignments
         </div>
-        <div style="width:1px;background:var(--border);"></div>
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--warning);">MQTT</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Protocol</div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-terminal" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Remote command dispatch and RouterOS bridge
+        </div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-bell" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Alert center with critical and warning tracking
         </div>
       </div>
     </div>
@@ -872,69 +1279,82 @@ tailwind.config = {
 </div>
 
 <!-- ─── MAIN APP ─────────────────────────────────────────────────────────── -->
-<div id="app" style="display:none;display:flex;height:100vh;overflow:hidden;">
+<div id="app" style="display:none;height:100vh;height:100dvh;overflow:hidden;">
 
   <!-- Sidebar -->
-  <aside class="sidebar" style="width:260px;min-width:260px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
+  <aside class="sidebar" style="width:260px;min-width:260px;background:var(--mp-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
     <!-- Brand -->
     <div style="padding:22px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;">
-      <div style="width:42px;height:42px;background:linear-gradient(135deg,#5750f1,#7b75f5);border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
+      <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
       <div>
-        <div style="font-size:15px;font-weight:800;color:var(--text-primary);letter-spacing:0.3px;">MARINE PRO</div>
-        <div style="font-size:10px;color:var(--text-muted);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
+        <div style="font-size:15px;font-weight:800;color:var(--mp-fg-strong);letter-spacing:0.3px;">MARINE PRO</div>
+        <div style="font-size:10px;color:var(--mp-fg-mute);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
+      </div>
+    </div>
+
+    <!-- Vessel Picker -->
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:6px;padding-left:2px;">Active Vessel</div>
+      <select id="global-vessel-picker" class="form-control" style="font-size:12px;height:36px;" onchange="onVesselPickerChange()">
+        <option value="">— Loading vessels… —</option>
+      </select>
+      <div id="global-vessel-badge" style="display:none;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="chip" id="global-vessel-tenant" style="font-size:10px;"></span>
+        <span class="chip" id="global-vessel-vessel" style="font-size:10px;"></span>
+        <span class="chip" id="global-vessel-edge" style="font-size:10px;"></span>
       </div>
     </div>
 
     <!-- Nav -->
     <nav style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;overflow-x:visible;">
       <!-- Section: MAIN MENU -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Main Menu</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:8px 12px 8px;margin-bottom:2px;font-family:'JetBrains Mono',monospace;">Monitoring</div>
       <button class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard')">
-        <i class="bi bi-speedometer2"></i> Executive Summary
+        <i class="bi bi-reception-4"></i> Fleet Overview
       </button>
       <button class="nav-item" id="nav-alerts" onclick="showPage('alerts')">
-        <i class="bi bi-bell-fill"></i> Alert Center
+        <i class="bi bi-exclamation-circle"></i> Alert Center
       </button>
       <button class="nav-item" id="nav-commands" onclick="showPage('commands')">
-        <i class="bi bi-terminal-fill"></i> Command History
+        <i class="bi bi-list-task"></i> Command History
       </button>
       <!-- Section: FLEET MANAGEMENT -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Fleet Management</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">Connectivity</div>
       <button class="nav-item" id="nav-hotspot" onclick="showPage('hotspot')">
-        <i class="bi bi-person-badge-fill"></i> Hotspot Accounts
+        <i class="bi bi-wifi"></i> Hotspot Accounts
       </button>
       <button class="nav-item" id="nav-quota" onclick="showPage('quota')">
-        <i class="bi bi-arrow-repeat"></i> Quota Sync
+        <i class="bi bi-sliders2"></i> Quota Sync
       </button>
       <button class="nav-item" id="nav-policy" onclick="showPage('policy')">
-        <i class="bi bi-shield-fill"></i> Policy Center
+        <i class="bi bi-diagram-3"></i> Policy Center
       </button>
       <button class="nav-item" id="nav-traffic" onclick="showPage('traffic')">
-        <i class="bi bi-graph-up-arrow"></i> Traffic View
+        <i class="bi bi-bar-chart-line"></i> Traffic View
       </button>
       <button class="nav-item" id="nav-packages" onclick="showPage('packages')">
-        <i class="bi bi-box-seam-fill"></i> Package Catalog
+        <i class="bi bi-archive"></i> Package Catalog
       </button>
       <!-- Section: SYSTEM -->
-      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1.6px;text-transform:uppercase;font-weight:700;padding:16px 12px 8px;margin-top:4px;font-family:'JetBrains Mono',monospace;">System</div>
       <button class="nav-item" id="nav-settings" onclick="showPage('settings')">
-        <i class="bi bi-gear-fill"></i> Tenant Settings
+        <i class="bi bi-gear"></i> Tenant Settings
       </button>
       <button class="nav-item" id="nav-login" onclick="showPage('login')">
-        <i class="bi bi-key-fill"></i> Auth Settings
+        <i class="bi bi-person-lock"></i> Auth Settings
       </button>
     </nav>
 
     <!-- User card (bottom) -->
     <div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5750f1,#a855f7);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--mp-surface);border:1px solid var(--border);border-radius:var(--radius-lg);">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;position:relative;flex-shrink:0;">
           M
-          <span id="sidebar-dot" style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--text-secondary);border:2px solid var(--bg-card);transition:background .3s;"></span>
+          <span id="sidebar-dot" style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--mp-fg);border:2px solid var(--mp-surface);transition:background .3s;"></span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
-          <div id="sidebar-conn-label" style="font-size:11px;color:var(--text-muted);margin-top:1px;">Idle</div>
+          <div style="font-size:13px;font-weight:600;color:var(--mp-fg-strong);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marine Ops</div>
+          <div id="sidebar-conn-label" style="font-size:11px;color:var(--mp-fg-mute);margin-top:1px;">Idle</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
           <span class="pill pill-gray" id="sidebar-conn-status" style="font-size:10px;padding:2px 8px;">idle</span>
@@ -949,50 +1369,59 @@ tailwind.config = {
 
     <!-- ─── GLOBAL HEADER ──────────────────────────────────────────────────── -->
     <header class="global-header">
+      <button class="mobile-nav-toggle" onclick="toggleMobileSidebar()" aria-label="Open navigation" aria-expanded="false" id="mobile-nav-btn">
+        <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
       <div class="hdr-breadcrumb">
         <span class="hdr-root">Marine Pro</span>
         <i class="bi bi-chevron-right hdr-sep"></i>
         <h2 class="hdr-page" id="hdr-page-title">Fleet Command Center</h2>
       </div>
       <div class="hdr-actions">
+        <span class="pill pill-brand" id="hdr-active-vessel" style="font-size:11px;display:none;" title="Tàu đang chọn"></span>
         <span class="pill pill-gray" id="hdr-conn-pill" style="font-size:11px;"></span>
         <button class="hdr-icon-btn" title="Notifications"><i class="bi bi-bell"></i></button>
-        <button class="hdr-icon-btn" title="Toggle dark mode" onclick="document.documentElement.classList.toggle('dark')"><i class="bi bi-moon"></i></button>
+        <button class="hdr-icon-btn" id="theme-toggle" title="Light mode" style="cursor:default;opacity:.5;" disabled><i class="bi bi-sun"></i></button>
         <button class="hdr-icon-btn" title="Refresh" onclick="loadDashboard ? loadDashboard() : null"><i class="bi bi-arrow-clockwise"></i></button>
         <div class="hdr-user" onclick="showPage('login')">
           <div class="hdr-avatar">A</div>
           <div>
-            <div style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.2;">Admin</div>
-            <div style="font-size:11px;color:var(--text-muted);line-height:1.2;">Fleet Ops</div>
+            <div style="font-size:13px;font-weight:600;color:var(--mp-fg-strong);line-height:1.2;">Admin</div>
+            <div style="font-size:11px;color:var(--mp-fg-mute);line-height:1.2;">Fleet Ops</div>
           </div>
-          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--text-muted);margin-left:2px;"></i>
+          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--mp-fg-mute);margin-left:2px;"></i>
         </div>
       </div>
     </header>
 
     <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
-    <div class="page active" id="page-dashboard" style="padding:22px 28px;">
-      <div class="page-header">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--primary-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--primary-light);font-size:16px;border:1px solid rgba(87,80,241,0.25);"><i class="bi bi-speedometer2"></i></div>
-            <h1>Fleet Command Center</h1>
+    <div class="page active" id="page-dashboard" style="padding:24px 28px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;background:var(--color-brand-50);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--color-brand-600);font-size:22px;border:1px solid var(--color-brand-100);">
+            <i class="bi bi-reception-4"></i>
           </div>
-          <p>NOC real-time monitoring &middot; Auto-refresh 60s &middot; <span id="dash-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
+          <div>
+            <h1 style="font-size:18px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.3px;line-height:1.2;">Fleet Command Center</h1>
+            <p style="font-size:12px;color:var(--mp-fg-mute);margin-top:3px;display:flex;align-items:center;gap:6px;">
+              <i class="bi bi-clock" style="font-size:11px;"></i> Auto-refresh 60s &nbsp;·&nbsp;
+              <span id="dash-mode-badge" class="pill pill-gray" style="font-size:10px;padding:1px 7px;">loading</span>
+            </p>
+          </div>
         </div>
-        <div class="page-header-actions">
-          <button class="btn btn-ghost btn-sm" onclick="showPage('packages')"><i class="bi bi-box-seam"></i> Packages</button>
-          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-person-badge-fill"></i> Hotspot</button>
-          <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()">
-            <i class="bi bi-arrow-clockwise"></i> Refresh
-          </button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-ghost btn-sm" onclick="showPage('traffic')"><i class="bi bi-bar-chart-line"></i> Traffic</button>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('hotspot')"><i class="bi bi-wifi"></i> Hotspot</button>
+          <button class="btn btn-primary btn-sm" id="dash-refresh-btn" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
-      <div class="topbar" style="display:none;"></div>
 
-      <div class="page-status-banner" id="dash-status-banner">
-        <span class="kicker" style="margin-bottom:0;">Portal status</span>
-        <span id="dash-conn-label" style="font-size:13px;color:var(--text-primary);font-weight:600;">Checking backend…</span>
+      <!-- Connection banner -->
+      <div class="page-status-banner" id="dash-status-banner" style="margin-bottom:20px;">
+        <i class="bi bi-broadcast" style="font-size:15px;color:var(--mp-fg-mute);"></i>
+        <span id="dash-conn-label" style="font-size:13px;color:var(--mp-fg-strong);font-weight:600;">Checking backend…</span>
         <span class="status-banner-label"></span>
         <span class="pill pill-gray" id="dash-conn-pill">idle</span>
       </div>
@@ -1002,36 +1431,50 @@ tailwind.config = {
         <span id="dash-error-msg"></span>
       </div>
 
-      <div class="grid grid-4" style="margin-bottom:16px;" id="dash-stats"></div>
-
-      <div class="grid grid-2" style="margin-bottom:16px;">
-        <div class="card card-body">
-          <span class="kicker">Backend status</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-health-pills">
-            <span class="pill pill-gray">checking…</span>
-          </div>
+      <!-- Fleet status rail: counts + health + live metrics -->
+      <div class="fleet-status-rail">
+        <div class="fleet-stat-group" id="dash-stats">
+          <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Edges</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value online">—</div><div class="fleet-stat-label">Online</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value warn">—</div><div class="fleet-stat-label">Cmds</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Packages</div></div>
         </div>
-        <div class="card card-body">
-          <span class="kicker">System metrics</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="dash-metrics-pills">
-            <span class="pill pill-gray">n/a</span>
-          </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Health</span>
+          <div id="dash-health-pills" style="display:contents;"><span class="pill pill-gray">checking…</span></div>
+        </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Live</span>
+          <div id="dash-metrics-pills" style="display:contents;"><span class="pill pill-gray">n/a</span></div>
         </div>
       </div>
 
-      <div class="grid grid-2" style="margin-bottom:16px;">
+      <!-- Fleet snapshot (wider) + Command jobs -->
+      <div class="dash-main-grid">
         <!-- Fleet snapshot -->
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-router-fill" style="color:var(--primary-light);"></i> Fleet snapshot</div>
-              <div class="card-subtitle" id="edges-source">Loading…</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="icon-tile icon-tile--brand" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+                <i class="bi bi-hdd-network"></i>
+              </div>
+              <div>
+                <div class="card-title">Vessel edges</div>
+                <div class="card-subtitle" id="edges-source">Loading…</div>
+              </div>
             </div>
             <span class="num-badge" id="edges-count">0</span>
           </div>
           <div style="padding:0;">
             <table class="tbl" id="edges-table">
-              <thead><tr><th>Edge</th><th>Status</th><th>WAN IP</th><th>Last seen</th></tr></thead>
+              <thead><tr>
+                <th scope="col"><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th scope="col"><i class="bi bi-circle-fill" style="margin-right:4px;opacity:.6;font-size:8px;"></i>Status</th>
+                <th scope="col"><i class="bi bi-globe" style="margin-right:4px;opacity:.6;"></i>WAN IP</th>
+                <th scope="col"><i class="bi bi-clock-history" style="margin-right:4px;opacity:.6;"></i>Last seen</th>
+              </tr></thead>
               <tbody id="edges-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
@@ -1040,9 +1483,14 @@ tailwind.config = {
         <!-- Command jobs -->
         <div class="card">
           <div class="card-header">
-            <div>
-              <div class="card-title"><i class="bi bi-terminal-fill" style="color:var(--warning);"></i> Command jobs</div>
-              <div class="card-subtitle" id="commands-source">Loading…</div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="icon-tile icon-tile--warning" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+                <i class="bi bi-send-check"></i>
+              </div>
+              <div>
+                <div class="card-title">Command jobs</div>
+                <div class="card-subtitle" id="commands-source">Loading…</div>
+              </div>
             </div>
             <div style="display:flex;gap:6px;">
               <button class="btn btn-ghost btn-sm" id="cmd-prev" onclick="prevCmdPage()" disabled><i class="bi bi-chevron-left"></i></button>
@@ -1051,7 +1499,12 @@ tailwind.config = {
           </div>
           <div style="padding:0;">
             <table class="tbl">
-              <thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th></tr></thead>
+              <thead><tr>
+                <th scope="col"><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th scope="col"><i class="bi bi-code-square" style="margin-right:4px;opacity:.6;"></i>Type</th>
+                <th scope="col"><i class="bi bi-check2-circle" style="margin-right:4px;opacity:.6;"></i>Status</th>
+                <th scope="col"><i class="bi bi-clock" style="margin-right:4px;opacity:.6;"></i>Time</th>
+              </tr></thead>
               <tbody id="commands-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
           </div>
@@ -1061,9 +1514,14 @@ tailwind.config = {
       <!-- Edge detail panel -->
       <div class="card" id="edge-detail-card" style="display:none;margin-bottom:16px;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-cpu-fill" style="color:var(--primary-light);"></i> <span id="edge-detail-title">Edge detail</span></div>
-            <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--success" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-router"></i>
+            </div>
+            <div>
+              <div class="card-title"><span id="edge-detail-title">Edge detail</span></div>
+              <div class="card-subtitle" id="edge-detail-subtitle">Select an edge to view detail</div>
+            </div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="closeEdgeDetail()"><i class="bi bi-x"></i> Close</button>
         </div>
@@ -1075,31 +1533,36 @@ tailwind.config = {
       <!-- Send command -->
       <div class="card" id="cmd-create-card" style="display:none;">
         <div class="card-header">
-          <div>
-            <div class="card-title"><i class="bi bi-send-fill" style="color:var(--success);"></i> Send command</div>
-            <div class="card-subtitle">Dispatch commands to the selected edge.</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--info" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-send"></i>
+            </div>
+            <div>
+              <div class="card-title">Send command</div>
+              <div class="card-subtitle">Dispatch commands to the selected edge.</div>
+            </div>
           </div>
         </div>
         <div class="card-body">
           <div id="cmd-notice" style="display:none;" class="alert"></div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Tenant code</label>
-              <input id="cmd-tenant" class="form-control" value="tnr13" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Vessel code</label>
-              <input id="cmd-vessel" class="form-control" value="vsl-001" />
-            </div>
+          <div id="cmd-no-edge-warn" class="alert alert-warn" style="display:none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Chưa chọn tàu. Hãy chọn tàu từ dropdown phía trên ở sidebar.</span>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Edge code</label>
-              <input id="cmd-edge" class="form-control" value="edge-001" />
+              <label class="form-label" for="cmd-target-display">Tenant / Vessel / Edge</label>
+              <input id="cmd-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+              <input type="hidden" id="cmd-tenant" />
+              <input type="hidden" id="cmd-vessel" />
+              <input type="hidden" id="cmd-edge" />
             </div>
             <div class="form-group">
-              <label class="form-label">Command type</label>
+              <label class="form-label" for="cmd-type">Command type</label>
               <select id="cmd-type" class="form-control" onchange="updateCommandTypeFields()">
+                <optgroup label="RouterOS Direct">
+                  <option value="ros_cmd">ros_cmd — RouterOS API proxy</option>
+                </optgroup>
                 <optgroup label="Failover">
                   <option value="failover_starlink">failover_starlink</option>
                   <option value="failback_vsat">failback_vsat</option>
@@ -1114,11 +1577,55 @@ tailwind.config = {
               </select>
             </div>
           </div>
+          <!-- ros_cmd fields -->
+          <div id="cmd-ros-fields" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="kicker" style="margin-bottom:0;">Quick presets</span>
+              <select id="ros-preset" class="form-control" style="max-width:260px;" onchange="applyRosPreset()">
+                <option value="">— chọn preset —</option>
+                <optgroup label="Hotspot User">
+                  <option value="hs_user_add">Thêm user hotspot</option>
+                  <option value="hs_user_get">Lấy danh sách users</option>
+                  <option value="hs_user_remove">Xóa user (cần .id)</option>
+                  <option value="hs_active_get">Active sessions</option>
+                  <option value="hs_active_kick">Kick session (cần .id)</option>
+                </optgroup>
+                <optgroup label="Hotspot Setup">
+                  <option value="hs_profile_add">Tạo server profile</option>
+                  <option value="hs_server_add">Tạo hotspot server</option>
+                  <option value="hs_user_profile_add">Tạo user profile (QoS)</option>
+                </optgroup>
+                <optgroup label="Khác">
+                  <option value="ip_binding_add">IP Binding (bypass MAC)</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="ros-path">Path <span style="color:var(--mp-fg-mute);font-weight:400;">(RouterOS API path)</span></label>
+                <input id="ros-path" class="form-control mono" placeholder="/ip/hotspot/user" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ros-method">Method</label>
+                <select id="ros-method" class="form-control">
+                  <option value="get">get</option>
+                  <option value="add">add</option>
+                  <option value="set">set</option>
+                  <option value="remove">remove</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ros-params">Params <span style="color:var(--mp-fg-mute);font-weight:400;">(JSON object)</span></label>
+              <textarea id="ros-params" class="form-control mono" rows="5" placeholder='{"name": "nguyen-van-a", "password": "abc123", "profile": "crew"}'></textarea>
+              <span class="helper">Blocked paths: /system/shutdown · /system/reboot · /system/reset-configuration · /user</span>
+            </div>
+          </div>
           <!-- hotspot_cmd fields -->
           <div id="cmd-hotspot-fields" style="display:none;">
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Action</label>
+                <label class="form-label" for="cmd-hotspot-action">Action</label>
                 <select id="cmd-hotspot-action" class="form-control">
                   <option value="create_user_profile">create_user_profile</option>
                   <option value="create_account">create_user</option>
@@ -1129,27 +1636,27 @@ tailwind.config = {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Username</label>
+                <label class="form-label" for="cmd-hotspot-username">Username</label>
                 <input id="cmd-hotspot-username" class="form-control" placeholder="nguyen-van-a" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Profile / Name</label>
+                <label class="form-label" for="cmd-hotspot-profile">Profile / Name</label>
                 <input id="cmd-hotspot-profile" class="form-control" placeholder="crew" />
               </div>
               <div class="form-group">
-                <label class="form-label">Password</label>
+                <label class="form-label" for="cmd-hotspot-password">Password</label>
                 <input id="cmd-hotspot-password" class="form-control" type="password" placeholder="abc123" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Rate limit</label>
+                <label class="form-label" for="cmd-hotspot-ratelimit">Rate limit</label>
                 <input id="cmd-hotspot-ratelimit" class="form-control" placeholder="2M/2M" />
               </div>
               <div class="form-group">
-                <label class="form-label">Shared users</label>
+                <label class="form-label" for="cmd-hotspot-shared">Shared users</label>
                 <input id="cmd-hotspot-shared" class="form-control" type="number" placeholder="1" />
               </div>
             </div>
@@ -1158,30 +1665,49 @@ tailwind.config = {
           <div id="cmd-radius-fields" style="display:none;">
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">RADIUS IP</label>
+                <label class="form-label" for="cmd-radius-ip">RADIUS IP</label>
                 <input id="cmd-radius-ip" class="form-control" placeholder="10.0.0.2" />
               </div>
               <div class="form-group">
-                <label class="form-label">RADIUS port</label>
+                <label class="form-label" for="cmd-radius-port">RADIUS port</label>
                 <input id="cmd-radius-port" class="form-control" type="number" value="1812" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">RADIUS secret</label>
+                <label class="form-label" for="cmd-radius-secret">RADIUS secret</label>
                 <input id="cmd-radius-secret" class="form-control" placeholder="mcu_radius_secret" />
               </div>
               <div class="form-group">
-                <label class="form-label">Hotspot profile</label>
+                <label class="form-label" for="cmd-radius-profile">Hotspot profile</label>
                 <input id="cmd-radius-profile" class="form-control" placeholder="hsprof1" />
               </div>
             </div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary" id="cmd-submit-btn" onclick="sendCommand()">
-              <i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink
+              <i class="bi bi-terminal"></i> Execute ros_cmd
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- ros_cmd result viewer -->
+      <div class="card" id="ros-result-card" style="display:none;">
+        <div class="card-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="icon-tile icon-tile--success" style="width:34px;height:34px;font-size:16px;border-radius:8px;">
+              <i class="bi bi-terminal-split"></i>
+            </div>
+            <div>
+              <div class="card-title">RouterOS result</div>
+              <div class="card-subtitle" id="ros-result-meta">—</div>
+            </div>
+          </div>
+          <span class="pill" id="ros-result-status-pill">—</span>
+        </div>
+        <div class="card-body">
+          <pre id="ros-result-pre" style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-all;background:var(--mp-surface-muted);border:1px solid var(--mp-border);border-radius:var(--radius-lg);padding:14px;max-height:400px;overflow:auto;color:var(--mp-fg-strong);"></pre>
         </div>
       </div>
     </div>
@@ -1197,13 +1723,14 @@ tailwind.config = {
           <p>Fleet-wide alerts &middot; warning and critical tracking &middot; <span id="alert-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
         </div>
         <div class="page-header-actions">
+          <label class="form-label" for="alert-severity-filter" style="position:absolute;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;">Severity filter</label>
           <select id="alert-severity-filter" class="form-control" style="width:150px;" onchange="loadAlertsCenter()">
             <option value="all">All severities</option>
             <option value="critical">Critical</option>
             <option value="warning">Warning</option>
             <option value="info">Info</option>
           </select>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mp-fg);cursor:pointer;white-space:nowrap;">
             <input id="alert-unread-only" type="checkbox" checked onchange="loadAlertsCenter()" />
             Unread only
           </label>
@@ -1212,36 +1739,19 @@ tailwind.config = {
       </div>
       <div class="topbar" style="display:none;"></div>
 
-      <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-blue"><i class="bi bi-bell-fill"></i></div>
-          <div class="stat-label">Total Alerts</div>
-          <div class="stat-value stat-accent" id="alert-total">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>fleet-wide</span>
-            <span class="stat-note" style="margin-top:0;">all edges</span>
-          </div>
-          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+      <!-- Alert triage strip: critical first, urgency drives the eye -->
+      <div class="fleet-status-rail" style="margin-bottom:20px;">
+        <div class="fleet-stat" style="min-width:110px;">
+          <div class="fleet-stat-value danger" id="alert-critical">—</div>
+          <div class="fleet-stat-label">Critical</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-red"><i class="bi bi-exclamation-octagon-fill"></i></div>
-          <div class="stat-label">Critical</div>
-          <div class="stat-value stat-red" id="alert-critical">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>high priority</span>
-            <span class="stat-note" style="margin-top:0;">immediate action</span>
-          </div>
-          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:32%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div></div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-value warn" id="alert-warning">—</div>
+          <div class="fleet-stat-label">Warnings</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-triangle-fill"></i></div>
-          <div class="stat-label">Warnings</div>
-          <div class="stat-value stat-amber" id="alert-warning">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>review soon</span>
-            <span class="stat-note" style="margin-top:0;">follow up</span>
-          </div>
-          <div class="stat-sparkline stat-amber"><div class="stat-sparkline-bar" style="height:35%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:48%;"></div><div class="stat-sparkline-bar" style="height:58%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div></div>
+        <div class="fleet-stat" style="border-right:none;">
+          <div class="fleet-stat-value" style="color:var(--mp-fg-mute);" id="alert-total">—</div>
+          <div class="fleet-stat-label">Total</div>
         </div>
       </div>
 
@@ -1254,7 +1764,7 @@ tailwind.config = {
           <span class="num-badge" id="alert-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Edge</th><th>Severity</th><th>Message</th><th>Time</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Edge</th><th scope="col">Severity</th><th scope="col">Message</th><th scope="col">Time</th></tr></thead>
           <tbody id="alert-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1279,34 +1789,37 @@ tailwind.config = {
       <div class="topbar" style="display:none;"></div>
       <div class="grid grid-3" style="margin-bottom:16px;" id="command-stats">
         <div class="stat-card">
-          <div class="stat-icon stat-icon-blue"><i class="bi bi-list-check"></i></div>
-          <div class="stat-label">Total Jobs</div>
-          <div class="stat-value stat-accent" id="cmd-history-total">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>this page</span>
-            <span class="stat-note" style="margin-top:0;">paginated view</span>
+          <div class="stat-card-head">
+            <span class="kicker">Total Jobs</span>
+            <div class="icon-tile icon-tile--brand"><i class="bi bi-list-check"></i></div>
           </div>
-          <div class="stat-sparkline stat-accent"><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:42%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:72%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:68%;"></div><div class="stat-sparkline-bar" style="height:52%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-total">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> this page</span>
+            <span class="stat-card-sub">paginated view</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle-fill"></i></div>
-          <div class="stat-label">Sent / Delivered</div>
-          <div class="stat-value stat-green" id="cmd-history-sent">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-up"><i class="bi bi-arrow-up-short"></i>queued</span>
-            <span class="stat-note" style="margin-top:0;">to MQTT</span>
+          <div class="stat-card-head">
+            <span class="kicker">Sent / Delivered</span>
+            <div class="icon-tile icon-tile--success"><i class="bi bi-check-circle"></i></div>
           </div>
-          <div class="stat-sparkline stat-green"><div class="stat-sparkline-bar" style="height:40%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:45%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:80%;"></div><div class="stat-sparkline-bar" style="height:65%;"></div><div class="stat-sparkline-bar" style="height:90%;"></div><div class="stat-sparkline-bar" style="height:70%;"></div><div class="stat-sparkline-bar" style="height:78%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:88%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-sent">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> queued</span>
+            <span class="stat-card-sub">to MQTT</span>
+          </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-red"><i class="bi bi-x-circle-fill"></i></div>
-          <div class="stat-label">Failed</div>
-          <div class="stat-value stat-red" id="cmd-history-failed">—</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <span class="trend trend-down"><i class="bi bi-arrow-down-short"></i>needs retry</span>
-            <span class="stat-note" style="margin-top:0;">can retry</span>
+          <div class="stat-card-head">
+            <span class="kicker">Failed</span>
+            <div class="icon-tile icon-tile--error"><i class="bi bi-x-circle"></i></div>
           </div>
-          <div class="stat-sparkline stat-red"><div class="stat-sparkline-bar" style="height:55%;"></div><div class="stat-sparkline-bar" style="height:38%;"></div><div class="stat-sparkline-bar" style="height:62%;"></div><div class="stat-sparkline-bar" style="height:30%;"></div><div class="stat-sparkline-bar" style="height:56%;"></div><div class="stat-sparkline-bar" style="height:25%;"></div><div class="stat-sparkline-bar" style="height:60%;"></div><div class="stat-sparkline-bar" style="height:22%;"></div><div class="stat-sparkline-bar" style="height:50%;"></div><div class="stat-sparkline-bar" style="height:28%;"></div><div class="stat-sparkline-bar" style="height:44%;"></div><div class="stat-sparkline-bar" style="height:20%;"></div></div>
+          <div class="stat-card-value" id="cmd-history-failed">—</div>
+          <div class="stat-card-foot">
+            <span class="pill pill--error"><i class="bi bi-arrow-down"></i> needs retry</span>
+            <span class="stat-card-sub">can retry</span>
+          </div>
         </div>
       </div>
       <div id="cmd-history-error" style="display:none;" class="alert alert-danger">
@@ -1318,7 +1831,7 @@ tailwind.config = {
           <span class="num-badge" id="cmd-history-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th><th style="text-align:right;">Actions</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Edge</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Time</th><th scope="col" style="text-align:right;">Actions</th></tr></thead>
           <tbody id="cmd-history-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1347,29 +1860,51 @@ tailwind.config = {
       </div>
       <div class="topbar" style="display:none;"></div>
 
-      <div class="grid grid-4" style="margin-bottom:16px;" id="hotspot-stats">
-        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-diagram-3-fill"></i></div><div class="stat-label">Bridge log</div><div class="stat-value stat-accent" id="hotspot-ops-total">—</div><div class="stat-note">Command jobs sent</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-green"><i class="bi bi-person-lines-fill"></i></div><div class="stat-label">Directory users</div><div class="stat-value stat-green" id="hotspot-directory-total">—</div><div class="stat-note">Synced from snapshots</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-amber"><i class="bi bi-broadcast-pin"></i></div><div class="stat-label">Online users</div><div class="stat-value stat-amber" id="hotspot-active-total">—</div><div class="stat-note">Currently connected</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-clock-history"></i></div><div class="stat-label">Last sync</div><div class="stat-value stat-accent" style="font-size:16px;" id="hotspot-last-sync">—</div><div class="stat-note">Most recent reply</div></div>
+      <!-- Hotspot status rail: activity first, timestamp as pill -->
+      <div class="fleet-status-rail" style="margin-bottom:20px;">
+        <div class="fleet-stat-group">
+          <div class="fleet-stat">
+            <div class="fleet-stat-value warn" id="hotspot-active-total">—</div>
+            <div class="fleet-stat-label">Online</div>
+          </div>
+          <div class="fleet-stat">
+            <div class="fleet-stat-value online" id="hotspot-directory-total">—</div>
+            <div class="fleet-stat-label">Directory</div>
+          </div>
+          <div class="fleet-stat" style="border-right:none;">
+            <div class="fleet-stat-value" style="color:var(--mp-fg-mute);" id="hotspot-ops-total">—</div>
+            <div class="fleet-stat-label">Bridge ops</div>
+          </div>
+        </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Last sync</span>
+          <span id="hotspot-last-sync" class="pill pill-gray">—</span>
+        </div>
       </div>
 
       <!-- User Management (hotspot_cmd) -->
-      <div class="card" style="margin-bottom:16px;">
+      <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-people-fill" style="color:var(--success);"></i> Quản lý thuyền viên</div>
           <div class="card-subtitle">Tạo / sửa / xóa tài khoản và profile hotspot trực tiếp trên Pi4</div></div>
         </div>
         <div class="card-body">
           <div id="usermgmt-notice" style="display:none;" class="alert"></div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="usermgmt-tenant" class="form-control" value="tnr13" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="usermgmt-vessel" class="form-control" value="vsl-001" /></div>
+          <div id="usermgmt-no-edge-warn" class="alert alert-warn" style="display:none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Chưa chọn tàu. Hãy chọn tàu từ dropdown ở sidebar.</span>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="usermgmt-edge" class="form-control" value="edge-001" /></div>
+          <input type="hidden" id="usermgmt-tenant" />
+          <input type="hidden" id="usermgmt-vessel" />
+          <input type="hidden" id="usermgmt-edge" />
+          <div class="form-row" style="margin-bottom:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Vessel đang chọn</label>
+              <input id="usermgmt-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
             <div class="form-group">
-              <label class="form-label">Action</label>
+              <label class="form-label" for="usermgmt-action">Action</label>
               <select id="usermgmt-action" class="form-control" onchange="updateUserMgmtFields()">
                 <option value="create_user_profile">Tạo Profile (create_user_profile)</option>
                 <option value="create_account">Tạo user (create_user)</option>
@@ -1382,24 +1917,24 @@ tailwind.config = {
           </div>
           <div id="usermgmt-profile-fields">
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Tên profile (name)</label><input id="usermgmt-name" class="form-control" placeholder="crew" /></div>
-              <div class="form-group"><label class="form-label">Rate limit</label><input id="usermgmt-profile-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-name">Tên profile (name)</label><input id="usermgmt-name" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-profile-ratelimit">Rate limit</label><input id="usermgmt-profile-ratelimit" class="form-control" placeholder="2M/2M" /></div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Shared users</label><input id="usermgmt-shared-users" class="form-control" type="number" value="1" min="1" /></div>
-              <div class="form-group"><label class="form-label">Mô tả</label><input id="usermgmt-description" class="form-control" placeholder="Thuyền viên – 2Mbps" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-shared-users">Shared users</label><input id="usermgmt-shared-users" class="form-control" type="number" value="1" min="1" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-description">Mô tả</label><input id="usermgmt-description" class="form-control" placeholder="Thuyền viên – 2Mbps" /></div>
             </div>
           </div>
           <div id="usermgmt-user-fields" style="display:none;">
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Username</label><input id="usermgmt-username" class="form-control" placeholder="nguyen-van-a" /></div>
-              <div class="form-group" id="usermgmt-password-group"><label class="form-label">Password</label><input id="usermgmt-password" class="form-control" type="password" placeholder="abc123" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-username">Username</label><input id="usermgmt-username" class="form-control" placeholder="nguyen-van-a" /></div>
+              <div class="form-group" id="usermgmt-password-group"><label class="form-label" for="usermgmt-password">Password</label><input id="usermgmt-password" class="form-control" type="password" placeholder="abc123" /></div>
             </div>
             <div class="form-row">
-              <div class="form-group" id="usermgmt-profile-select-group"><label class="form-label">Profile</label><input id="usermgmt-user-profile" class="form-control" placeholder="crew" /></div>
-              <div class="form-group"><label class="form-label">Rate limit (tuỳ chọn)</label><input id="usermgmt-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+              <div class="form-group" id="usermgmt-profile-select-group"><label class="form-label" for="usermgmt-user-profile">Profile</label><input id="usermgmt-user-profile" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-ratelimit">Rate limit (tuỳ chọn)</label><input id="usermgmt-ratelimit" class="form-control" placeholder="2M/2M" /></div>
             </div>
-            <div class="form-group"><label class="form-label">Comment (tuỳ chọn)</label><input id="usermgmt-comment" class="form-control" placeholder="Máy trưởng" /></div>
+            <div class="form-group"><label class="form-label" for="usermgmt-comment">Comment (tuỳ chọn)</label><input id="usermgmt-comment" class="form-control" placeholder="Máy trưởng" /></div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary" id="usermgmt-submit-btn" onclick="sendUserMgmtCmd()"><i class="bi bi-send"></i> Gửi lệnh</button>
@@ -1408,7 +1943,7 @@ tailwind.config = {
       </div>
 
       <!-- JSON Bridge -->
-      <div class="card" id="hotspot-create-card" style="margin-bottom:16px;">
+      <div class="card" id="hotspot-create-card" style="margin-bottom:28px;">
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-diagram-3-fill" style="color:var(--primary-light);"></i> JSON bridge request (RouterOS nâng cao)</div>
           <div class="card-subtitle">Gửi lệnh RouterOS API thô. Dùng cho VLAN, DHCP, Hotspot server…</div></div>
@@ -1419,14 +1954,16 @@ tailwind.config = {
             <i class="bi bi-info-circle"></i>
             <span>Dùng <code>params</code> cho RouterOS keys, kể cả dashed names như <code>rate-limit</code>.</span>
           </div>
+          <input type="hidden" id="hotspot-create-tenant" />
+          <input type="hidden" id="hotspot-create-vessel" />
+          <input type="hidden" id="hotspot-create-edge" />
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="hotspot-create-tenant" class="form-control" value="tnr13" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="hotspot-create-vessel" class="form-control" value="vsl-001" /></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="hotspot-create-edge" class="form-control" value="edge-001" /></div>
             <div class="form-group">
-              <label class="form-label">Template</label>
+              <label class="form-label" for="hotspot-create-target-display">Vessel đang chọn</label>
+              <input id="hotspot-create-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="hotspot-template">Template</label>
               <select id="hotspot-template" class="form-control" onchange="applyHotspotTemplate()">
                 <option value="custom" selected>Custom</option>
                 <option value="vlan">VLAN interface</option>
@@ -1440,9 +1977,9 @@ tailwind.config = {
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Reference ID</label><input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" /></div>
+            <div class="form-group"><label class="form-label" for="hotspot-reference-id">Reference ID</label><input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" /></div>
             <div class="form-group">
-              <label class="form-label">Method</label>
+              <label class="form-label" for="hotspot-method">Method</label>
               <select id="hotspot-method" class="form-control">
                 <option value="add" selected>add</option>
                 <option value="set">set</option>
@@ -1451,14 +1988,14 @@ tailwind.config = {
               </select>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Path</label><input id="hotspot-path" class="form-control" placeholder="/ip/pool" /></div>
+          <div class="form-group"><label class="form-label" for="hotspot-path">Path</label><input id="hotspot-path" class="form-control" placeholder="/ip/pool" /></div>
           <div class="form-group">
-            <label class="form-label">Params JSON</label>
+            <label class="form-label" for="hotspot-params">Params JSON</label>
             <textarea id="hotspot-params" class="form-control font-mono" rows="8" placeholder='{"name":"pool_vlan50","ranges":"192.168.50.10-192.168.50.254"}'></textarea>
           </div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="hotspot-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary btn-sm" id="hotspot-action-submit" onclick="sendHotspotAction()"><i class="bi bi-send"></i> Send bridge request</button>
@@ -1467,14 +2004,14 @@ tailwind.config = {
       </div>
 
       <!-- Directory & Active -->
-      <div class="grid grid-2" style="margin-bottom:16px;">
+      <div class="grid grid-2" style="margin-bottom:20px;">
         <div class="card">
           <div class="card-header">
             <div><div class="card-title"><i class="bi bi-person-lines-fill" style="color:var(--success);"></i> Router directory</div><div class="card-subtitle" id="hotspot-directory-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-directory-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Username</th><th>Profile</th><th>QoS</th><th>Uptime</th><th>Status</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Username</th><th scope="col">Profile</th><th scope="col">QoS</th><th scope="col">Uptime</th><th scope="col">Status</th></tr></thead>
             <tbody id="hotspot-directory-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
           </div>
         </div>
@@ -1484,7 +2021,7 @@ tailwind.config = {
             <span class="num-badge" id="hotspot-active-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Username</th><th>IP</th><th>MAC</th><th>Session</th><th>Uptime</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Username</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">Session</th><th scope="col">Uptime</th></tr></thead>
             <tbody id="hotspot-active-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
           </div>
         </div>
@@ -1497,7 +2034,7 @@ tailwind.config = {
           <span class="num-badge" id="hotspot-ops-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Target</th><th>Path</th><th>Method</th><th>Reference</th><th>Status</th><th>Result</th><th>Created</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Target</th><th scope="col">Path</th><th scope="col">Method</th><th scope="col">Reference</th><th scope="col">Status</th><th scope="col">Result</th><th scope="col">Created</th></tr></thead>
           <tbody id="hotspot-ops-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1531,10 +2068,12 @@ tailwind.config = {
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header"><div class="card-title"><i class="bi bi-crosshair" style="color:var(--primary-light);"></i> Edge đích</div></div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Tenant code</label><input id="quota-tenant" class="form-control" value="tnr13" oninput="updateQuotaTargetLabel()" /></div>
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel code</label><input id="quota-vessel" class="form-control" value="vsl-001" oninput="updateQuotaTargetLabel()" /></div>
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Edge code</label><input id="quota-edge" class="form-control" value="edge-001" oninput="updateQuotaTargetLabel()" /></div>
+          <input type="hidden" id="quota-tenant" />
+          <input type="hidden" id="quota-vessel" />
+          <input type="hidden" id="quota-edge" />
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="quota-target-display">Vessel đang chọn</label>
+            <input id="quota-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
           </div>
         </div>
       </div>
@@ -1552,9 +2091,9 @@ tailwind.config = {
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:var(--text-secondary);"></i> Payload preview</div></div>
+        <div class="card-header"><div class="card-title"><i class="bi bi-code-slash" style="color:var(--mp-fg);"></i> Payload preview</div></div>
         <div class="card-body">
-          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:80px;">{}</pre>
+          <pre id="quota-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:80px;">{}</pre>
         </div>
       </div>
 
@@ -1594,14 +2133,16 @@ tailwind.config = {
       <div class="card">
         <div class="card-header"><div class="card-title"><i class="bi bi-sliders2" style="color:var(--primary-light);"></i> Uplink policy</div></div>
         <div class="card-body">
+          <input type="hidden" id="policy-tenant" />
+          <input type="hidden" id="policy-vessel" />
+          <input type="hidden" id="policy-edge" />
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="policy-vessel" class="form-control" value="vsl-001" oninput="updatePolicyPreview()" /></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="policy-edge" class="form-control" value="edge-001" oninput="updatePolicyPreview()" /></div>
             <div class="form-group">
-              <label class="form-label">Active uplink</label>
+              <label class="form-label" for="policy-target-display">Vessel đang chọn</label>
+              <input id="policy-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="policy-active-uplink">Active uplink</label>
               <select id="policy-active-uplink" class="form-control" onchange="updatePolicyPreview()">
                 <option value="automatic">automatic</option>
                 <option value="starlink">starlink</option>
@@ -1610,15 +2151,15 @@ tailwind.config = {
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">VSAT gateway</label><input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" /></div>
-            <div class="form-group"><label class="form-label">Starlink gateway</label><input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label" for="policy-vsat-gateway">VSAT gateway</label><input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label" for="policy-starlink-gateway">Starlink gateway</label><input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" /></div>
           </div>
-          <div class="form-group"><label class="form-label">Work IPs</label><textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea></div>
-          <div class="form-group"><label class="form-label">Entertainment IPs</label><textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24" oninput="updatePolicyPreview()"></textarea></div>
-          <div class="form-group"><label class="form-label">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-work-ips">Work IPs</label><textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-ent-ips">Entertainment IPs</label><textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-notes">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
-            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
+            <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="fillPolicyFromSelectedEdge()">Use selected edge</button>
@@ -1668,7 +2209,7 @@ tailwind.config = {
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-graph-up-arrow" style="color:var(--primary-light);"></i> Traffic summary</div><div class="card-subtitle" id="traffic-source">Loading…</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input id="traffic-vessel" class="form-control" style="width:140px;" value="vsl-001" placeholder="vessel code" />
+            <input id="traffic-vessel" class="form-control" style="width:160px;" readonly placeholder="— chọn tàu từ sidebar —" style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);" />
             <input id="traffic-days" class="form-control" style="width:100px;" type="number" min="1" max="365" value="30" />
           </div>
         </div>
@@ -1684,14 +2225,14 @@ tailwind.config = {
         <div class="card">
           <div class="card-header"><div class="card-title"><i class="bi bi-diagram-3" style="color:var(--success);"></i> Daily buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">RX</th><th scope="col">TX</th><th scope="col">Throughput</th></tr></thead>
             <tbody id="traffic-daily-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title"><i class="bi bi-calendar-month" style="color:var(--warning);"></i> Monthly buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">RX</th><th scope="col">TX</th><th scope="col">Throughput</th></tr></thead>
             <tbody id="traffic-monthly-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
@@ -1734,17 +2275,17 @@ tailwind.config = {
         <div class="card-body">
           <div id="pkg-form-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Code</label><input id="pkg-code" class="form-control" placeholder="basic-50gb" /></div>
-            <div class="form-group"><label class="form-label">Name</label><input id="pkg-name" class="form-control" placeholder="Basic 50GB" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-code">Code</label><input id="pkg-code" class="form-control" placeholder="basic-50gb" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-name">Name</label><input id="pkg-name" class="form-control" placeholder="Basic 50GB" /></div>
           </div>
-          <div class="form-group"><label class="form-label">Description</label><input id="pkg-desc" class="form-control" placeholder="Starter package" /></div>
+          <div class="form-group"><label class="form-label" for="pkg-desc">Description</label><input id="pkg-desc" class="form-control" placeholder="Starter package" /></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Quota (MB)</label><input id="pkg-quota" class="form-control" type="number" value="51200" /></div>
-            <div class="form-group"><label class="form-label">Validity (days)</label><input id="pkg-validity" class="form-control" type="number" value="30" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-quota">Quota (MB)</label><input id="pkg-quota" class="form-control" type="number" value="51200" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-validity">Validity (days)</label><input id="pkg-validity" class="form-control" type="number" value="30" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Speed limit (Kbps)</label><input id="pkg-speed" class="form-control" type="number" value="5120" /></div>
-            <div class="form-group"><label class="form-label">Price (USD)</label><input id="pkg-price" class="form-control" type="number" value="0" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-speed">Speed limit (Kbps)</label><input id="pkg-speed" class="form-control" type="number" value="5120" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-price">Price (USD)</label><input id="pkg-price" class="form-control" type="number" value="0" /></div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="togglePkgForm(false)">Cancel</button>
@@ -1757,12 +2298,12 @@ tailwind.config = {
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header">
           <div class="card-title"><i class="bi bi-box-seam-fill" style="color:var(--primary-light);"></i> Packages</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mp-fg);cursor:pointer;">
             <input type="checkbox" id="show-inactive" onchange="loadPackages()"> Hiển thị inactive
           </label>
         </div>
         <table class="tbl">
-          <thead><tr><th>Code</th><th>Name</th><th>Quota</th><th>Speed</th><th>Validity</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+          <thead><tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Quota</th><th scope="col">Speed</th><th scope="col">Validity</th><th scope="col">Status</th><th scope="col" style="text-align:right;">Actions</th></tr></thead>
           <tbody id="pkg-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody>
         </table>
       </div>
@@ -1773,12 +2314,16 @@ tailwind.config = {
         <div class="card-body">
           <div id="assign-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Package</label><select id="assign-pkg" class="form-control"><option value="">— select package —</option></select></div>
-            <div class="form-group"><label class="form-label">Username</label><input id="assign-user" class="form-control" placeholder="user123" /></div>
+            <div class="form-group"><label class="form-label" for="assign-pkg">Package</label><select id="assign-pkg" class="form-control"><option value="">— select package —</option></select></div>
+            <div class="form-group"><label class="form-label" for="assign-user">Username</label><input id="assign-user" class="form-control" placeholder="user123" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="assign-vessel" class="form-control" value="vsl-001" /></div>
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="assign-tenant" class="form-control" value="tnr13" /></div>
+            <div class="form-group">
+              <label class="form-label" for="assign-target-display">Vessel / Tenant</label>
+              <input id="assign-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+              <input type="hidden" id="assign-vessel" />
+              <input type="hidden" id="assign-tenant" />
+            </div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-success" onclick="doAssign()"><i class="bi bi-person-check"></i> Assign</button>
@@ -1794,9 +2339,9 @@ tailwind.config = {
         </div>
         <div class="card-body">
           <div class="form-row" style="margin-bottom:12px;">
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel</label><input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" /></div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label" for="usage-vessel">Vessel</label><input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" /></div>
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Bucket</label>
+              <label class="form-label" for="usage-bucket">Bucket</label>
               <select id="usage-bucket" class="form-control">
                 <option value="hour">Hour</option>
                 <option value="day" selected>Day</option>
@@ -1821,7 +2366,7 @@ tailwind.config = {
       <div class="page-header">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-gear-fill"></i></div>
+            <div style="width:36px;height:36px;background:var(--mp-surface-muted);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--mp-fg);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-gear-fill"></i></div>
             <h1>Tenant Settings</h1>
           </div>
           <p>Local operator settings for alerts webhook and tenant scope &middot; <span id="settings-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">local</span></p>
@@ -1841,16 +2386,16 @@ tailwind.config = {
         <div class="card-header"><div class="card-title"><i class="bi bi-gear-fill" style="color:var(--primary-light);"></i> Webhook notifications</div></div>
         <div class="card-body">
           <div id="settings-notice" style="display:none;" class="alert"></div>
-          <div class="form-group"><label class="form-label">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
-          <div class="form-group"><label class="form-label">Webhook URL</label><input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" /></div>
+          <div class="form-group"><label class="form-label" for="settings-tenant-code">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
+          <div class="form-group"><label class="form-label" for="settings-webhook-url">Webhook URL</label><input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" /></div>
           <div class="form-group">
-            <label class="form-label">Webhook enabled</label>
+            <label class="form-label" for="settings-webhook-enabled">Webhook enabled</label>
             <select id="settings-webhook-enabled" class="form-control">
               <option value="false">Disabled</option>
               <option value="true">Enabled</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Note</label><textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea></div>
+          <div class="form-group"><label class="form-label" for="settings-webhook-note">Note</label><textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea></div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="testWebhookSettings()"><i class="bi bi-send-check"></i> Test webhook</button>
             <button class="btn btn-primary" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
@@ -1864,7 +2409,7 @@ tailwind.config = {
       <div class="page-header" style="margin-bottom:14px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <div style="width:36px;height:36px;background:var(--bg-elevated);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-key-fill"></i></div>
+            <div style="width:36px;height:36px;background:var(--mp-surface-muted);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--mp-fg);font-size:16px;border:1px solid var(--border-light);"><i class="bi bi-key-fill"></i></div>
             <h1>Auth Settings</h1>
           </div>
           <p>HTTP Basic Auth &middot; Browser credential storage</p>
@@ -1877,8 +2422,8 @@ tailwind.config = {
           <div id="login-inline-saved" style="display:none;" class="alert alert-success">
             <i class="bi bi-shield-check"></i> Auth header currently saved in this browser.
           </div>
-          <div class="form-group"><label class="form-label">Username</label><input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" /></div>
-          <div class="form-group"><label class="form-label">Password</label><input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
+          <div class="form-group"><label class="form-label" for="inline-user">Username</label><input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" /></div>
+          <div class="form-group"><label class="form-label" for="inline-pass">Password</label><input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
           <div id="inline-err" style="display:none;" class="alert alert-danger"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
@@ -1891,8 +2436,11 @@ tailwind.config = {
   </main>
 </div>
 
+<!-- Sidebar overlay (mobile tap-to-close) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
 <!-- Toast stack -->
-<div class="toast-stack" id="toast-stack"></div>
+<div class="toast-stack" id="toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -1934,6 +2482,7 @@ function doLogin() {
   if (!u || !p) { showLoginErr('Username and password required.'); return; }
   saveBasicAuth(u, p);
   showPage(initialPage);
+  loadVesselPicker();
 }
 
 function doLoginInline() {
@@ -1965,12 +2514,13 @@ let trafficRows = [];
 let trafficSummary = null;
 let trafficQuota = null;
 let trafficWindow = {
-  vessel: 'vsl-001',
+  vessel: '',
   period: 'day',
   month: new Date().toISOString().slice(0, 7)
 };
 
 function showPage(name) {
+  closeMobileSidebar();
   if (name === 'login') {
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -1992,7 +2542,7 @@ function showPage(name) {
   currentPage = name;
   // Update global header breadcrumb
   const pageTitles = {
-    dashboard:'Fleet Command Center', alerts:'Alert Center',
+    dashboard:'Fleet Overview', alerts:'Alert Center',
     commands:'Command History', hotspot:'Hotspot Management',
     quota:'Quota Sync', policy:'Policy Center',
     traffic:'Traffic View', packages:'Package Catalog',
@@ -2090,7 +2640,12 @@ async function apiFetch(path, opts = {}) {
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.error || j.message || errMsg; } catch {}
+      try {
+        const j = await res.json();
+        const e = j.error;
+        errMsg = typeof e === 'string' ? e
+               : (e?.message || j.message || JSON.stringify(e) || errMsg);
+      } catch {}
       throw new Error(errMsg);
     }
     return await res.json();
@@ -2133,6 +2688,153 @@ const TENANT_SETTINGS_KEY = 'marine_tenant_settings';
 let alertReadIds = new Set();
 let alertedWebhookIds = new Set();
 let tenantSettings = { tenant_code: 'tnr13', webhook_url: '', webhook_enabled: false, note: '' };
+
+// ─── VESSEL PICKER & ACTIVE EDGE ──────────────────────────────────────────────
+
+function setActiveEdge(edge) {
+  selectedEdgeContext = edge;
+
+  const label = edge
+    ? `${edge.vessel_name || edge.vessel_code} · ${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`
+    : '';
+
+  // Sidebar badges
+  const badge = document.getElementById('global-vessel-badge');
+  if (badge) badge.style.display = edge ? 'flex' : 'none';
+  const elT = document.getElementById('global-vessel-tenant');
+  const elV = document.getElementById('global-vessel-vessel');
+  const elE = document.getElementById('global-vessel-edge');
+  if (elT) elT.textContent = edge?.tenant_code || '';
+  if (elV) elV.textContent = edge?.vessel_code || '';
+  if (elE) elE.textContent = edge?.edge_code || '';
+
+  // Commands page
+  const cmdT = document.getElementById('cmd-tenant');
+  const cmdV = document.getElementById('cmd-vessel');
+  const cmdE = document.getElementById('cmd-edge');
+  const cmdDisp = document.getElementById('cmd-target-display');
+  const cmdWarn = document.getElementById('cmd-no-edge-warn');
+  if (cmdT) cmdT.value = edge?.tenant_code || '';
+  if (cmdV) cmdV.value = edge?.vessel_code || '';
+  if (cmdE) cmdE.value = edge?.edge_code || '';
+  if (cmdDisp) cmdDisp.value = label;
+  if (cmdWarn) cmdWarn.style.display = edge ? 'none' : 'flex';
+
+  // Hotspot user management
+  const umT = document.getElementById('usermgmt-tenant');
+  const umV = document.getElementById('usermgmt-vessel');
+  const umE = document.getElementById('usermgmt-edge');
+  const umDisp = document.getElementById('usermgmt-target-display');
+  const umWarn = document.getElementById('usermgmt-no-edge-warn');
+  if (umT) umT.value = edge?.tenant_code || '';
+  if (umV) umV.value = edge?.vessel_code || '';
+  if (umE) umE.value = edge?.edge_code || '';
+  if (umDisp) umDisp.value = label;
+  if (umWarn) umWarn.style.display = edge ? 'none' : 'flex';
+
+  // Hotspot JSON bridge
+  const hcT = document.getElementById('hotspot-create-tenant');
+  const hcV = document.getElementById('hotspot-create-vessel');
+  const hcE = document.getElementById('hotspot-create-edge');
+  const hcDisp = document.getElementById('hotspot-create-target-display');
+  if (hcT) hcT.value = edge?.tenant_code || '';
+  if (hcV) hcV.value = edge?.vessel_code || '';
+  if (hcE) hcE.value = edge?.edge_code || '';
+  if (hcDisp) hcDisp.value = label;
+
+  // Quota page
+  const qT = document.getElementById('quota-tenant');
+  const qV = document.getElementById('quota-vessel');
+  const qE = document.getElementById('quota-edge');
+  const qDisp = document.getElementById('quota-target-display');
+  if (qT) qT.value = edge?.tenant_code || '';
+  if (qV) qV.value = edge?.vessel_code || '';
+  if (qE) qE.value = edge?.edge_code || '';
+  if (qDisp) qDisp.value = label;
+  updateQuotaTargetLabel?.();
+
+  // Policy page
+  const pT = document.getElementById('policy-tenant');
+  const pV = document.getElementById('policy-vessel');
+  const pE = document.getElementById('policy-edge');
+  const pDisp = document.getElementById('policy-target-display');
+  if (pT) pT.value = edge?.tenant_code || '';
+  if (pV) pV.value = edge?.vessel_code || '';
+  if (pE) pE.value = edge?.edge_code || '';
+  if (pDisp) pDisp.value = label;
+  updatePolicyPreview?.();
+
+  // Traffic page
+  const tvV = document.getElementById('traffic-vessel');
+  if (tvV) tvV.value = edge?.vessel_code || '';
+  if (trafficWindow) trafficWindow.vessel = edge?.vessel_code || '';
+
+  // Packages page
+  const aV = document.getElementById('assign-vessel');
+  const aT = document.getElementById('assign-tenant');
+  const aDisp = document.getElementById('assign-target-display');
+  if (aV) aV.value = edge?.vessel_code || '';
+  if (aT) aT.value = edge?.tenant_code || '';
+  if (aDisp) aDisp.value = label;
+
+  // Header vessel indicator pill
+  const hdrVessel = document.getElementById('hdr-active-vessel');
+  if (hdrVessel) {
+    hdrVessel.textContent = edge ? edge.vessel_code : '';
+    hdrVessel.style.display = edge ? '' : 'none';
+  }
+}
+
+async function loadVesselPicker() {
+  const picker = document.getElementById('global-vessel-picker');
+  if (!picker) return;
+  try {
+    const data = await apiFetch('/api/mcu/edges');
+    const edges = data.edges || data || [];
+    picker.innerHTML = '<option value="">— Chọn tàu —</option>';
+    edges.forEach((e, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${e.vessel_name || e.vessel_code} (${e.tenant_code}/${e.vessel_code}/${e.edge_code})`;
+      opt.dataset.edge = JSON.stringify(e);
+      picker.appendChild(opt);
+    });
+    // Auto-select if only one vessel
+    if (edges.length === 1) {
+      picker.selectedIndex = 1;
+      setActiveEdge(edges[0]);
+    }
+    // Restore last selected vessel from localStorage
+    const lastVessel = localStorage.getItem('mp_active_vessel');
+    if (lastVessel) {
+      for (const opt of picker.options) {
+        if (!opt.dataset.edge) continue;
+        const e = JSON.parse(opt.dataset.edge);
+        if (e.vessel_code === lastVessel) {
+          opt.selected = true;
+          setActiveEdge(e);
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    picker.innerHTML = '<option value="">— Lỗi tải danh sách tàu —</option>';
+  }
+}
+
+function onVesselPickerChange() {
+  const picker = document.getElementById('global-vessel-picker');
+  if (!picker) return;
+  const opt = picker.options[picker.selectedIndex];
+  if (!opt || !opt.dataset.edge) {
+    setActiveEdge(null);
+    localStorage.removeItem('mp_active_vessel');
+    return;
+  }
+  const edge = JSON.parse(opt.dataset.edge);
+  setActiveEdge(edge);
+  localStorage.setItem('mp_active_vessel', edge.vessel_code);
+}
 
 function clearEdgeStreamReconnectTimer() {
   if (edgeStreamReconnectTimer) {
@@ -2270,7 +2972,7 @@ function renderTrafficView() {
   const rows = Array.isArray(trafficRows) ? trafficRows : [];
   const period = trafficWindow.period || 'day';
   const month = trafficWindow.month || new Date().toISOString().slice(0, 7);
-  const vessel = trafficWindow.vessel || 'vsl-001';
+  const vessel = trafficWindow.vessel || selectedEdgeContext?.vessel_code || '';
 
   const buckets = aggregateTelemetryBuckets(rows, period);
   const daily = aggregateTelemetryBuckets(rows, 'day');
@@ -3052,50 +3754,39 @@ function renderDashboard() {
   const stats = [
     {
       label: 'Total Edges', value: edges.length,
-      tone: 'accent', icon: 'bi-router-fill', iconCls: 'stat-icon-blue',
+      icon: 'bi-hdd-network', tileCls: 'icon-tile--brand',
       trend: edges.length > 0 ? `${edges.length} registered` : 'none',
-      trendDir: 'up', note: mode === 'live' ? 'live from API' : 'fallback data',
-      sparkHeights: [30,45,35,60,50,75,55,80,65,72,58,85]
+      trendDir: 'up', note: mode === 'live' ? 'live from API' : 'fallback data'
     },
     {
       label: 'Online Edges', value: onlineEdges,
-      tone: onlineEdges > 0 ? 'green' : 'red', icon: 'bi-activity', iconCls: onlineEdges > 0 ? 'stat-icon-green' : 'stat-icon-red',
+      icon: 'bi-broadcast-pin', tileCls: 'icon-tile--success',
       trend: onlineEdges > 0 ? `${Math.round(onlineEdges/Math.max(edges.length,1)*100)}% fleet up` : 'all offline',
-      trendDir: onlineEdges > 0 ? 'up' : 'down', note: `${warnEdges} with warnings`,
-      sparkHeights: [40,60,45,70,55,80,65,90,70,78,62,88]
+      trendDir: onlineEdges > 0 ? 'up' : 'down', note: `${warnEdges} with warnings`
     },
     {
       label: 'Recent Commands', value: commands.length,
-      tone: 'amber', icon: 'bi-terminal-fill', iconCls: 'stat-icon-amber',
+      icon: 'bi-terminal', tileCls: 'icon-tile--warning',
       trend: `page ${Math.floor(cmdOffset/CMD_PAGE)+1}`,
-      trendDir: 'up', note: 'dispatched this session',
-      sparkHeights: [20,35,25,50,40,55,45,60,38,52,42,58]
+      trendDir: 'up', note: 'dispatched this session'
     },
     {
       label: 'Active Packages', value: activePkgs,
-      tone: 'accent', icon: 'bi-box-seam-fill', iconCls: 'stat-icon-blue',
+      icon: 'bi-box-seam', tileCls: 'icon-tile--info',
       trend: activePkgs > 0 ? `${activePkgs} assignable` : 'none active',
-      trendDir: activePkgs > 0 ? 'up' : 'down', note: 'Phase 3 catalog',
-      sparkHeights: [25,40,30,55,42,65,50,72,55,68,52,78]
+      trendDir: activePkgs > 0 ? 'up' : 'down', note: 'Phase 3 catalog'
     }
   ];
 
   const statsEl = document.getElementById('dash-stats');
-  if (statsEl) statsEl.innerHTML = stats.map(s => `
-    <div class="stat-card">
-      <div class="stat-icon ${s.iconCls}"><i class="bi ${s.icon}"></i></div>
-      <div class="stat-label">${s.label}</div>
-      <div class="stat-value stat-${s.tone}">${s.value}</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <span class="trend ${s.trendDir === 'up' ? 'trend-up' : 'trend-down'}">
-          <i class="bi ${s.trendDir === 'up' ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i>${s.trend}
-        </span>
-        <span class="stat-note" style="margin-top:0;">${s.note}</span>
-      </div>
-      <div class="stat-sparkline stat-${s.tone}">
-        ${s.sparkHeights.map(h => `<div class="stat-sparkline-bar" style="height:${h}%;"></div>`).join('')}
-      </div>
-    </div>`).join('');
+  if (statsEl) {
+    const colorCls = ['', 'online', 'warn', ''];
+    statsEl.innerHTML = stats.map((s, i) => `
+      <div class="fleet-stat">
+        <div class="fleet-stat-value ${colorCls[i] || ''}" title="${s.note}">${s.value}</div>
+        <div class="fleet-stat-label">${s.label}</div>
+      </div>`).join('');
+  }
 
   // Edges table
   const edgesBody = document.getElementById('edges-body');
@@ -3115,12 +3806,12 @@ function renderDashboard() {
         const dotColor = isOnline ? 'var(--success)' : isWarn ? 'var(--warning)' : 'var(--danger)';
         const wanIp = e.public_wan_ip
           ? `<span class="chip mono" style="font-size:11px;">${e.public_wan_ip}</span>`
-          : '<span style="color:var(--text-faint);font-size:12px;">—</span>';
-        return `<tr class="row-click" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})">
+          : '<span style="color:var(--mp-fg-soft);font-size:12px;">—</span>';
+        return `<tr class="row-click" tabindex="0" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEdge(${JSON.stringify(JSON.stringify(e))})}">
           <td>
             <div style="display:flex;flex-direction:column;gap:2px;">
-              <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${e.edge_code}</span>
-              <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${e.tenant_code}/${e.vessel_code}</span>
+              <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${e.edge_code}</span>
+              <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${e.tenant_code}/${e.vessel_code}</span>
             </div>
           </td>
           <td>
@@ -3130,7 +3821,7 @@ function renderDashboard() {
             </span>
           </td>
           <td>${wanIp}</td>
-          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(e.last_seen_at)}</span></td>
+          <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(e.last_seen_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -3151,10 +3842,10 @@ function renderDashboard() {
         const sc = { sent: 'pill-info', delivered: 'pill-success', failed: 'pill-danger', pending: 'pill-warning' }[status] || 'pill-gray';
         const si = { sent: 'bi-send-fill', delivered: 'bi-check-circle-fill', failed: 'bi-x-circle-fill', pending: 'bi-hourglass-split' }[status] || 'bi-circle';
         return `<tr>
-          <td><span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${c.edge_code || '—'}</span></td>
+          <td><span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${c.edge_code || '—'}</span></td>
           <td><span class="chip mono" style="font-size:11px;">${c.command_type}</span></td>
           <td><span class="pill ${sc}" style="gap:5px;"><i class="bi ${si}" style="font-size:10px;"></i>${status}</span></td>
-          <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(c.created_at)}</span></td>
+          <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(c.created_at)}</span></td>
         </tr>`;
       }).join('');
     }
@@ -3731,16 +4422,16 @@ function renderAlertsCenter() {
     const sevIcon = sev === 'critical' ? 'bi-exclamation-octagon-fill' : sev === 'warning' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill';
     const read = isAlertRead(alert.id);
     return `
-      <tr class="row-click ${read ? '' : 'row-selected'}" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})">
+      <tr class="row-click ${read ? '' : 'row-selected'}" tabindex="0" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAlert(${JSON.stringify(JSON.stringify(alert))})}">
         <td>
           <div style="display:flex;flex-direction:column;gap:2px;">
-            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${(alert.edge_key || '—').split('/').pop()}</span>
-            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${alert.edge_key || '—'}${read ? '' : ' <span style="color:var(--primary-light);">· unread</span>'}</span>
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${(alert.edge_key || '—').split('/').pop()}</span>
+            <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${alert.edge_key || '—'}${read ? '' : ' <span style="color:var(--primary-light);">· unread</span>'}</span>
           </div>
         </td>
         <td><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${sevIcon}" style="font-size:10px;"></i>${alert.severity || 'info'}</span></td>
-        <td style="color:var(--text-secondary);max-width:320px;">${alert.message || JSON.stringify(alert)}</td>
-        <td><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(alert.created_at)}</span></td>
+        <td style="color:var(--mp-fg);max-width:320px;">${alert.message || JSON.stringify(alert)}</td>
+        <td><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(alert.created_at)}</span></td>
       </tr>`;
   }).join('');
 }
@@ -3870,13 +4561,13 @@ function renderCommandHistory(jobs) {
       <tr class="row-click">
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})">
           <div style="display:flex;flex-direction:column;gap:2px;">
-            <span class="mono" style="font-size:12px;font-weight:600;color:var(--text-primary);">${job.edge_code || '—'}</span>
-            <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">${job.tenant_code || ''}/${job.vessel_code || ''}</span>
+            <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${job.edge_code || '—'}</span>
+            <span style="font-size:11px;color:var(--mp-fg-mute);font-family:'JetBrains Mono',monospace;">${job.tenant_code || ''}/${job.vessel_code || ''}</span>
           </div>
         </td>
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="chip mono" style="font-size:11px;">${job.command_type || '—'}</span></td>
         <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="pill ${pillClass}" style="gap:5px;"><i class="bi ${statusIcon}" style="font-size:10px;"></i>${status}</span></td>
-        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="mono" style="font-size:11px;color:var(--text-muted);">${fmtTime(job.created_at)}</span></td>
+        <td onclick="selectCommandJob(${JSON.stringify(JSON.stringify(job))})"><span class="mono" style="font-size:11px;color:var(--mp-fg-mute);">${fmtTime(job.created_at)}</span></td>
         <td style="text-align:right;">
           <button class="btn ${canRetry ? 'btn-success' : 'btn-ghost'} btn-sm" ${canRetry ? '' : 'disabled'} onclick="retryCommandJob(${JSON.stringify(JSON.stringify(job))})">
             <i class="bi bi-arrow-repeat"></i> Retry
@@ -4002,7 +4693,22 @@ async function nextHistoryCmdPage() {
 // ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
 async function selectEdge(edgeJson, options = {}) {
   const edge = typeof edgeJson === 'string' ? JSON.parse(edgeJson) : edgeJson;
-  selectedEdgeContext = edge;
+  setActiveEdge(edge);
+
+  // Sync vessel picker to reflect this selection
+  const picker = document.getElementById('global-vessel-picker');
+  if (picker) {
+    for (const opt of picker.options) {
+      if (!opt.dataset.edge) continue;
+      const e = JSON.parse(opt.dataset.edge);
+      if (e.vessel_code === edge.vessel_code && e.tenant_code === edge.tenant_code && e.edge_code === edge.edge_code) {
+        picker.value = opt.value;
+        break;
+      }
+    }
+  }
+  localStorage.setItem('mp_active_vessel', edge.vessel_code);
+
   const card = document.getElementById('edge-detail-card');
   const body = document.getElementById('edge-detail-body');
   const title = document.getElementById('edge-detail-title');
@@ -4144,22 +4850,45 @@ function closeEdgeDetail() {
   document.getElementById('edge-detail-card').style.display = 'none';
 }
 
+const ROS_PRESETS = {
+  hs_user_add:        { path: '/ip/hotspot/user',         method: 'add',    params: { name: 'nguyen-van-a', password: 'abc123', profile: 'crew', server: 'all', comment: '' } },
+  hs_user_get:        { path: '/ip/hotspot/user',         method: 'get',    params: {} },
+  hs_user_remove:     { path: '/ip/hotspot/user',         method: 'remove', params: { '.id': '*1' } },
+  hs_active_get:      { path: '/ip/hotspot/active',       method: 'get',    params: {} },
+  hs_active_kick:     { path: '/ip/hotspot/active',       method: 'remove', params: { '.id': '*A0000001' } },
+  hs_profile_add:     { path: '/ip/hotspot/profile',      method: 'add',    params: { name: 'hsprof1', 'hotspot-address': '192.168.40.1', 'dns-name': 'hotspot.local', 'login-by': 'http-chap,http-pap' } },
+  hs_server_add:      { path: '/ip/hotspot',              method: 'add',    params: { name: 'hs1', interface: 'ether5-USER', 'address-pool': 'dhcp_pool_lan', profile: 'hsprof1', disabled: 'no' } },
+  hs_user_profile_add:{ path: '/ip/hotspot/user/profile', method: 'add',    params: { name: 'crew', 'rate-limit': '2M/2M', 'shared-users': '1' } },
+  ip_binding_add:     { path: '/ip/hotspot/ip-binding',   method: 'add',    params: { 'mac-address': 'AA:BB:CC:DD:EE:FF', address: '192.168.40.50', type: 'bypassed' } },
+};
+
+function applyRosPreset() {
+  const preset = ROS_PRESETS[document.getElementById('ros-preset')?.value];
+  if (!preset) return;
+  const pathEl = document.getElementById('ros-path');
+  const methodEl = document.getElementById('ros-method');
+  const paramsEl = document.getElementById('ros-params');
+  if (pathEl) pathEl.value = preset.path;
+  if (methodEl) methodEl.value = preset.method;
+  if (paramsEl) paramsEl.value = JSON.stringify(preset.params, null, 2);
+}
+
 function updateCommandTypeFields() {
-  const type = document.getElementById('cmd-type')?.value || 'failover_starlink';
+  const type = document.getElementById('cmd-type')?.value || 'ros_cmd';
   const btn = document.getElementById('cmd-submit-btn');
   if (btn) {
     btn.innerHTML = {
-      failover_starlink: '<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
-      failback_vsat: '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
-      restore_automatic: '<i class="bi bi-arrow-repeat"></i> Restore automatic',
-      hotspot_cmd: '<i class="bi bi-person-badge-fill"></i> Gửi hotspot_cmd',
-      radius_setup: '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
+      ros_cmd:          '<i class="bi bi-terminal"></i> Execute ros_cmd',
+      failover_starlink:'<i class="bi bi-arrow-up-right-circle"></i> Failover to Starlink',
+      failback_vsat:    '<i class="bi bi-arrow-down-left-circle"></i> Failback to VSAT',
+      restore_automatic:'<i class="bi bi-arrow-repeat"></i> Restore automatic',
+      hotspot_cmd:      '<i class="bi bi-wifi"></i> Gửi hotspot_cmd',
+      radius_setup:     '<i class="bi bi-shield-lock-fill"></i> Gửi radius_setup'
     }[type] || '<i class="bi bi-send"></i> Send command';
   }
-  const hotspotFields = document.getElementById('cmd-hotspot-fields');
-  const radiusFields = document.getElementById('cmd-radius-fields');
-  if (hotspotFields) hotspotFields.style.display = type === 'hotspot_cmd' ? 'block' : 'none';
-  if (radiusFields) radiusFields.style.display = type === 'radius_setup' ? 'block' : 'none';
+  document.getElementById('cmd-ros-fields').style.display     = type === 'ros_cmd'     ? 'block' : 'none';
+  document.getElementById('cmd-hotspot-fields').style.display = type === 'hotspot_cmd' ? 'block' : 'none';
+  document.getElementById('cmd-radius-fields').style.display  = type === 'radius_setup'? 'block' : 'none';
 }
 
 const HOTSPOT_TEMPLATE_PRESETS = {
@@ -4328,7 +5057,7 @@ async function sendHotspotAction() {
 
   if (!tenant || !vessel || !edge) {
     if (noticeEl) {
-      showEl('hotspot-create-notice', 'Tenant, vessel, and edge are required.', 'alert-warn');
+      showEl('hotspot-create-notice', 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
       noticeEl.style.display = 'flex';
     }
     return;
@@ -4410,6 +5139,13 @@ async function sendCommand() {
   const edge = document.getElementById('cmd-edge').value.trim();
   const type = document.getElementById('cmd-type').value;
   const commandPayload = (() => {
+    if (type === 'ros_cmd') {
+      const path = document.getElementById('ros-path')?.value.trim() || '';
+      const method = document.getElementById('ros-method')?.value || 'get';
+      let params = {};
+      try { params = JSON.parse(document.getElementById('ros-params')?.value || '{}'); } catch { throw new Error('Params JSON không hợp lệ'); }
+      return { path, method, params };
+    }
     if (type === 'failover_starlink') return { preferred_uplink: 'starlink' };
     if (type === 'failback_vsat') return { preferred_uplink: 'vsat' };
     if (type === 'restore_automatic') return { preferred_uplink: 'automatic', mode: 'automatic' };
@@ -4439,9 +5175,19 @@ async function sendCommand() {
     return {};
   })();
 
-  if (!tenant || !vessel || !edge || !type) {
+  if (!tenant || !vessel || !edge) {
     if (noticeEl) {
-      showEl(noticeEl.id, 'All fields required.', 'alert-warn');
+      showEl(noticeEl.id, 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    const warn = document.getElementById('cmd-no-edge-warn');
+    if (warn) warn.style.display = 'flex';
+    return;
+  }
+
+  if (!type) {
+    if (noticeEl) {
+      showEl(noticeEl.id, 'Chọn loại lệnh.', 'alert-warn');
       noticeEl.style.display = 'flex';
     }
     return;
@@ -4467,12 +5213,49 @@ async function sendCommand() {
         command_payload: commandPayload
       }
     });
+    const cmdId = res?.command?.id || res?.id || res?.command_id || '?';
     if (noticeEl) {
-      showEl(noticeEl.id, `Command sent successfully! ID: ${res?.command?.id || res.id || res.command_id || res?.command_id || '?'}`, 'alert-success');
+      showEl(noticeEl.id, `Command sent! ID: ${cmdId} — chờ result từ Pi (~2-3s)`, 'alert-success');
     }
     noticeEl.style.display = 'flex';
     toast('Command sent ✓', 'success');
-    await loadDashboard(true);
+    if (type === 'ros_cmd') {
+      // Poll for result up to 15s
+      const rosResultCard = document.getElementById('ros-result-card');
+      const rosResultPre = document.getElementById('ros-result-pre');
+      const rosResultMeta = document.getElementById('ros-result-meta');
+      const rosStatusPill = document.getElementById('ros-result-status-pill');
+      if (rosResultCard) {
+        rosResultCard.style.display = 'block';
+        rosResultPre.textContent = 'Waiting for Pi result…';
+        rosResultMeta.textContent = `job ${cmdId}`;
+        rosStatusPill.className = 'pill pill-gray';
+        rosStatusPill.textContent = 'pending';
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          try {
+            const jobRes = await apiFetch(`/api/commands?limit=5`);
+            const jobs = jobRes?.jobs || jobRes?.data || [];
+            const job = jobs.find(j => j.id === cmdId);
+            if (job && (job.status === 'success' || job.status === 'failed')) {
+              clearInterval(poll);
+              rosStatusPill.className = job.status === 'success' ? 'pill pill--success' : 'pill pill--error';
+              rosStatusPill.textContent = job.status;
+              rosResultMeta.textContent = `job ${cmdId} · ${job.status} · ${new Date(job.result_at || job.updated_at || Date.now()).toLocaleTimeString()}`;
+              rosResultPre.textContent = JSON.stringify(job.result_payload ?? {}, null, 2);
+            } else if (attempts >= 15) {
+              clearInterval(poll);
+              rosStatusPill.className = 'pill pill--warning';
+              rosStatusPill.textContent = 'timeout';
+              rosResultPre.textContent = 'No result after 15s. Pi may be offline or command is still processing.';
+            }
+          } catch { /* ignore poll errors */ }
+        }, 1000);
+      }
+    } else {
+      await loadDashboard(true);
+    }
   } catch (err) {
     if (noticeEl) {
       showEl(noticeEl.id, `Failed: ${err.message}`, 'alert-danger');
@@ -4587,7 +5370,7 @@ async function savePackage() {
     validity_days: Number(document.getElementById('pkg-validity').value),
     speed_limit_kbps: Number(document.getElementById('pkg-speed').value),
     price: Number(document.getElementById('pkg-price').value),
-    tenant_code: 'tnr13'
+    tenant_code: selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || ''
   };
 
   if (!payload.code || !payload.name) {
@@ -4663,7 +5446,8 @@ async function loadUsage() {
   const bucket = document.getElementById('usage-bucket')?.value || 'day';
 
   try {
-    const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+    const tenant = selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '';
+    const params = new URLSearchParams({ tenant, bucket, window_minutes: '1440' });
     if (vessel) params.set('vessel', vessel);
 
     const data = await apiFetch('/api/reports/usage?' + params);
@@ -4685,7 +5469,8 @@ async function loadUsage() {
 async function exportUsage() {
   const vessel = document.getElementById('usage-vessel')?.value.trim() || '';
   const bucket = document.getElementById('usage-bucket')?.value || 'day';
-  const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+  const tenant = selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '';
+  const params = new URLSearchParams({ tenant, bucket, window_minutes: '1440' });
   if (vessel) params.set('vessel', vessel);
   const url = (API_BASE || '') + '/api/reports/usage/export?' + params;
   toast('Opening export URL…', 'info');
@@ -4747,27 +5532,20 @@ function getPolicyPayload() {
   }
 
   return {
-    tenant_code: document.getElementById('policy-tenant')?.value.trim() || tenantSettings.tenant_code || 'tnr13',
-    vessel_code: document.getElementById('policy-vessel')?.value.trim() || 'vsl-001',
-    edge_code: document.getElementById('policy-edge')?.value.trim() || 'edge-001',
+    tenant_code: document.getElementById('policy-tenant')?.value.trim() || selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '',
+    vessel_code: document.getElementById('policy-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '',
+    edge_code: document.getElementById('policy-edge')?.value.trim() || selectedEdgeContext?.edge_code || '',
     groups
   };
 }
 
 function fillPolicyFromSelectedEdge() {
   if (!selectedEdgeContext) {
-    toast('Select an edge from dashboard first', 'warn');
+    toast('Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu.', 'warn');
     return;
   }
-  const edge = selectedEdgeContext;
-  const tenant = document.getElementById('policy-tenant');
-  const vessel = document.getElementById('policy-vessel');
-  const edgeCode = document.getElementById('policy-edge');
-  if (tenant) tenant.value = edge.tenant_code || tenant.value;
-  if (vessel) vessel.value = edge.vessel_code || vessel.value;
-  if (edgeCode) edgeCode.value = edge.edge_code || edgeCode.value;
-  updatePolicyPreview();
-  toast('Policy form filled from selected edge', 'success');
+  setActiveEdge(selectedEdgeContext);
+  toast('Đã điền thông tin tàu đang chọn', 'success');
 }
 
 async function applyPolicy() {
@@ -4946,7 +5724,7 @@ function renderTrafficTables(daily, monthly) {
 async function loadTrafficView() {
   const modeBadge = document.getElementById('traffic-mode-badge');
   const source = document.getElementById('traffic-source');
-  const vessel = document.getElementById('traffic-vessel')?.value.trim() || 'vsl-001';
+  const vessel = document.getElementById('traffic-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '';
   const period = document.getElementById('traffic-period')?.value || 'day';
   const days = Math.max(1, Math.min(365, Number(document.getElementById('traffic-days')?.value || 30)));
   const month = document.getElementById('traffic-month')?.value || new Date().toISOString().slice(0, 7);
@@ -5091,7 +5869,7 @@ function toast(msg, type = 'info') {
   el.innerHTML = `
     <i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};font-size:16px;flex-shrink:0;"></i>
     <span style="flex:1;">${msg}</span>
-    <span class="toast-dismiss" onclick="document.getElementById('toast-${id}').remove()"><i class="bi bi-x"></i></span>`;
+    <button class="toast-dismiss" onclick="document.getElementById('toast-${id}').remove()" aria-label="Dismiss notification"><i class="bi bi-x" aria-hidden="true"></i></button>`;
 
   document.getElementById('toast-stack').appendChild(el);
   setTimeout(() => el.remove(), 5000);
@@ -5108,19 +5886,36 @@ function startAutoRefresh() {
   startTrafficRefresh();
 }
 
+// ─── API SETUP ────────────────────────────────────────────────────────────────
+function connectApiSetup(useRelative) {
+  if (useRelative) {
+    localStorage.setItem('marine_api_base', '');
+    location.reload();
+    return;
+  }
+  const val = (document.getElementById('api-setup-url').value || '').trim();
+  const errEl = document.getElementById('api-setup-err');
+  if (!val) {
+    errEl.textContent = 'Please enter a URL or use "Use relative URL".';
+    errEl.style.display = 'flex';
+    return;
+  }
+  try { new URL(val); } catch {
+    errEl.textContent = 'Invalid URL — include the scheme, e.g. http://localhost:3000';
+    errEl.style.display = 'flex';
+    return;
+  }
+  errEl.style.display = 'none';
+  localStorage.setItem('marine_api_base', val);
+  location.reload();
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
-  // Check if we need to show the API setup prompt
+  // Check if we need to show the API setup panel
   if (!API_BASE) {
-    const apiBase = prompt(
-      'Marine Portal — Backend API URL\n\nEnter your backend base URL (e.g. http://localhost:3000)\nLeave blank to use relative URLs (same host):',
-      'http://localhost:3000'
-    );
-    if (apiBase && apiBase.trim()) {
-      localStorage.setItem('marine_api_base', apiBase.trim());
-      location.reload();
-      return;
-    }
+    document.getElementById('api-setup-page').style.display = 'flex';
+    return;
   }
 
   syncTenantSettingsFromStorage();
@@ -5147,11 +5942,11 @@ function init() {
     document.getElementById('app').style.display = 'flex';
     showPage(initialPage);
     updateCommandTypeFields();
-    startEdgeStream({
-      tenant_code: tenantSettings.tenant_code || 'tnr13',
-      vessel_code: tenantSettings.vessel_code || 'vsl-001',
-      edge_code: tenantSettings.edge_code || null
-    }).catch(() => {});
+    loadVesselPicker().then(() => {
+      if (selectedEdgeContext) {
+        startEdgeStream(selectedEdgeContext).catch(() => {});
+      }
+    });
   } else {
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -5159,6 +5954,7 @@ function init() {
 
   updateCommandTypeFields();
   startAutoRefresh();
+  document.querySelectorAll('.bi').forEach(icon => { if (!icon.getAttribute('aria-label')) icon.setAttribute('aria-hidden', 'true'); });
 }
 
 // ─── USER MANAGEMENT (hotspot_cmd) ───────────────────────────────────────────
@@ -5185,8 +5981,10 @@ async function sendUserMgmtCmd() {
   const action = document.getElementById('usermgmt-action')?.value || '';
 
   if (!tenant || !vessel || !edge) {
-    showEl('usermgmt-notice', 'Tenant, vessel, và edge là bắt buộc.', 'alert-warn');
+    showEl('usermgmt-notice', 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
     if (noticeEl) noticeEl.style.display = 'flex';
+    const warn = document.getElementById('usermgmt-no-edge-warn');
+    if (warn) warn.style.display = 'flex';
     return;
   }
 
@@ -5368,9 +6166,9 @@ function clearQuotaRules() {
 function updateQuotaPreview() {
   const el = document.getElementById('quota-preview');
   if (!el) return;
-  const t = document.getElementById('quota-tenant')?.value.trim() || 'tnr13';
-  const v = document.getElementById('quota-vessel')?.value.trim() || 'vsl-001';
-  const e = document.getElementById('quota-edge')?.value.trim() || 'edge-001';
+  const t = document.getElementById('quota-tenant')?.value.trim() || selectedEdgeContext?.tenant_code || '';
+  const v = document.getElementById('quota-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '';
+  const e = document.getElementById('quota-edge')?.value.trim() || selectedEdgeContext?.edge_code || '';
   const rules = quotaRules.filter(r => r.username);
   el.textContent = JSON.stringify({
     tenant_code: t, vessel_code: v, edge_code: e,
@@ -5423,6 +6221,25 @@ async function sendQuotaSync() {
   }
 }
 
+// ─── MOBILE SIDEBAR ───────────────────────────────────────────────────────────
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('mobile-nav-btn');
+  const isOpen = sidebar.classList.toggle('sidebar--open');
+  overlay.classList.toggle('sidebar--open', isOpen);
+  if (btn) btn.setAttribute('aria-expanded', String(isOpen));
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('mobile-nav-btn');
+  sidebar.classList.remove('sidebar--open');
+  overlay.classList.remove('sidebar--open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
 document.addEventListener('DOMContentLoaded', init);
 window.addEventListener('hashchange', () => {
   if (document.getElementById('login-page').style.display !== 'none') return;
@@ -5452,5 +6269,8 @@ window.addEventListener('beforeunload', stopEdgeStream);
 window.addEventListener('beforeunload', stopCommandDetailPoll);
 window.addEventListener('beforeunload', stopTrafficStream);
 </script>
+<!-- impeccable-live-start -->
+<script src="http://localhost:8400/live.js"></script>
+<!-- impeccable-live-end -->
 </body>
 </html>

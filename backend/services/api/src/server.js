@@ -1430,11 +1430,50 @@ const buildHotspotCommandPayload = (job) => {
   };
 };
 
+// Paths Pi will refuse to execute — blocked on server side too
+const ROS_CMD_BLOCKED_PATHS = new Set([
+  "/system/shutdown",
+  "/system/reboot",
+  "/system/reset-configuration",
+  "/user"
+]);
+
+function validateRosCmd(commandPayload = {}) {
+  const path = String(commandPayload.path ?? "").trim();
+  const method = String(commandPayload.method ?? "").trim().toLowerCase();
+  if (!path) throw Object.assign(new Error("ros_cmd requires path"), { code: "bad_request" });
+  if (!["add", "set", "remove", "get"].includes(method))
+    throw Object.assign(new Error(`ros_cmd method '${method}' not allowed — use add|set|remove|get`), { code: "bad_request" });
+  for (const blocked of ROS_CMD_BLOCKED_PATHS) {
+    if (path === blocked || path.startsWith(blocked + "/"))
+      throw Object.assign(new Error(`ros_cmd path '${path}' is blocked`), { code: "bad_request" });
+  }
+  return { path, method, params: commandPayload.params ?? {} };
+}
+
 const resolveCommandDispatch = (job) => {
   if (isHotspotCommandType(job.command_type)) {
     const envelope = buildHotspotCommandPayload(job);
     return {
       topic: HOTSPOT_COMMAND_TOPIC,
+      payload: JSON.stringify(envelope),
+      envelope
+    };
+  }
+
+  if (job.command_type === "ros_cmd") {
+    const { path, method, params } = validateRosCmd(job.command_payload);
+    const envelope = {
+      msg_id: job.id,
+      schema_version: "v1",
+      timestamp: new Date().toISOString(),
+      payload: {
+        command_type: "ros_cmd",
+        command_payload: { path, method, params }
+      }
+    };
+    return {
+      topic: `mcu/${job.tenant_code}/${job.vessel_code}/${job.edge_code}/command`,
       payload: JSON.stringify(envelope),
       envelope
     };

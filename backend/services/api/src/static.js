@@ -20,7 +20,14 @@ const routes = new Map([
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8"
+  ".js": "application/javascript; charset=utf-8",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".eot": "application/vnd.ms-fontobject",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon"
 };
 
 function buildEtag(stats) {
@@ -205,6 +212,12 @@ export async function maybeServeStatic(req, res, url) {
 
   if (url.pathname.startsWith("/marine-portal/")) {
     await sendMarinePortalFile(res, "marine-portal.html");
+    return true;
+  }
+
+  if (url.pathname.startsWith("/vendor/")) {
+    const relative = url.pathname.slice(1);
+    await sendFile(res, relative);
     return true;
   }
 
