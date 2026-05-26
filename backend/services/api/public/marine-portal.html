@@ -1,63 +1,12 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Marine Pro — Fleet Ops</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
-      colors: {
-        boxdark:  '#111928',
-        'boxdark-2': '#0d1526',
-        strokedark: '#1D2939',
-        'form-strokedark': '#344054',
-        'form-input': '#101828',
-        primary:  '#465fff',
-        secondary:'#80CAEE',
-        meta3:    '#10B981',
-        meta6:    '#FBBF24',
-        meta1:    '#F03846',
-        meta5:    '#259AE6',
-        bodydark: '#AEB7C0',
-        bodydark2:'#8A99AF',
-        graydark: '#333A48',
-      },
-      keyframes: {
-        slideIn: { from:{opacity:'0',transform:'translateX(16px)'}, to:{opacity:'1',transform:'translateX(0)'} },
-        fadeIn:  { from:{opacity:'0',transform:'translateY(4px)'}, to:{opacity:'1',transform:'translateY(0)'} },
-        spin:    { to:{transform:'rotate(360deg)'} },
-      },
-      animation: {
-        slideIn: 'slideIn 0.2s ease',
-        fadeIn:  'fadeIn 0.2s ease',
-        spin:    'spin 0.7s linear infinite',
-      },
-    }
-  }
-}
-</script>
-<script>
-  function toggleTheme() {
-    const root = document.documentElement;
-    root.classList.toggle('dark');
-    localStorage.setItem('mp-theme', root.classList.contains('dark') ? 'dark' : 'light');
-    const icon = document.querySelector('#theme-toggle i');
-    if (icon) icon.className = root.classList.contains('dark') ? 'bi bi-sun' : 'bi bi-moon-stars';
-  }
-  if (localStorage.getItem('mp-theme') === 'dark') document.documentElement.classList.add('dark');
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css" />
 <style>
   /* ── Marine Pro × TailAdmin — tokens.css (verbatim, dark mapped) ── */
   :root {
@@ -239,7 +188,7 @@ tailwind.config = {
   @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
   @keyframes spin    { to{transform:rotate(360deg)} }
   @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.4} }
-  @keyframes connPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,173,92,.6)} 60%{box-shadow:0 0 0 5px rgba(34,173,92,0)} }
+  @keyframes connPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(1.55)} }
   @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
   @keyframes sidebarGlow { 0%,100%{opacity:.5} 50%{opacity:1} }
   @keyframes bgDot { 0%{background-position:0 0} 100%{background-position:40px 40px} }
@@ -521,6 +470,8 @@ tailwind.config = {
   .tbl tbody tr:hover td { background: var(--mp-row-hover); }
   .tbl tr.row-click { transition: background .15s; }
   .tbl tr.row-click:hover td { background: var(--mp-row-hover) !important; cursor: pointer; }
+  .tbl tr.row-click:focus { outline: 2px solid var(--mp-primary); outline-offset: -2px; }
+  .tbl tr.row-click:focus td { background: var(--mp-row-hover) !important; }
   .tbl tr.row-selected td { background: rgba(70,95,255,0.12) !important; }
   .tbl .cell-strong { color: var(--mp-fg-strong); font-weight: 500; }
   .tbl .cell-mute   { color: var(--mp-fg-mute); }
@@ -565,6 +516,44 @@ tailwind.config = {
   .kicker { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--mp-fg-mute); }
   .metric-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;background:var(--mp-surface-muted);border:1px solid var(--mp-border);color:var(--mp-fg); }
 
+  /* ── Fleet status rail ── */
+  .fleet-status-rail {
+    display: flex; align-items: stretch; flex-wrap: wrap;
+    background: var(--mp-surface); border: 1px solid var(--mp-border);
+    border-radius: var(--radius-2xl); overflow: hidden; margin-bottom: 24px;
+  }
+  .fleet-stat-group { display: flex; align-items: stretch; flex-wrap: wrap; }
+  .fleet-stat {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 13px 20px 13px 18px; gap: 2px;
+    border-right: 1px solid var(--mp-border); min-width: 88px;
+  }
+  .fleet-stat-value {
+    font-size: 20px; font-weight: 700; line-height: 1;
+    color: var(--mp-fg-strong); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .fleet-stat-value.online { color: var(--success); }
+  .fleet-stat-value.warn   { color: var(--warning); }
+  .fleet-stat-value.danger { color: var(--danger); }
+  .fleet-stat-label {
+    font-size: 10px; color: var(--mp-fg-mute); font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .fleet-rail-sep { width: 1px; background: var(--mp-border); align-self: stretch; flex-shrink: 0; }
+  .fleet-pills-section {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 16px; flex-wrap: wrap; flex: 1; min-width: 180px;
+  }
+  .fleet-pills-section-label {
+    font-size: 9px; color: var(--mp-fg-mute); font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    white-space: nowrap; margin-right: 4px; flex-shrink: 0;
+  }
+  /* ── Asymmetric dashboard main grid ── */
+  .dash-main-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .dash-main-grid { grid-template-columns: 1fr; } }
+
   /* ── Layout Grid ── */
   .grid   { display: grid; gap: 18px; }
   .grid-2 { grid-template-columns: repeat(2, 1fr); }
@@ -595,13 +584,12 @@ tailwind.config = {
     padding: 16px 18px; font-size: var(--text-theme-sm); max-width: 360px;
     box-shadow: var(--shadow-theme-lg); animation: slideIn .25s ease;
     display: flex; align-items: flex-start; gap: 12px;
-    border-left: 4px solid var(--mp-border);
   }
-  .toast-item.toast-success { border-left-color: var(--color-success-500); }
-  .toast-item.toast-danger  { border-left-color: var(--color-error-500); }
-  .toast-item.toast-warn    { border-left-color: var(--color-warning-500); }
-  .toast-item.toast-info    { border-left-color: var(--color-brand-500); }
-  .toast-dismiss { margin-left: auto; cursor: pointer; color: var(--mp-fg-mute); font-size: 18px; flex-shrink: 0; transition: color 160ms; }
+  .toast-item.toast-success { border-color: var(--color-success-500); }
+  .toast-item.toast-danger  { border-color: var(--color-error-500); }
+  .toast-item.toast-warn    { border-color: var(--color-warning-500); }
+  .toast-item.toast-info    { border-color: var(--color-brand-500); }
+  .toast-dismiss { margin-left: auto; cursor: pointer; color: var(--mp-fg-mute); font-size: 18px; flex-shrink: 0; transition: color 160ms; background: none; border: none; padding: 0; line-height: 1; display: flex; align-items: center; }
   .toast-dismiss:hover { color: var(--mp-fg-strong); }
 
   /* ── Misc Utilities (layout.css + misc) ── */
@@ -795,70 +783,495 @@ tailwind.config = {
 
   /* ── Responsive ── */
   @media(max-width:900px) { .grid-3{grid-template-columns:repeat(2,1fr)} .grid-4{grid-template-columns:repeat(2,1fr)} }
-  @media(max-width:600px) { .sidebar{display:none} .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
+  @media(max-width:600px) { .grid-2,.grid-3,.grid-4{grid-template-columns:1fr} .form-row{grid-template-columns:1fr} }
+
+  /* ── Mobile nav ── */
+  .mobile-nav-toggle {
+    display: none; width: 40px; height: 40px; border-radius: var(--radius-md);
+    background: transparent; border: 1px solid var(--mp-border);
+    color: var(--mp-fg-mute); cursor: pointer; font-size: 18px;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    transition: background 160ms, color 160ms;
+  }
+  .mobile-nav-toggle:hover { background: var(--mp-surface-muted); color: var(--mp-fg); }
+  .sidebar-overlay {
+    display: none; position: fixed; inset: 0; z-index: 90;
+    background: rgba(0,0,0,0.55);
+  }
+  @media(max-width:600px) {
+    .mobile-nav-toggle { display: inline-flex; }
+    .sidebar {
+      position: fixed; top: 0; left: -280px; bottom: 0; z-index: 100;
+      width: 260px !important; min-width: 260px !important;
+      transition: left 240ms ease; box-shadow: none;
+    }
+    .sidebar.sidebar--open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
+    .sidebar-overlay.sidebar--open { display: block; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     DARK THEME — solid surfaces, no blur, precision over decoration
+     Scene: NOC operator at desk in dim control room, monitoring vessel
+     telemetry at 2am. Precision and density; no decorative noise.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  :root {
+    --mp-bg:            #0d1117;
+    --mp-surface:       #161b22;
+    --mp-surface-2:     #1c2128;
+    --mp-surface-muted: #10151c;
+
+    --mp-border:        #30363d;
+    --mp-border-strong: #3d444d;
+    --border:           #30363d;
+    --border-light:     #30363d;
+    --border-strong:    #3d444d;
+    --glass-border:     #30363d;
+
+    --mp-fg:        rgba(230,237,243,0.9);
+    --mp-fg-strong: #e6edf3;
+    --mp-fg-mute:   #8b949e;
+    --mp-fg-soft:   #6e7681;
+    --text-primary:   rgba(230,237,243,0.9);
+    --text-secondary: #8b949e;
+    --text-muted:     #6e7681;
+    --text-faint:     #484f58;
+    --text2:          #8b949e;
+    --text3:          #6e7681;
+
+    /* Brand — muted teal, legible at this lightness */
+    --mp-primary:       #39d0d8;
+    --mp-primary-hover: #2eb8bf;
+    --color-brand-25:   rgba(57,208,216,0.04);
+    --color-brand-50:   rgba(57,208,216,0.08);
+    --color-brand-100:  rgba(57,208,216,0.14);
+    --color-brand-200:  rgba(57,208,216,0.25);
+    --color-brand-300:  rgba(57,208,216,0.55);
+    --color-brand-400:  #4de8f0;
+    --color-brand-500:  #39d0d8;
+    --color-brand-600:  #2eb8bf;
+    --color-brand-700:  #22959b;
+    --color-brand-800:  #197279;
+    --color-brand-text: #39d0d8;
+    --primary:          #39d0d8;
+    --primary-light:    #39d0d8;
+    --primary-bg:       rgba(57,208,216,0.08);
+    --accent2:          #39d0d8;
+    --accent3:          #39d0d8;
+
+    /* Status */
+    --success:    #3fb950;
+    --success-bg: rgba(63,185,80,0.1);
+    --warning:    #d29922;
+    --warning-bg: rgba(210,153,34,0.1);
+    --danger:     #f85149;
+    --danger-bg:  rgba(248,81,73,0.1);
+    --info:       #39d0d8;
+    --info-bg:    rgba(57,208,216,0.08);
+    --purple:     #bc8cff;
+    --purple-bg:  rgba(188,140,255,0.1);
+    --green:      #3fb950;
+    --amber:      #d29922;
+    --red:        #f85149;
+
+    --color-success-50:   rgba(63,185,80,0.1);
+    --color-success-100:  rgba(63,185,80,0.18);
+    --color-success-300:  #3fb950;
+    --color-success-500:  #3fb950;
+    --color-success-600:  #3fb950;
+    --color-success-700:  #2ea043;
+    --color-error-50:     rgba(248,81,73,0.1);
+    --color-error-100:    rgba(248,81,73,0.18);
+    --color-error-500:    #f85149;
+    --color-error-600:    #f85149;
+    --color-error-700:    #da3633;
+    --color-warning-50:   rgba(210,153,34,0.1);
+    --color-warning-100:  rgba(210,153,34,0.18);
+    --color-warning-300:  #d29922;
+    --color-warning-500:  #d29922;
+    --color-warning-600:  #d29922;
+    --color-warning-700:  #b07a00;
+    --color-blue-light-50:  rgba(57,208,216,0.08);
+    --color-blue-light-100: rgba(57,208,216,0.15);
+    --color-blue-light-500: #39d0d8;
+    --color-blue-light-600: #2eb8bf;
+    --color-orange-50:  rgba(210,120,40,0.1);
+    --color-orange-400: #e3853f;
+    --color-orange-500: #d06a20;
+
+    --mp-row-hover:   rgba(255,255,255,0.03);
+    --mp-thead-bg:    rgba(255,255,255,0.02);
+    --mp-kbd-bg:      rgba(255,255,255,0.05);
+    --mp-icon-btn-bg: #1c2128;
+    --mp-shadow-card: 0 1px 3px rgba(0,0,0,0.5);
+
+    --bg-body:       #0d1117;
+    --bg-sidebar:    #161b22;
+    --bg-card:       #161b22;
+    --bg-card-hover: #1c2128;
+    --bg-elevated:   #21262d;
+    --bg-input:      #0d1117;
+
+    --shadow:          0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg:       0 8px 24px rgba(0,0,0,0.6);
+    --shadow-theme-xs: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-theme-sm: 0 2px 6px rgba(0,0,0,0.4);
+    --shadow-theme-md: 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-theme-lg: 0 8px 24px rgba(0,0,0,0.5);
+    --shadow-theme-xl: 0 16px 40px rgba(0,0,0,0.6);
+    --shadow-focus-ring: 0 0 0 3px rgba(57,208,216,0.22);
+  }
+
+  /* Body — solid dark, no animated gradient */
+  body { background: #0d1117; }
+  body::before { display: none; }
+
+  #app, #login-page { background: transparent; }
+
+  /* Sidebar — solid, no blur */
+  .sidebar {
+    background: #161b22;
+    border-right: 1px solid #30363d;
+  }
+
+  /* Global header — solid dark, subtle bottom border */
+  .global-header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    box-shadow: 0 1px 0 #30363d;
+  }
+
+  /* Cards, stat cards, table wrappers — solid surfaces */
+  .card, .stat-card, .tbl-wrap {
+    background: #161b22;
+    border: 1px solid #30363d;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .card:hover, .stat-card:hover {
+    border-color: #3d444d;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .card-header {
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid #30363d;
+  }
+
+  /* Table */
+  .tbl thead th {
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid #30363d;
+    color: #6e7681;
+  }
+  .tbl tbody td { border-bottom: 1px solid rgba(48,54,61,0.7); }
+  .tbl tr.row-selected td { background: rgba(57,208,216,0.08); }
+
+  /* Buttons */
+  .btn-primary, .btn--primary {
+    background: #39d0d8;
+    border: 1px solid #39d0d8;
+    color: #0d1117;
+    box-shadow: none;
+  }
+  .btn-primary:hover:not(:disabled), .btn--primary:hover:not(:disabled) {
+    background: #2eb8bf;
+    border-color: #2eb8bf;
+    box-shadow: none;
+  }
+  .btn--secondary {
+    background: #21262d;
+    border-color: #30363d;
+    color: rgba(230,237,243,0.9);
+  }
+  .btn--secondary:hover:not(:disabled) { background: #30363d; }
+  .btn-ghost, .btn--ghost {
+    background: transparent;
+    border-color: #30363d;
+    color: #8b949e;
+  }
+  .btn-ghost:hover:not(:disabled), .btn--ghost:hover:not(:disabled) {
+    background: #21262d;
+    color: rgba(230,237,243,0.9);
+  }
+  .btn-success {
+    background: rgba(63,185,80,0.1);
+    border-color: rgba(63,185,80,0.4);
+    color: #3fb950;
+  }
+  .btn-danger, .btn--danger {
+    background: rgba(248,81,73,0.1);
+    border: 1px solid #f85149;
+    color: #f85149;
+  }
+
+  /* Pills */
+  .pill-success, .pill--success { background:rgba(63,185,80,0.12);  color:#3fb950; border:1px solid rgba(63,185,80,0.3); }
+  .pill-danger,  .pill--error   { background:rgba(248,81,73,0.12);  color:#f85149; border:1px solid rgba(248,81,73,0.3); }
+  .pill-warning, .pill--warning { background:rgba(210,153,34,0.12); color:#d29922; border:1px solid rgba(210,153,34,0.3); }
+  .pill-info                    { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-primary, .pill--brand   { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-green  { background:rgba(63,185,80,0.12);  color:#3fb950; border:1px solid rgba(63,185,80,0.3); }
+  .pill-amber  { background:rgba(210,153,34,0.12); color:#d29922; border:1px solid rgba(210,153,34,0.3); }
+  .pill-red    { background:rgba(248,81,73,0.12);  color:#f85149; border:1px solid rgba(248,81,73,0.3); }
+  .pill-blue   { background:rgba(57,208,216,0.1);  color:#39d0d8; border:1px solid rgba(57,208,216,0.25); }
+  .pill-gray, .pill--gray { background:rgba(255,255,255,0.06); color:#8b949e; border:1px solid #30363d; }
+
+  /* Nav items */
+  .nav-item:hover, .menu-item:hover {
+    background: rgba(255,255,255,0.05);
+    color: #e6edf3;
+  }
+  .nav-item.active, .menu-item--active {
+    background: rgba(57,208,216,0.1);
+    color: #39d0d8;
+  }
+  .nav-item.active::before { background: #39d0d8; box-shadow: none; }
+  .nav-item.active i { color: #39d0d8; animation: none; }
+  .nav-item:hover i  { color: #39d0d8; }
+
+  /* Form controls */
+  .form-control, .input {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: rgba(230,237,243,0.9);
+    box-shadow: none;
+  }
+  .form-control::placeholder, .input::placeholder { color: #484f58; }
+  .form-control:focus, .input:focus {
+    border-color: #39d0d8;
+    box-shadow: 0 0 0 3px rgba(57,208,216,0.18);
+  }
+  .form-control:disabled, .input:disabled {
+    background: #10151c;
+    color: rgba(110,118,129,0.6);
+  }
+  select.form-control, select.input { color-scheme: dark; }
+  select.form-control option, select.input option { background: #161b22; color: rgba(230,237,243,0.9); }
+
+  /* Toggle */
+  .toggle__track { background: #30363d; }
+  .toggle input:checked + .toggle__track { background: #39d0d8; }
+
+  /* Alerts */
+  .alert-warn    { background:rgba(210,153,34,0.1);  border-color:rgba(210,153,34,0.25);  color:#d29922; }
+  .alert-danger  { background:rgba(248,81,73,0.1);   border-color:rgba(248,81,73,0.25);   color:#f85149; }
+  .alert-info    { background:rgba(57,208,216,0.08); border-color:rgba(57,208,216,0.22);  color:#39d0d8; }
+  .alert-success { background:rgba(63,185,80,0.1);   border-color:rgba(63,185,80,0.25);   color:#3fb950; }
+
+  /* Toast — full border per severity, no side-stripe */
+  .toast-item {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    color: rgba(230,237,243,0.9);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .toast-item.toast-success { border-color: rgba(63,185,80,0.4);  }
+  .toast-item.toast-danger  { border-color: rgba(248,81,73,0.45); }
+  .toast-item.toast-warn    { border-color: rgba(210,153,34,0.4); }
+  .toast-item.toast-info    { border-color: rgba(57,208,216,0.3); }
+  .toast-dismiss { color: #6e7681; }
+  .toast-dismiss:hover { color: #e6edf3; }
+
+  /* Modal — solid dark */
+  .modal-backdrop { background: rgba(0,0,0,0.72); }
+  .modal {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+  }
+  .modal__header { border-bottom:1px solid #30363d; background:rgba(255,255,255,0.02); }
+  .modal__footer { border-top:1px solid #30363d;    background:rgba(255,255,255,0.02); }
+
+  /* Status banners */
+  .page-status-banner, .status-banner {
+    background: #161b22;
+    border: 1px solid #30363d;
+  }
+
+  /* Chip */
+  .chip { background:rgba(255,255,255,0.06); border:1px solid #30363d; color:#8b949e; }
+
+  /* Tabs */
+  .tabs { background:rgba(255,255,255,0.03); border-color:#30363d; }
+  .tabs__item--active { background:#21262d; color:#e6edf3; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .tabs-line { border-bottom-color:#30363d; }
+  .tabs-line__item--active { color:#39d0d8; border-bottom-color:#39d0d8; }
+
+  /* Pagination */
+  .pagination__btn { background:#21262d; border-color:#30363d; color:#8b949e; }
+  .pagination__btn:hover { background:#30363d; color:#e6edf3; }
+  .pagination__btn--active { background:#39d0d8; border-color:#39d0d8; color:#0d1117; }
+
+  /* Dropdown */
+  .menu-pop { background:#1c2128; border:1px solid #30363d; box-shadow:0 8px 24px rgba(0,0,0,0.5); }
+  .menu-pop__item:hover { background:rgba(255,255,255,0.05); }
+  .menu-pop__divider { background:#30363d; }
+
+  /* Header */
+  .hdr-user { background:rgba(255,255,255,0.04); border-color:#30363d; }
+  .hdr-user:hover { background:rgba(255,255,255,0.07); }
+  .hdr-icon-btn { background:#1c2128; border-color:#30363d; color:#6e7681; }
+  .hdr-icon-btn:hover { background:#30363d; color:#e6edf3; }
+  .hdr-avatar { background: linear-gradient(135deg,#39d0d8,#bc8cff); }
+  .icon-btn { background:#1c2128; border-color:#30363d; }
+  .icon-btn:hover { background:#30363d; }
+
+  /* Icon tiles */
+  .icon-tile--brand   { background:rgba(57,208,216,0.1);  color:#39d0d8; }
+  .icon-tile--success { background:rgba(63,185,80,0.1);   color:#3fb950; }
+  .icon-tile--warning { background:rgba(210,153,34,0.1);  color:#d29922; }
+  .icon-tile--error   { background:rgba(248,81,73,0.1);   color:#f85149; }
+  .icon-tile--info    { background:rgba(57,208,216,0.08); color:#39d0d8; }
+  .stat-icon-blue  { background:rgba(57,208,216,0.1);  color:#39d0d8; }
+  .stat-icon-green { background:rgba(63,185,80,0.1);   color:#3fb950; }
+  .stat-icon-amber { background:rgba(210,153,34,0.1);  color:#d29922; }
+  .stat-icon-red   { background:rgba(248,81,73,0.1);   color:#f85149; }
+
+  /* Trend chips */
+  .trend-up,   .trend--up   { background:rgba(63,185,80,0.1);  color:#3fb950; }
+  .trend-down, .trend--down { background:rgba(248,81,73,0.1);  color:#f85149; }
+
+  /* Progress */
+  .progress { background:rgba(255,255,255,0.07); }
+  .progress-primary { background:#39d0d8; }
+  .progress-success { background:#3fb950; }
+  .progress-warning { background:#d29922; }
+
+  /* Traffic bars */
+  .bar-rx { background:#39d0d8; }
+  .bar-tx { background:#3fb950; }
+  .traffic-bar-bg { background:rgba(255,255,255,0.06); }
+
+  /* Chart shells & live samples */
+  .live-chart-shell { background:rgba(255,255,255,0.02); border-color:#30363d; }
+  .live-sample-item { background:rgba(255,255,255,0.02); border-color:#30363d; }
+  .live-sample-item:hover { background:rgba(255,255,255,0.04); }
+
+  /* Stats grid */
+  .stats-grid { background:#30363d; }
+  .stat-cell  { background:#161b22; }
+
+  /* Misc */
+  .divider { background:#30363d; }
+  .page-header { border-bottom-color:#30363d; }
+  .detail-section-title { border-bottom-color:#30363d; }
+  .quota-rule-row { border-bottom-color:#30363d; }
+  .quota-rule-row:hover { background:rgba(255,255,255,0.03); }
+  .num-badge { background:rgba(57,208,216,0.1); color:#39d0d8; border-color:rgba(57,208,216,0.2); }
+  .metric-chip { background:rgba(255,255,255,0.05); border-color:#30363d; }
+  .kbd, .kbd-inline { background:rgba(255,255,255,0.05); border-color:#30363d; color:#6e7681; }
+  .conn-dot { border-color:#0d1117; }
+
+  /* Choice checkbox/radio */
+  .choice__box { border-color:#30363d; background:#0d1117; }
+  .choice input:checked + .choice__box { background:#39d0d8; border-color:#39d0d8; }
+
+  /* Scrollbar */
+  * { scrollbar-width: thin; scrollbar-color: #30363d transparent; }
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#30363d; border-radius:10px; }
+  ::-webkit-scrollbar-thumb:hover { background:#3d444d; }
+
+  /* Login brand panel — solid */
+  #login-brand-panel { background: #161b22; }
+  /* ═══════════════════════════════════════════════════════════════════ */
 </style>
 </head>
 <body style="min-height: 100vh;">
 
 <!-- ─── LOGIN (TailAdmin split-screen) ─────────────────────────────────────── -->
+<!-- ─── API SETUP PANEL ───────────────────────────────────────────────────── -->
+<div id="api-setup-page" style="display:none;min-height:100vh;background:var(--mp-bg);align-items:center;justify-content:center;flex-direction:column;">
+  <div style="width:100%;max-width:420px;padding:0 24px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
+      <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
+      <span style="font-size:16px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
+    </div>
+    <h1 style="font-size:22px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:8px;">Connect to backend</h1>
+    <p style="font-size:14px;color:var(--mp-fg-mute);margin-bottom:24px;">Enter the base URL of your Marine Pro API. Leave blank to use relative URLs (same host).</p>
+    <div class="form-group">
+      <label class="form-label" for="api-setup-url">Backend API URL</label>
+      <input id="api-setup-url" class="form-control" style="height:44px;" placeholder="http://localhost:3000" autocomplete="url" />
+    </div>
+    <div id="api-setup-err" style="display:none;" class="alert alert-danger" style="margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="connectApiSetup(true)">Use relative URL</button>
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="connectApiSetup(false)"><i class="bi bi-box-arrow-in-right"></i> Connect</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-page" style="display:none;">
   <!-- Left: Form -->
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 32px;">
-    <div style="width:100%;max-width:400px;">
-      <div style="margin-bottom:36px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;">
-          <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;">⚓</div>
-          <span style="font-size:16px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
-        </div>
-        <h1 style="font-size:26px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:8px;">Sign In</h1>
-        <p style="font-size:14px;color:var(--mp-fg-mute);">Enter your credentials to access the Fleet Ops portal.</p>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 40px;">
+    <div style="width:100%;max-width:380px;">
+
+      <!-- Brand mark -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:40px;">
+        <div style="width:42px;height:42px;background:linear-gradient(135deg, var(--color-brand-500), var(--color-brand-400));border-radius:11px;box-shadow:0 6px 20px rgba(87,80,241,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;">⚓</div>
+        <span style="font-size:15px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:.3px;">Marine Pro</span>
       </div>
+
+      <!-- Heading -->
+      <h1 style="font-size:26px;font-weight:700;color:var(--mp-fg-strong);letter-spacing:-.4px;line-height:1.2;margin-bottom:6px;">Sign in</h1>
+      <p style="font-size:13px;color:var(--mp-fg-mute);margin-bottom:28px;">Fleet Ops portal. Your session is stored in this browser.</p>
+
       <div id="login-notice" style="display:none;" class="alert alert-info"></div>
       <div id="saved-auth-banner" style="display:none;" class="alert alert-success">
         <i class="bi bi-shield-check"></i>
         <div><strong>Credentials saved</strong><br/><span style="font-size:12px;">Stored in this browser.</span></div>
       </div>
+
       <div class="form-group">
-        <label class="form-label">Username</label>
+        <label class="form-label" for="login-user">Username</label>
         <input id="login-user" class="form-control" placeholder="admin" autocomplete="username" style="height:44px;" />
       </div>
       <div class="form-group">
-        <label class="form-label">Password</label>
+        <label class="form-label" for="login-pass">Password</label>
         <input id="login-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" style="height:44px;" />
       </div>
       <div id="login-err" style="display:none;" class="alert alert-danger"></div>
-      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;height:44px;font-size:14px;border-radius:10px;margin-top:8px;">
-        <i class="bi bi-box-arrow-in-right"></i> Sign In
+
+      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center;height:44px;font-size:14px;border-radius:10px;margin-top:20px;">
+        <i class="bi bi-box-arrow-in-right"></i> Sign in
       </button>
-      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;">
-        <button class="btn btn-ghost btn-sm" onclick="clearAuth()" style="flex:1;justify-content:center;">Clear saved</button>
-        <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')" style="flex:1;justify-content:center;">
-          <i class="bi bi-skip-forward"></i> Skip auth
-        </button>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+        <div style="flex:1;height:1px;background:var(--mp-border);"></div>
+        <span style="font-size:11px;color:var(--mp-fg-mute);letter-spacing:.04em;text-transform:uppercase;">or</span>
+        <div style="flex:1;height:1px;background:var(--mp-border);"></div>
       </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" onclick="clearAuth()" style="flex:1;justify-content:center;">Clear saved</button>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')" style="flex:1;justify-content:center;"><i class="bi bi-skip-forward"></i> Skip</button>
+      </div>
+
     </div>
   </div>
-  <!-- Right: Brand panel -->
-  <div style="flex:1;background:var(--mp-surface);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="login-brand-panel">
-    <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.08) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
-    <div style="position:relative;text-align:center;max-width:340px;">
-      <div style="width:72px;height:72px;background:rgba(70,95,255,.15);border:1px solid rgba(70,95,255,.3);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 24px;">⚓</div>
-      <h2 style="font-size:24px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:12px;">Fleet Command Center</h2>
-      <p style="font-size:14px;color:var(--mp-fg-mute);line-height:1.6;">Real-time monitoring and management for maritime vessel edge devices.</p>
-      <div style="display:flex;gap:10px;margin-top:32px;justify-content:center;">
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--primary-light);">99.9%</div>
-          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Uptime</div>
+
+  <!-- Right: Brand panel (desktop only, via CSS) -->
+  <div style="flex:1;background:var(--mp-surface);display:none;align-items:center;justify-content:center;position:relative;overflow:hidden;border-left:1px solid var(--mp-border);" id="login-brand-panel">
+    <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(70,95,255,.06) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
+    <div style="position:relative;max-width:320px;">
+      <div style="width:64px;height:64px;background:rgba(57,208,216,0.08);border:1px solid rgba(57,208,216,0.18);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:28px;">⚓</div>
+      <h2 style="font-size:22px;font-weight:700;color:var(--mp-fg-strong);margin-bottom:10px;letter-spacing:-.3px;line-height:1.3;">Fleet Command<br>Center</h2>
+      <p style="font-size:13px;color:var(--mp-fg-mute);line-height:1.65;margin-bottom:32px;">Operational platform for maritime vessel edge devices on MQTT.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-reception-4" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Fleet health, telemetry, and WAN monitoring
         </div>
-        <div style="width:1px;background:var(--border);"></div>
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--success);">Live</div>
-          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Telemetry</div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-wifi" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Hotspot accounts, data quotas, and package assignments
         </div>
-        <div style="width:1px;background:var(--border);"></div>
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;color:var(--warning);">MQTT</div>
-          <div style="font-size:11px;color:var(--mp-fg-mute);margin-top:2px;">Protocol</div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-terminal" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Remote command dispatch and RouterOS bridge
+        </div>
+        <div style="font-size:12px;color:var(--mp-fg-mute);display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-bell" style="color:var(--mp-primary);font-size:13px;flex-shrink:0;"></i>
+          Alert center with critical and warning tracking
         </div>
       </div>
     </div>
@@ -866,7 +1279,7 @@ tailwind.config = {
 </div>
 
 <!-- ─── MAIN APP ─────────────────────────────────────────────────────────── -->
-<div id="app" style="display:none;display:flex;height:100vh;overflow:hidden;">
+<div id="app" style="display:none;height:100vh;height:100dvh;overflow:hidden;">
 
   <!-- Sidebar -->
   <aside class="sidebar" style="width:260px;min-width:260px;background:var(--mp-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;">
@@ -876,6 +1289,19 @@ tailwind.config = {
       <div>
         <div style="font-size:15px;font-weight:800;color:var(--mp-fg-strong);letter-spacing:0.3px;">MARINE PRO</div>
         <div style="font-size:10px;color:var(--mp-fg-mute);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px;font-weight:600;">Fleet Ops</div>
+      </div>
+    </div>
+
+    <!-- Vessel Picker -->
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div style="font-size:10px;color:var(--mp-fg-soft);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:6px;padding-left:2px;">Active Vessel</div>
+      <select id="global-vessel-picker" class="form-control" style="font-size:12px;height:36px;" onchange="onVesselPickerChange()">
+        <option value="">— Loading vessels… —</option>
+      </select>
+      <div id="global-vessel-badge" style="display:none;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="chip" id="global-vessel-tenant" style="font-size:10px;"></span>
+        <span class="chip" id="global-vessel-vessel" style="font-size:10px;"></span>
+        <span class="chip" id="global-vessel-edge" style="font-size:10px;"></span>
       </div>
     </div>
 
@@ -943,15 +1369,19 @@ tailwind.config = {
 
     <!-- ─── GLOBAL HEADER ──────────────────────────────────────────────────── -->
     <header class="global-header">
+      <button class="mobile-nav-toggle" onclick="toggleMobileSidebar()" aria-label="Open navigation" aria-expanded="false" id="mobile-nav-btn">
+        <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
       <div class="hdr-breadcrumb">
         <span class="hdr-root">Marine Pro</span>
         <i class="bi bi-chevron-right hdr-sep"></i>
         <h2 class="hdr-page" id="hdr-page-title">Fleet Command Center</h2>
       </div>
       <div class="hdr-actions">
+        <span class="pill pill-brand" id="hdr-active-vessel" style="font-size:11px;display:none;" title="Tàu đang chọn"></span>
         <span class="pill pill-gray" id="hdr-conn-pill" style="font-size:11px;"></span>
         <button class="hdr-icon-btn" title="Notifications"><i class="bi bi-bell"></i></button>
-        <button class="hdr-icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme"><i class="bi bi-moon-stars"></i></button>
+        <button class="hdr-icon-btn" id="theme-toggle" title="Light mode" style="cursor:default;opacity:.5;" disabled><i class="bi bi-sun"></i></button>
         <button class="hdr-icon-btn" title="Refresh" onclick="loadDashboard ? loadDashboard() : null"><i class="bi bi-arrow-clockwise"></i></button>
         <div class="hdr-user" onclick="showPage('login')">
           <div class="hdr-avatar">A</div>
@@ -1001,33 +1431,28 @@ tailwind.config = {
         <span id="dash-error-msg"></span>
       </div>
 
-      <!-- KPI stat cards -->
-      <div class="grid grid-4" style="margin-bottom:20px;" id="dash-stats"></div>
-
-      <!-- Health + metrics row -->
-      <div class="grid grid-2" style="margin-bottom:20px;">
-        <div class="card card-body" style="gap:10px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <i class="bi bi-heart-pulse" style="color:var(--color-success-600);font-size:15px;"></i>
-            <span class="kicker" style="margin-bottom:0;">Backend health</span>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="dash-health-pills">
-            <span class="pill pill-gray">checking…</span>
-          </div>
+      <!-- Fleet status rail: counts + health + live metrics -->
+      <div class="fleet-status-rail">
+        <div class="fleet-stat-group" id="dash-stats">
+          <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Edges</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value online">—</div><div class="fleet-stat-label">Online</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value warn">—</div><div class="fleet-stat-label">Cmds</div></div>
+          <div class="fleet-stat"><div class="fleet-stat-value">—</div><div class="fleet-stat-label">Packages</div></div>
         </div>
-        <div class="card card-body" style="gap:10px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <i class="bi bi-speedometer" style="color:var(--color-brand-600);font-size:15px;"></i>
-            <span class="kicker" style="margin-bottom:0;">System metrics</span>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="dash-metrics-pills">
-            <span class="pill pill-gray">n/a</span>
-          </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Health</span>
+          <div id="dash-health-pills" style="display:contents;"><span class="pill pill-gray">checking…</span></div>
+        </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Live</span>
+          <div id="dash-metrics-pills" style="display:contents;"><span class="pill pill-gray">n/a</span></div>
         </div>
       </div>
 
-      <!-- Fleet snapshot + Command jobs -->
-      <div class="grid grid-2" style="margin-bottom:20px;">
+      <!-- Fleet snapshot (wider) + Command jobs -->
+      <div class="dash-main-grid">
         <!-- Fleet snapshot -->
         <div class="card">
           <div class="card-header">
@@ -1045,10 +1470,10 @@ tailwind.config = {
           <div style="padding:0;">
             <table class="tbl" id="edges-table">
               <thead><tr>
-                <th><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
-                <th><i class="bi bi-circle-fill" style="margin-right:4px;opacity:.6;font-size:8px;"></i>Status</th>
-                <th><i class="bi bi-globe" style="margin-right:4px;opacity:.6;"></i>WAN IP</th>
-                <th><i class="bi bi-clock-history" style="margin-right:4px;opacity:.6;"></i>Last seen</th>
+                <th scope="col"><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th scope="col"><i class="bi bi-circle-fill" style="margin-right:4px;opacity:.6;font-size:8px;"></i>Status</th>
+                <th scope="col"><i class="bi bi-globe" style="margin-right:4px;opacity:.6;"></i>WAN IP</th>
+                <th scope="col"><i class="bi bi-clock-history" style="margin-right:4px;opacity:.6;"></i>Last seen</th>
               </tr></thead>
               <tbody id="edges-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
@@ -1075,10 +1500,10 @@ tailwind.config = {
           <div style="padding:0;">
             <table class="tbl">
               <thead><tr>
-                <th><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
-                <th><i class="bi bi-code-square" style="margin-right:4px;opacity:.6;"></i>Type</th>
-                <th><i class="bi bi-check2-circle" style="margin-right:4px;opacity:.6;"></i>Status</th>
-                <th><i class="bi bi-clock" style="margin-right:4px;opacity:.6;"></i>Time</th>
+                <th scope="col"><i class="bi bi-cpu" style="margin-right:4px;opacity:.6;"></i>Edge</th>
+                <th scope="col"><i class="bi bi-code-square" style="margin-right:4px;opacity:.6;"></i>Type</th>
+                <th scope="col"><i class="bi bi-check2-circle" style="margin-right:4px;opacity:.6;"></i>Status</th>
+                <th scope="col"><i class="bi bi-clock" style="margin-right:4px;opacity:.6;"></i>Time</th>
               </tr></thead>
               <tbody id="commands-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody>
             </table>
@@ -1120,23 +1545,20 @@ tailwind.config = {
         </div>
         <div class="card-body">
           <div id="cmd-notice" style="display:none;" class="alert"></div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Tenant code</label>
-              <input id="cmd-tenant" class="form-control" value="tnr13" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Vessel code</label>
-              <input id="cmd-vessel" class="form-control" value="vsl-001" />
-            </div>
+          <div id="cmd-no-edge-warn" class="alert alert-warn" style="display:none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Chưa chọn tàu. Hãy chọn tàu từ dropdown phía trên ở sidebar.</span>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Edge code</label>
-              <input id="cmd-edge" class="form-control" value="edge-001" />
+              <label class="form-label" for="cmd-target-display">Tenant / Vessel / Edge</label>
+              <input id="cmd-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+              <input type="hidden" id="cmd-tenant" />
+              <input type="hidden" id="cmd-vessel" />
+              <input type="hidden" id="cmd-edge" />
             </div>
             <div class="form-group">
-              <label class="form-label">Command type</label>
+              <label class="form-label" for="cmd-type">Command type</label>
               <select id="cmd-type" class="form-control" onchange="updateCommandTypeFields()">
                 <optgroup label="RouterOS Direct">
                   <option value="ros_cmd">ros_cmd — RouterOS API proxy</option>
@@ -1180,11 +1602,11 @@ tailwind.config = {
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Path <span style="color:var(--mp-fg-mute);font-weight:400;">(RouterOS API path)</span></label>
+                <label class="form-label" for="ros-path">Path <span style="color:var(--mp-fg-mute);font-weight:400;">(RouterOS API path)</span></label>
                 <input id="ros-path" class="form-control mono" placeholder="/ip/hotspot/user" />
               </div>
               <div class="form-group">
-                <label class="form-label">Method</label>
+                <label class="form-label" for="ros-method">Method</label>
                 <select id="ros-method" class="form-control">
                   <option value="get">get</option>
                   <option value="add">add</option>
@@ -1194,7 +1616,7 @@ tailwind.config = {
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Params <span style="color:var(--mp-fg-mute);font-weight:400;">(JSON object)</span></label>
+              <label class="form-label" for="ros-params">Params <span style="color:var(--mp-fg-mute);font-weight:400;">(JSON object)</span></label>
               <textarea id="ros-params" class="form-control mono" rows="5" placeholder='{"name": "nguyen-van-a", "password": "abc123", "profile": "crew"}'></textarea>
               <span class="helper">Blocked paths: /system/shutdown · /system/reboot · /system/reset-configuration · /user</span>
             </div>
@@ -1203,7 +1625,7 @@ tailwind.config = {
           <div id="cmd-hotspot-fields" style="display:none;">
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Action</label>
+                <label class="form-label" for="cmd-hotspot-action">Action</label>
                 <select id="cmd-hotspot-action" class="form-control">
                   <option value="create_user_profile">create_user_profile</option>
                   <option value="create_account">create_user</option>
@@ -1214,27 +1636,27 @@ tailwind.config = {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Username</label>
+                <label class="form-label" for="cmd-hotspot-username">Username</label>
                 <input id="cmd-hotspot-username" class="form-control" placeholder="nguyen-van-a" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Profile / Name</label>
+                <label class="form-label" for="cmd-hotspot-profile">Profile / Name</label>
                 <input id="cmd-hotspot-profile" class="form-control" placeholder="crew" />
               </div>
               <div class="form-group">
-                <label class="form-label">Password</label>
+                <label class="form-label" for="cmd-hotspot-password">Password</label>
                 <input id="cmd-hotspot-password" class="form-control" type="password" placeholder="abc123" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Rate limit</label>
+                <label class="form-label" for="cmd-hotspot-ratelimit">Rate limit</label>
                 <input id="cmd-hotspot-ratelimit" class="form-control" placeholder="2M/2M" />
               </div>
               <div class="form-group">
-                <label class="form-label">Shared users</label>
+                <label class="form-label" for="cmd-hotspot-shared">Shared users</label>
                 <input id="cmd-hotspot-shared" class="form-control" type="number" placeholder="1" />
               </div>
             </div>
@@ -1243,21 +1665,21 @@ tailwind.config = {
           <div id="cmd-radius-fields" style="display:none;">
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">RADIUS IP</label>
+                <label class="form-label" for="cmd-radius-ip">RADIUS IP</label>
                 <input id="cmd-radius-ip" class="form-control" placeholder="10.0.0.2" />
               </div>
               <div class="form-group">
-                <label class="form-label">RADIUS port</label>
+                <label class="form-label" for="cmd-radius-port">RADIUS port</label>
                 <input id="cmd-radius-port" class="form-control" type="number" value="1812" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">RADIUS secret</label>
+                <label class="form-label" for="cmd-radius-secret">RADIUS secret</label>
                 <input id="cmd-radius-secret" class="form-control" placeholder="mcu_radius_secret" />
               </div>
               <div class="form-group">
-                <label class="form-label">Hotspot profile</label>
+                <label class="form-label" for="cmd-radius-profile">Hotspot profile</label>
                 <input id="cmd-radius-profile" class="form-control" placeholder="hsprof1" />
               </div>
             </div>
@@ -1301,6 +1723,7 @@ tailwind.config = {
           <p>Fleet-wide alerts &middot; warning and critical tracking &middot; <span id="alert-mode-badge" class="pill pill-gray" style="font-size:10px;padding:2px 8px;vertical-align:middle;">loading</span></p>
         </div>
         <div class="page-header-actions">
+          <label class="form-label" for="alert-severity-filter" style="position:absolute;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;">Severity filter</label>
           <select id="alert-severity-filter" class="form-control" style="width:150px;" onchange="loadAlertsCenter()">
             <option value="all">All severities</option>
             <option value="critical">Critical</option>
@@ -1316,39 +1739,19 @@ tailwind.config = {
       </div>
       <div class="topbar" style="display:none;"></div>
 
-      <div class="grid grid-3" style="margin-bottom:16px;" id="alert-stats">
-        <div class="stat-card">
-          <div class="stat-card-head">
-            <span class="kicker">Total Alerts</span>
-            <div class="icon-tile icon-tile--brand"><i class="bi bi-bell"></i></div>
-          </div>
-          <div class="stat-card-value" id="alert-total">—</div>
-          <div class="stat-card-foot">
-            <span class="pill pill--success"><i class="bi bi-arrow-up"></i> fleet-wide</span>
-            <span class="stat-card-sub">all edges</span>
-          </div>
+      <!-- Alert triage strip: critical first, urgency drives the eye -->
+      <div class="fleet-status-rail" style="margin-bottom:20px;">
+        <div class="fleet-stat" style="min-width:110px;">
+          <div class="fleet-stat-value danger" id="alert-critical">—</div>
+          <div class="fleet-stat-label">Critical</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-card-head">
-            <span class="kicker">Critical</span>
-            <div class="icon-tile icon-tile--error"><i class="bi bi-exclamation-octagon"></i></div>
-          </div>
-          <div class="stat-card-value" id="alert-critical">—</div>
-          <div class="stat-card-foot">
-            <span class="pill pill--error"><i class="bi bi-arrow-down"></i> high priority</span>
-            <span class="stat-card-sub">immediate action</span>
-          </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-value warn" id="alert-warning">—</div>
+          <div class="fleet-stat-label">Warnings</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-card-head">
-            <span class="kicker">Warnings</span>
-            <div class="icon-tile icon-tile--warning"><i class="bi bi-exclamation-triangle"></i></div>
-          </div>
-          <div class="stat-card-value" id="alert-warning">—</div>
-          <div class="stat-card-foot">
-            <span class="pill pill--warning"><i class="bi bi-arrow-up"></i> review soon</span>
-            <span class="stat-card-sub">follow up</span>
-          </div>
+        <div class="fleet-stat" style="border-right:none;">
+          <div class="fleet-stat-value" style="color:var(--mp-fg-mute);" id="alert-total">—</div>
+          <div class="fleet-stat-label">Total</div>
         </div>
       </div>
 
@@ -1361,7 +1764,7 @@ tailwind.config = {
           <span class="num-badge" id="alert-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Edge</th><th>Severity</th><th>Message</th><th>Time</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Edge</th><th scope="col">Severity</th><th scope="col">Message</th><th scope="col">Time</th></tr></thead>
           <tbody id="alert-body"><tr><td colspan="4" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1428,7 +1831,7 @@ tailwind.config = {
           <span class="num-badge" id="cmd-history-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Edge</th><th>Type</th><th>Status</th><th>Time</th><th style="text-align:right;">Actions</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Edge</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Time</th><th scope="col" style="text-align:right;">Actions</th></tr></thead>
           <tbody id="cmd-history-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1457,29 +1860,51 @@ tailwind.config = {
       </div>
       <div class="topbar" style="display:none;"></div>
 
-      <div class="grid grid-4" style="margin-bottom:16px;" id="hotspot-stats">
-        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-diagram-3-fill"></i></div><div class="stat-label">Bridge log</div><div class="stat-value stat-accent" id="hotspot-ops-total">—</div><div class="stat-note">Command jobs sent</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-green"><i class="bi bi-person-lines-fill"></i></div><div class="stat-label">Directory users</div><div class="stat-value stat-green" id="hotspot-directory-total">—</div><div class="stat-note">Synced from snapshots</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-amber"><i class="bi bi-broadcast-pin"></i></div><div class="stat-label">Online users</div><div class="stat-value stat-amber" id="hotspot-active-total">—</div><div class="stat-note">Currently connected</div></div>
-        <div class="stat-card"><div class="stat-icon stat-icon-blue"><i class="bi bi-clock-history"></i></div><div class="stat-label">Last sync</div><div class="stat-value stat-accent" style="font-size:16px;" id="hotspot-last-sync">—</div><div class="stat-note">Most recent reply</div></div>
+      <!-- Hotspot status rail: activity first, timestamp as pill -->
+      <div class="fleet-status-rail" style="margin-bottom:20px;">
+        <div class="fleet-stat-group">
+          <div class="fleet-stat">
+            <div class="fleet-stat-value warn" id="hotspot-active-total">—</div>
+            <div class="fleet-stat-label">Online</div>
+          </div>
+          <div class="fleet-stat">
+            <div class="fleet-stat-value online" id="hotspot-directory-total">—</div>
+            <div class="fleet-stat-label">Directory</div>
+          </div>
+          <div class="fleet-stat" style="border-right:none;">
+            <div class="fleet-stat-value" style="color:var(--mp-fg-mute);" id="hotspot-ops-total">—</div>
+            <div class="fleet-stat-label">Bridge ops</div>
+          </div>
+        </div>
+        <div class="fleet-rail-sep"></div>
+        <div class="fleet-pills-section">
+          <span class="fleet-pills-section-label">Last sync</span>
+          <span id="hotspot-last-sync" class="pill pill-gray">—</span>
+        </div>
       </div>
 
       <!-- User Management (hotspot_cmd) -->
-      <div class="card" style="margin-bottom:16px;">
+      <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-people-fill" style="color:var(--success);"></i> Quản lý thuyền viên</div>
           <div class="card-subtitle">Tạo / sửa / xóa tài khoản và profile hotspot trực tiếp trên Pi4</div></div>
         </div>
         <div class="card-body">
           <div id="usermgmt-notice" style="display:none;" class="alert"></div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="usermgmt-tenant" class="form-control" value="tnr13" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="usermgmt-vessel" class="form-control" value="vsl-001" /></div>
+          <div id="usermgmt-no-edge-warn" class="alert alert-warn" style="display:none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span>Chưa chọn tàu. Hãy chọn tàu từ dropdown ở sidebar.</span>
           </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="usermgmt-edge" class="form-control" value="edge-001" /></div>
+          <input type="hidden" id="usermgmt-tenant" />
+          <input type="hidden" id="usermgmt-vessel" />
+          <input type="hidden" id="usermgmt-edge" />
+          <div class="form-row" style="margin-bottom:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Vessel đang chọn</label>
+              <input id="usermgmt-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
             <div class="form-group">
-              <label class="form-label">Action</label>
+              <label class="form-label" for="usermgmt-action">Action</label>
               <select id="usermgmt-action" class="form-control" onchange="updateUserMgmtFields()">
                 <option value="create_user_profile">Tạo Profile (create_user_profile)</option>
                 <option value="create_account">Tạo user (create_user)</option>
@@ -1492,24 +1917,24 @@ tailwind.config = {
           </div>
           <div id="usermgmt-profile-fields">
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Tên profile (name)</label><input id="usermgmt-name" class="form-control" placeholder="crew" /></div>
-              <div class="form-group"><label class="form-label">Rate limit</label><input id="usermgmt-profile-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-name">Tên profile (name)</label><input id="usermgmt-name" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-profile-ratelimit">Rate limit</label><input id="usermgmt-profile-ratelimit" class="form-control" placeholder="2M/2M" /></div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Shared users</label><input id="usermgmt-shared-users" class="form-control" type="number" value="1" min="1" /></div>
-              <div class="form-group"><label class="form-label">Mô tả</label><input id="usermgmt-description" class="form-control" placeholder="Thuyền viên – 2Mbps" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-shared-users">Shared users</label><input id="usermgmt-shared-users" class="form-control" type="number" value="1" min="1" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-description">Mô tả</label><input id="usermgmt-description" class="form-control" placeholder="Thuyền viên – 2Mbps" /></div>
             </div>
           </div>
           <div id="usermgmt-user-fields" style="display:none;">
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Username</label><input id="usermgmt-username" class="form-control" placeholder="nguyen-van-a" /></div>
-              <div class="form-group" id="usermgmt-password-group"><label class="form-label">Password</label><input id="usermgmt-password" class="form-control" type="password" placeholder="abc123" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-username">Username</label><input id="usermgmt-username" class="form-control" placeholder="nguyen-van-a" /></div>
+              <div class="form-group" id="usermgmt-password-group"><label class="form-label" for="usermgmt-password">Password</label><input id="usermgmt-password" class="form-control" type="password" placeholder="abc123" /></div>
             </div>
             <div class="form-row">
-              <div class="form-group" id="usermgmt-profile-select-group"><label class="form-label">Profile</label><input id="usermgmt-user-profile" class="form-control" placeholder="crew" /></div>
-              <div class="form-group"><label class="form-label">Rate limit (tuỳ chọn)</label><input id="usermgmt-ratelimit" class="form-control" placeholder="2M/2M" /></div>
+              <div class="form-group" id="usermgmt-profile-select-group"><label class="form-label" for="usermgmt-user-profile">Profile</label><input id="usermgmt-user-profile" class="form-control" placeholder="crew" /></div>
+              <div class="form-group"><label class="form-label" for="usermgmt-ratelimit">Rate limit (tuỳ chọn)</label><input id="usermgmt-ratelimit" class="form-control" placeholder="2M/2M" /></div>
             </div>
-            <div class="form-group"><label class="form-label">Comment (tuỳ chọn)</label><input id="usermgmt-comment" class="form-control" placeholder="Máy trưởng" /></div>
+            <div class="form-group"><label class="form-label" for="usermgmt-comment">Comment (tuỳ chọn)</label><input id="usermgmt-comment" class="form-control" placeholder="Máy trưởng" /></div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-primary" id="usermgmt-submit-btn" onclick="sendUserMgmtCmd()"><i class="bi bi-send"></i> Gửi lệnh</button>
@@ -1518,7 +1943,7 @@ tailwind.config = {
       </div>
 
       <!-- JSON Bridge -->
-      <div class="card" id="hotspot-create-card" style="margin-bottom:16px;">
+      <div class="card" id="hotspot-create-card" style="margin-bottom:28px;">
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-diagram-3-fill" style="color:var(--primary-light);"></i> JSON bridge request (RouterOS nâng cao)</div>
           <div class="card-subtitle">Gửi lệnh RouterOS API thô. Dùng cho VLAN, DHCP, Hotspot server…</div></div>
@@ -1529,14 +1954,16 @@ tailwind.config = {
             <i class="bi bi-info-circle"></i>
             <span>Dùng <code>params</code> cho RouterOS keys, kể cả dashed names như <code>rate-limit</code>.</span>
           </div>
+          <input type="hidden" id="hotspot-create-tenant" />
+          <input type="hidden" id="hotspot-create-vessel" />
+          <input type="hidden" id="hotspot-create-edge" />
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="hotspot-create-tenant" class="form-control" value="tnr13" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="hotspot-create-vessel" class="form-control" value="vsl-001" /></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="hotspot-create-edge" class="form-control" value="edge-001" /></div>
             <div class="form-group">
-              <label class="form-label">Template</label>
+              <label class="form-label" for="hotspot-create-target-display">Vessel đang chọn</label>
+              <input id="hotspot-create-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="hotspot-template">Template</label>
               <select id="hotspot-template" class="form-control" onchange="applyHotspotTemplate()">
                 <option value="custom" selected>Custom</option>
                 <option value="vlan">VLAN interface</option>
@@ -1550,9 +1977,9 @@ tailwind.config = {
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Reference ID</label><input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" /></div>
+            <div class="form-group"><label class="form-label" for="hotspot-reference-id">Reference ID</label><input id="hotspot-reference-id" class="form-control" placeholder="vlan50-01" /></div>
             <div class="form-group">
-              <label class="form-label">Method</label>
+              <label class="form-label" for="hotspot-method">Method</label>
               <select id="hotspot-method" class="form-control">
                 <option value="add" selected>add</option>
                 <option value="set">set</option>
@@ -1561,9 +1988,9 @@ tailwind.config = {
               </select>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Path</label><input id="hotspot-path" class="form-control" placeholder="/ip/pool" /></div>
+          <div class="form-group"><label class="form-label" for="hotspot-path">Path</label><input id="hotspot-path" class="form-control" placeholder="/ip/pool" /></div>
           <div class="form-group">
-            <label class="form-label">Params JSON</label>
+            <label class="form-label" for="hotspot-params">Params JSON</label>
             <textarea id="hotspot-params" class="form-control font-mono" rows="8" placeholder='{"name":"pool_vlan50","ranges":"192.168.50.10-192.168.50.254"}'></textarea>
           </div>
           <div class="detail-section" style="margin-bottom:14px;">
@@ -1577,14 +2004,14 @@ tailwind.config = {
       </div>
 
       <!-- Directory & Active -->
-      <div class="grid grid-2" style="margin-bottom:16px;">
+      <div class="grid grid-2" style="margin-bottom:20px;">
         <div class="card">
           <div class="card-header">
             <div><div class="card-title"><i class="bi bi-person-lines-fill" style="color:var(--success);"></i> Router directory</div><div class="card-subtitle" id="hotspot-directory-source">Loading…</div></div>
             <span class="num-badge" id="hotspot-directory-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Username</th><th>Profile</th><th>QoS</th><th>Uptime</th><th>Status</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Username</th><th scope="col">Profile</th><th scope="col">QoS</th><th scope="col">Uptime</th><th scope="col">Status</th></tr></thead>
             <tbody id="hotspot-directory-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
           </div>
         </div>
@@ -1594,7 +2021,7 @@ tailwind.config = {
             <span class="num-badge" id="hotspot-active-count">0</span>
           </div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Username</th><th>IP</th><th>MAC</th><th>Session</th><th>Uptime</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Username</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">Session</th><th scope="col">Uptime</th></tr></thead>
             <tbody id="hotspot-active-body"><tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr></tbody></table>
           </div>
         </div>
@@ -1607,7 +2034,7 @@ tailwind.config = {
           <span class="num-badge" id="hotspot-ops-count">0</span>
         </div>
         <div style="padding:0;">
-          <table class="tbl"><thead><tr><th>Target</th><th>Path</th><th>Method</th><th>Reference</th><th>Status</th><th>Result</th><th>Created</th></tr></thead>
+          <table class="tbl"><thead><tr><th scope="col">Target</th><th scope="col">Path</th><th scope="col">Method</th><th scope="col">Reference</th><th scope="col">Status</th><th scope="col">Result</th><th scope="col">Created</th></tr></thead>
           <tbody id="hotspot-ops-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody></table>
         </div>
       </div>
@@ -1641,10 +2068,12 @@ tailwind.config = {
       <div class="card" style="margin-bottom:16px;">
         <div class="card-header"><div class="card-title"><i class="bi bi-crosshair" style="color:var(--primary-light);"></i> Edge đích</div></div>
         <div class="card-body">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Tenant code</label><input id="quota-tenant" class="form-control" value="tnr13" oninput="updateQuotaTargetLabel()" /></div>
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel code</label><input id="quota-vessel" class="form-control" value="vsl-001" oninput="updateQuotaTargetLabel()" /></div>
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Edge code</label><input id="quota-edge" class="form-control" value="edge-001" oninput="updateQuotaTargetLabel()" /></div>
+          <input type="hidden" id="quota-tenant" />
+          <input type="hidden" id="quota-vessel" />
+          <input type="hidden" id="quota-edge" />
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="quota-target-display">Vessel đang chọn</label>
+            <input id="quota-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
           </div>
         </div>
       </div>
@@ -1704,14 +2133,16 @@ tailwind.config = {
       <div class="card">
         <div class="card-header"><div class="card-title"><i class="bi bi-sliders2" style="color:var(--primary-light);"></i> Uplink policy</div></div>
         <div class="card-body">
+          <input type="hidden" id="policy-tenant" />
+          <input type="hidden" id="policy-vessel" />
+          <input type="hidden" id="policy-edge" />
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="policy-tenant" class="form-control" value="tnr13" oninput="updatePolicyPreview()" /></div>
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="policy-vessel" class="form-control" value="vsl-001" oninput="updatePolicyPreview()" /></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Edge code</label><input id="policy-edge" class="form-control" value="edge-001" oninput="updatePolicyPreview()" /></div>
             <div class="form-group">
-              <label class="form-label">Active uplink</label>
+              <label class="form-label" for="policy-target-display">Vessel đang chọn</label>
+              <input id="policy-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="policy-active-uplink">Active uplink</label>
               <select id="policy-active-uplink" class="form-control" onchange="updatePolicyPreview()">
                 <option value="automatic">automatic</option>
                 <option value="starlink">starlink</option>
@@ -1720,12 +2151,12 @@ tailwind.config = {
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">VSAT gateway</label><input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" /></div>
-            <div class="form-group"><label class="form-label">Starlink gateway</label><input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label" for="policy-vsat-gateway">VSAT gateway</label><input id="policy-vsat-gateway" class="form-control" placeholder="192.168.10.1" oninput="updatePolicyPreview()" /></div>
+            <div class="form-group"><label class="form-label" for="policy-starlink-gateway">Starlink gateway</label><input id="policy-starlink-gateway" class="form-control" placeholder="192.168.20.1" oninput="updatePolicyPreview()" /></div>
           </div>
-          <div class="form-group"><label class="form-label">Work IPs</label><textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea></div>
-          <div class="form-group"><label class="form-label">Entertainment IPs</label><textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24" oninput="updatePolicyPreview()"></textarea></div>
-          <div class="form-group"><label class="form-label">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-work-ips">Work IPs</label><textarea id="policy-work-ips" class="form-control" rows="3" placeholder="10.10.0.0/16, 172.16.1.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-ent-ips">Entertainment IPs</label><textarea id="policy-ent-ips" class="form-control" rows="3" placeholder="192.168.100.0/24" oninput="updatePolicyPreview()"></textarea></div>
+          <div class="form-group"><label class="form-label" for="policy-notes">Notes</label><textarea id="policy-notes" class="form-control" rows="2" placeholder="Optional operator notes" oninput="updatePolicyPreview()"></textarea></div>
           <div class="detail-section" style="margin-bottom:14px;">
             <div class="detail-section-title">Payload preview</div>
             <pre id="policy-preview" class="font-mono" style="white-space:pre-wrap;background:rgba(0,0,0,.22);padding:14px;border-radius:10px;border:1px solid var(--border);color:var(--mp-fg);font-size:12px;overflow:auto;min-height:100px;">{}</pre>
@@ -1778,7 +2209,7 @@ tailwind.config = {
         <div class="card-header">
           <div><div class="card-title"><i class="bi bi-graph-up-arrow" style="color:var(--primary-light);"></i> Traffic summary</div><div class="card-subtitle" id="traffic-source">Loading…</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input id="traffic-vessel" class="form-control" style="width:140px;" value="vsl-001" placeholder="vessel code" />
+            <input id="traffic-vessel" class="form-control" style="width:160px;" readonly placeholder="— chọn tàu từ sidebar —" style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);" />
             <input id="traffic-days" class="form-control" style="width:100px;" type="number" min="1" max="365" value="30" />
           </div>
         </div>
@@ -1794,14 +2225,14 @@ tailwind.config = {
         <div class="card">
           <div class="card-header"><div class="card-title"><i class="bi bi-diagram-3" style="color:var(--success);"></i> Daily buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Date</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Date</th><th scope="col">RX</th><th scope="col">TX</th><th scope="col">Throughput</th></tr></thead>
             <tbody id="traffic-daily-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><div class="card-title"><i class="bi bi-calendar-month" style="color:var(--warning);"></i> Monthly buckets</div></div>
           <div style="padding:0;">
-            <table class="tbl"><thead><tr><th>Month</th><th>RX</th><th>TX</th><th>Throughput</th></tr></thead>
+            <table class="tbl"><thead><tr><th scope="col">Month</th><th scope="col">RX</th><th scope="col">TX</th><th scope="col">Throughput</th></tr></thead>
             <tbody id="traffic-monthly-body"><tr><td colspan="4"><div class="empty"><span class="spinner"></span></div></td></tr></tbody></table>
           </div>
         </div>
@@ -1844,17 +2275,17 @@ tailwind.config = {
         <div class="card-body">
           <div id="pkg-form-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Code</label><input id="pkg-code" class="form-control" placeholder="basic-50gb" /></div>
-            <div class="form-group"><label class="form-label">Name</label><input id="pkg-name" class="form-control" placeholder="Basic 50GB" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-code">Code</label><input id="pkg-code" class="form-control" placeholder="basic-50gb" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-name">Name</label><input id="pkg-name" class="form-control" placeholder="Basic 50GB" /></div>
           </div>
-          <div class="form-group"><label class="form-label">Description</label><input id="pkg-desc" class="form-control" placeholder="Starter package" /></div>
+          <div class="form-group"><label class="form-label" for="pkg-desc">Description</label><input id="pkg-desc" class="form-control" placeholder="Starter package" /></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Quota (MB)</label><input id="pkg-quota" class="form-control" type="number" value="51200" /></div>
-            <div class="form-group"><label class="form-label">Validity (days)</label><input id="pkg-validity" class="form-control" type="number" value="30" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-quota">Quota (MB)</label><input id="pkg-quota" class="form-control" type="number" value="51200" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-validity">Validity (days)</label><input id="pkg-validity" class="form-control" type="number" value="30" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Speed limit (Kbps)</label><input id="pkg-speed" class="form-control" type="number" value="5120" /></div>
-            <div class="form-group"><label class="form-label">Price (USD)</label><input id="pkg-price" class="form-control" type="number" value="0" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-speed">Speed limit (Kbps)</label><input id="pkg-speed" class="form-control" type="number" value="5120" /></div>
+            <div class="form-group"><label class="form-label" for="pkg-price">Price (USD)</label><input id="pkg-price" class="form-control" type="number" value="0" /></div>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="togglePkgForm(false)">Cancel</button>
@@ -1872,7 +2303,7 @@ tailwind.config = {
           </label>
         </div>
         <table class="tbl">
-          <thead><tr><th>Code</th><th>Name</th><th>Quota</th><th>Speed</th><th>Validity</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+          <thead><tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Quota</th><th scope="col">Speed</th><th scope="col">Validity</th><th scope="col">Status</th><th scope="col" style="text-align:right;">Actions</th></tr></thead>
           <tbody id="pkg-body"><tr><td colspan="7" class="empty"><span class="spinner"></span></td></tr></tbody>
         </table>
       </div>
@@ -1883,12 +2314,16 @@ tailwind.config = {
         <div class="card-body">
           <div id="assign-notice" style="display:none;" class="alert"></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Package</label><select id="assign-pkg" class="form-control"><option value="">— select package —</option></select></div>
-            <div class="form-group"><label class="form-label">Username</label><input id="assign-user" class="form-control" placeholder="user123" /></div>
+            <div class="form-group"><label class="form-label" for="assign-pkg">Package</label><select id="assign-pkg" class="form-control"><option value="">— select package —</option></select></div>
+            <div class="form-group"><label class="form-label" for="assign-user">Username</label><input id="assign-user" class="form-control" placeholder="user123" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Vessel code</label><input id="assign-vessel" class="form-control" value="vsl-001" /></div>
-            <div class="form-group"><label class="form-label">Tenant code</label><input id="assign-tenant" class="form-control" value="tnr13" /></div>
+            <div class="form-group">
+              <label class="form-label" for="assign-target-display">Vessel / Tenant</label>
+              <input id="assign-target-display" class="form-control" readonly style="background:var(--mp-surface-muted);color:var(--mp-fg-mute);cursor:default;" placeholder="— chọn tàu từ sidebar —" />
+              <input type="hidden" id="assign-vessel" />
+              <input type="hidden" id="assign-tenant" />
+            </div>
           </div>
           <div style="display:flex;justify-content:flex-end;">
             <button class="btn btn-success" onclick="doAssign()"><i class="bi bi-person-check"></i> Assign</button>
@@ -1904,9 +2339,9 @@ tailwind.config = {
         </div>
         <div class="card-body">
           <div class="form-row" style="margin-bottom:12px;">
-            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Vessel</label><input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" /></div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label" for="usage-vessel">Vessel</label><input id="usage-vessel" class="form-control" placeholder="vsl-001 (blank = all)" /></div>
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">Bucket</label>
+              <label class="form-label" for="usage-bucket">Bucket</label>
               <select id="usage-bucket" class="form-control">
                 <option value="hour">Hour</option>
                 <option value="day" selected>Day</option>
@@ -1951,16 +2386,16 @@ tailwind.config = {
         <div class="card-header"><div class="card-title"><i class="bi bi-gear-fill" style="color:var(--primary-light);"></i> Webhook notifications</div></div>
         <div class="card-body">
           <div id="settings-notice" style="display:none;" class="alert"></div>
-          <div class="form-group"><label class="form-label">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
-          <div class="form-group"><label class="form-label">Webhook URL</label><input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" /></div>
+          <div class="form-group"><label class="form-label" for="settings-tenant-code">Tenant code</label><input id="settings-tenant-code" class="form-control" value="tnr13" /></div>
+          <div class="form-group"><label class="form-label" for="settings-webhook-url">Webhook URL</label><input id="settings-webhook-url" class="form-control" placeholder="https://example.com/webhooks/alerts" /></div>
           <div class="form-group">
-            <label class="form-label">Webhook enabled</label>
+            <label class="form-label" for="settings-webhook-enabled">Webhook enabled</label>
             <select id="settings-webhook-enabled" class="form-control">
               <option value="false">Disabled</option>
               <option value="true">Enabled</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Note</label><textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea></div>
+          <div class="form-group"><label class="form-label" for="settings-webhook-note">Note</label><textarea id="settings-webhook-note" class="form-control" rows="3" placeholder="Optional note for operators"></textarea></div>
           <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-ghost" onclick="testWebhookSettings()"><i class="bi bi-send-check"></i> Test webhook</button>
             <button class="btn btn-primary" onclick="saveTenantSettings()"><i class="bi bi-save"></i> Save settings</button>
@@ -1987,8 +2422,8 @@ tailwind.config = {
           <div id="login-inline-saved" style="display:none;" class="alert alert-success">
             <i class="bi bi-shield-check"></i> Auth header currently saved in this browser.
           </div>
-          <div class="form-group"><label class="form-label">Username</label><input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" /></div>
-          <div class="form-group"><label class="form-label">Password</label><input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
+          <div class="form-group"><label class="form-label" for="inline-user">Username</label><input id="inline-user" class="form-control" placeholder="admin" autocomplete="username" /></div>
+          <div class="form-group"><label class="form-label" for="inline-pass">Password</label><input id="inline-pass" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" /></div>
           <div id="inline-err" style="display:none;" class="alert alert-danger"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-ghost" onclick="clearAuth()">Clear saved</button>
@@ -2001,8 +2436,11 @@ tailwind.config = {
   </main>
 </div>
 
+<!-- Sidebar overlay (mobile tap-to-close) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
 <!-- Toast stack -->
-<div class="toast-stack" id="toast-stack"></div>
+<div class="toast-stack" id="toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -2044,6 +2482,7 @@ function doLogin() {
   if (!u || !p) { showLoginErr('Username and password required.'); return; }
   saveBasicAuth(u, p);
   showPage(initialPage);
+  loadVesselPicker();
 }
 
 function doLoginInline() {
@@ -2075,12 +2514,13 @@ let trafficRows = [];
 let trafficSummary = null;
 let trafficQuota = null;
 let trafficWindow = {
-  vessel: 'vsl-001',
+  vessel: '',
   period: 'day',
   month: new Date().toISOString().slice(0, 7)
 };
 
 function showPage(name) {
+  closeMobileSidebar();
   if (name === 'login') {
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -2249,6 +2689,153 @@ let alertReadIds = new Set();
 let alertedWebhookIds = new Set();
 let tenantSettings = { tenant_code: 'tnr13', webhook_url: '', webhook_enabled: false, note: '' };
 
+// ─── VESSEL PICKER & ACTIVE EDGE ──────────────────────────────────────────────
+
+function setActiveEdge(edge) {
+  selectedEdgeContext = edge;
+
+  const label = edge
+    ? `${edge.vessel_name || edge.vessel_code} · ${edge.tenant_code}/${edge.vessel_code}/${edge.edge_code}`
+    : '';
+
+  // Sidebar badges
+  const badge = document.getElementById('global-vessel-badge');
+  if (badge) badge.style.display = edge ? 'flex' : 'none';
+  const elT = document.getElementById('global-vessel-tenant');
+  const elV = document.getElementById('global-vessel-vessel');
+  const elE = document.getElementById('global-vessel-edge');
+  if (elT) elT.textContent = edge?.tenant_code || '';
+  if (elV) elV.textContent = edge?.vessel_code || '';
+  if (elE) elE.textContent = edge?.edge_code || '';
+
+  // Commands page
+  const cmdT = document.getElementById('cmd-tenant');
+  const cmdV = document.getElementById('cmd-vessel');
+  const cmdE = document.getElementById('cmd-edge');
+  const cmdDisp = document.getElementById('cmd-target-display');
+  const cmdWarn = document.getElementById('cmd-no-edge-warn');
+  if (cmdT) cmdT.value = edge?.tenant_code || '';
+  if (cmdV) cmdV.value = edge?.vessel_code || '';
+  if (cmdE) cmdE.value = edge?.edge_code || '';
+  if (cmdDisp) cmdDisp.value = label;
+  if (cmdWarn) cmdWarn.style.display = edge ? 'none' : 'flex';
+
+  // Hotspot user management
+  const umT = document.getElementById('usermgmt-tenant');
+  const umV = document.getElementById('usermgmt-vessel');
+  const umE = document.getElementById('usermgmt-edge');
+  const umDisp = document.getElementById('usermgmt-target-display');
+  const umWarn = document.getElementById('usermgmt-no-edge-warn');
+  if (umT) umT.value = edge?.tenant_code || '';
+  if (umV) umV.value = edge?.vessel_code || '';
+  if (umE) umE.value = edge?.edge_code || '';
+  if (umDisp) umDisp.value = label;
+  if (umWarn) umWarn.style.display = edge ? 'none' : 'flex';
+
+  // Hotspot JSON bridge
+  const hcT = document.getElementById('hotspot-create-tenant');
+  const hcV = document.getElementById('hotspot-create-vessel');
+  const hcE = document.getElementById('hotspot-create-edge');
+  const hcDisp = document.getElementById('hotspot-create-target-display');
+  if (hcT) hcT.value = edge?.tenant_code || '';
+  if (hcV) hcV.value = edge?.vessel_code || '';
+  if (hcE) hcE.value = edge?.edge_code || '';
+  if (hcDisp) hcDisp.value = label;
+
+  // Quota page
+  const qT = document.getElementById('quota-tenant');
+  const qV = document.getElementById('quota-vessel');
+  const qE = document.getElementById('quota-edge');
+  const qDisp = document.getElementById('quota-target-display');
+  if (qT) qT.value = edge?.tenant_code || '';
+  if (qV) qV.value = edge?.vessel_code || '';
+  if (qE) qE.value = edge?.edge_code || '';
+  if (qDisp) qDisp.value = label;
+  updateQuotaTargetLabel?.();
+
+  // Policy page
+  const pT = document.getElementById('policy-tenant');
+  const pV = document.getElementById('policy-vessel');
+  const pE = document.getElementById('policy-edge');
+  const pDisp = document.getElementById('policy-target-display');
+  if (pT) pT.value = edge?.tenant_code || '';
+  if (pV) pV.value = edge?.vessel_code || '';
+  if (pE) pE.value = edge?.edge_code || '';
+  if (pDisp) pDisp.value = label;
+  updatePolicyPreview?.();
+
+  // Traffic page
+  const tvV = document.getElementById('traffic-vessel');
+  if (tvV) tvV.value = edge?.vessel_code || '';
+  if (trafficWindow) trafficWindow.vessel = edge?.vessel_code || '';
+
+  // Packages page
+  const aV = document.getElementById('assign-vessel');
+  const aT = document.getElementById('assign-tenant');
+  const aDisp = document.getElementById('assign-target-display');
+  if (aV) aV.value = edge?.vessel_code || '';
+  if (aT) aT.value = edge?.tenant_code || '';
+  if (aDisp) aDisp.value = label;
+
+  // Header vessel indicator pill
+  const hdrVessel = document.getElementById('hdr-active-vessel');
+  if (hdrVessel) {
+    hdrVessel.textContent = edge ? edge.vessel_code : '';
+    hdrVessel.style.display = edge ? '' : 'none';
+  }
+}
+
+async function loadVesselPicker() {
+  const picker = document.getElementById('global-vessel-picker');
+  if (!picker) return;
+  try {
+    const data = await apiFetch('/api/mcu/edges');
+    const edges = data.edges || data || [];
+    picker.innerHTML = '<option value="">— Chọn tàu —</option>';
+    edges.forEach((e, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${e.vessel_name || e.vessel_code} (${e.tenant_code}/${e.vessel_code}/${e.edge_code})`;
+      opt.dataset.edge = JSON.stringify(e);
+      picker.appendChild(opt);
+    });
+    // Auto-select if only one vessel
+    if (edges.length === 1) {
+      picker.selectedIndex = 1;
+      setActiveEdge(edges[0]);
+    }
+    // Restore last selected vessel from localStorage
+    const lastVessel = localStorage.getItem('mp_active_vessel');
+    if (lastVessel) {
+      for (const opt of picker.options) {
+        if (!opt.dataset.edge) continue;
+        const e = JSON.parse(opt.dataset.edge);
+        if (e.vessel_code === lastVessel) {
+          opt.selected = true;
+          setActiveEdge(e);
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    picker.innerHTML = '<option value="">— Lỗi tải danh sách tàu —</option>';
+  }
+}
+
+function onVesselPickerChange() {
+  const picker = document.getElementById('global-vessel-picker');
+  if (!picker) return;
+  const opt = picker.options[picker.selectedIndex];
+  if (!opt || !opt.dataset.edge) {
+    setActiveEdge(null);
+    localStorage.removeItem('mp_active_vessel');
+    return;
+  }
+  const edge = JSON.parse(opt.dataset.edge);
+  setActiveEdge(edge);
+  localStorage.setItem('mp_active_vessel', edge.vessel_code);
+}
+
 function clearEdgeStreamReconnectTimer() {
   if (edgeStreamReconnectTimer) {
     clearTimeout(edgeStreamReconnectTimer);
@@ -2385,7 +2972,7 @@ function renderTrafficView() {
   const rows = Array.isArray(trafficRows) ? trafficRows : [];
   const period = trafficWindow.period || 'day';
   const month = trafficWindow.month || new Date().toISOString().slice(0, 7);
-  const vessel = trafficWindow.vessel || 'vsl-001';
+  const vessel = trafficWindow.vessel || selectedEdgeContext?.vessel_code || '';
 
   const buckets = aggregateTelemetryBuckets(rows, period);
   const daily = aggregateTelemetryBuckets(rows, 'day');
@@ -3192,20 +3779,14 @@ function renderDashboard() {
   ];
 
   const statsEl = document.getElementById('dash-stats');
-  if (statsEl) statsEl.innerHTML = stats.map(s => `
-    <div class="stat-card">
-      <div class="stat-card-head">
-        <span class="kicker">${s.label}</span>
-        <div class="icon-tile ${s.tileCls}"><i class="bi ${s.icon}"></i></div>
-      </div>
-      <div class="stat-card-value">${s.value}</div>
-      <div class="stat-card-foot">
-        <span class="pill ${s.trendDir === 'up' ? 'pill--success' : 'pill--error'}">
-          <i class="bi ${s.trendDir === 'up' ? 'bi-arrow-up' : 'bi-arrow-down'}"></i> ${s.trend}
-        </span>
-        <span class="stat-card-sub">${s.note}</span>
-      </div>
-    </div>`).join('');
+  if (statsEl) {
+    const colorCls = ['', 'online', 'warn', ''];
+    statsEl.innerHTML = stats.map((s, i) => `
+      <div class="fleet-stat">
+        <div class="fleet-stat-value ${colorCls[i] || ''}" title="${s.note}">${s.value}</div>
+        <div class="fleet-stat-label">${s.label}</div>
+      </div>`).join('');
+  }
 
   // Edges table
   const edgesBody = document.getElementById('edges-body');
@@ -3226,7 +3807,7 @@ function renderDashboard() {
         const wanIp = e.public_wan_ip
           ? `<span class="chip mono" style="font-size:11px;">${e.public_wan_ip}</span>`
           : '<span style="color:var(--mp-fg-soft);font-size:12px;">—</span>';
-        return `<tr class="row-click" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})">
+        return `<tr class="row-click" tabindex="0" onclick="selectEdge(${JSON.stringify(JSON.stringify(e))})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectEdge(${JSON.stringify(JSON.stringify(e))})}">
           <td>
             <div style="display:flex;flex-direction:column;gap:2px;">
               <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${e.edge_code}</span>
@@ -3841,7 +4422,7 @@ function renderAlertsCenter() {
     const sevIcon = sev === 'critical' ? 'bi-exclamation-octagon-fill' : sev === 'warning' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill';
     const read = isAlertRead(alert.id);
     return `
-      <tr class="row-click ${read ? '' : 'row-selected'}" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})">
+      <tr class="row-click ${read ? '' : 'row-selected'}" tabindex="0" onclick="openAlert(${JSON.stringify(JSON.stringify(alert))})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAlert(${JSON.stringify(JSON.stringify(alert))})}">
         <td>
           <div style="display:flex;flex-direction:column;gap:2px;">
             <span class="mono" style="font-size:12px;font-weight:600;color:var(--mp-fg-strong);">${(alert.edge_key || '—').split('/').pop()}</span>
@@ -4112,7 +4693,22 @@ async function nextHistoryCmdPage() {
 // ─── EDGE DETAIL ──────────────────────────────────────────────────────────────
 async function selectEdge(edgeJson, options = {}) {
   const edge = typeof edgeJson === 'string' ? JSON.parse(edgeJson) : edgeJson;
-  selectedEdgeContext = edge;
+  setActiveEdge(edge);
+
+  // Sync vessel picker to reflect this selection
+  const picker = document.getElementById('global-vessel-picker');
+  if (picker) {
+    for (const opt of picker.options) {
+      if (!opt.dataset.edge) continue;
+      const e = JSON.parse(opt.dataset.edge);
+      if (e.vessel_code === edge.vessel_code && e.tenant_code === edge.tenant_code && e.edge_code === edge.edge_code) {
+        picker.value = opt.value;
+        break;
+      }
+    }
+  }
+  localStorage.setItem('mp_active_vessel', edge.vessel_code);
+
   const card = document.getElementById('edge-detail-card');
   const body = document.getElementById('edge-detail-body');
   const title = document.getElementById('edge-detail-title');
@@ -4461,7 +5057,7 @@ async function sendHotspotAction() {
 
   if (!tenant || !vessel || !edge) {
     if (noticeEl) {
-      showEl('hotspot-create-notice', 'Tenant, vessel, and edge are required.', 'alert-warn');
+      showEl('hotspot-create-notice', 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
       noticeEl.style.display = 'flex';
     }
     return;
@@ -4579,9 +5175,19 @@ async function sendCommand() {
     return {};
   })();
 
-  if (!tenant || !vessel || !edge || !type) {
+  if (!tenant || !vessel || !edge) {
     if (noticeEl) {
-      showEl(noticeEl.id, 'All fields required.', 'alert-warn');
+      showEl(noticeEl.id, 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
+      noticeEl.style.display = 'flex';
+    }
+    const warn = document.getElementById('cmd-no-edge-warn');
+    if (warn) warn.style.display = 'flex';
+    return;
+  }
+
+  if (!type) {
+    if (noticeEl) {
+      showEl(noticeEl.id, 'Chọn loại lệnh.', 'alert-warn');
       noticeEl.style.display = 'flex';
     }
     return;
@@ -4764,7 +5370,7 @@ async function savePackage() {
     validity_days: Number(document.getElementById('pkg-validity').value),
     speed_limit_kbps: Number(document.getElementById('pkg-speed').value),
     price: Number(document.getElementById('pkg-price').value),
-    tenant_code: 'tnr13'
+    tenant_code: selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || ''
   };
 
   if (!payload.code || !payload.name) {
@@ -4840,7 +5446,8 @@ async function loadUsage() {
   const bucket = document.getElementById('usage-bucket')?.value || 'day';
 
   try {
-    const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+    const tenant = selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '';
+    const params = new URLSearchParams({ tenant, bucket, window_minutes: '1440' });
     if (vessel) params.set('vessel', vessel);
 
     const data = await apiFetch('/api/reports/usage?' + params);
@@ -4862,7 +5469,8 @@ async function loadUsage() {
 async function exportUsage() {
   const vessel = document.getElementById('usage-vessel')?.value.trim() || '';
   const bucket = document.getElementById('usage-bucket')?.value || 'day';
-  const params = new URLSearchParams({ tenant: 'tnr13', bucket, window_minutes: '1440' });
+  const tenant = selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '';
+  const params = new URLSearchParams({ tenant, bucket, window_minutes: '1440' });
   if (vessel) params.set('vessel', vessel);
   const url = (API_BASE || '') + '/api/reports/usage/export?' + params;
   toast('Opening export URL…', 'info');
@@ -4924,27 +5532,20 @@ function getPolicyPayload() {
   }
 
   return {
-    tenant_code: document.getElementById('policy-tenant')?.value.trim() || tenantSettings.tenant_code || 'tnr13',
-    vessel_code: document.getElementById('policy-vessel')?.value.trim() || 'vsl-001',
-    edge_code: document.getElementById('policy-edge')?.value.trim() || 'edge-001',
+    tenant_code: document.getElementById('policy-tenant')?.value.trim() || selectedEdgeContext?.tenant_code || tenantSettings.tenant_code || '',
+    vessel_code: document.getElementById('policy-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '',
+    edge_code: document.getElementById('policy-edge')?.value.trim() || selectedEdgeContext?.edge_code || '',
     groups
   };
 }
 
 function fillPolicyFromSelectedEdge() {
   if (!selectedEdgeContext) {
-    toast('Select an edge from dashboard first', 'warn');
+    toast('Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu.', 'warn');
     return;
   }
-  const edge = selectedEdgeContext;
-  const tenant = document.getElementById('policy-tenant');
-  const vessel = document.getElementById('policy-vessel');
-  const edgeCode = document.getElementById('policy-edge');
-  if (tenant) tenant.value = edge.tenant_code || tenant.value;
-  if (vessel) vessel.value = edge.vessel_code || vessel.value;
-  if (edgeCode) edgeCode.value = edge.edge_code || edgeCode.value;
-  updatePolicyPreview();
-  toast('Policy form filled from selected edge', 'success');
+  setActiveEdge(selectedEdgeContext);
+  toast('Đã điền thông tin tàu đang chọn', 'success');
 }
 
 async function applyPolicy() {
@@ -5123,7 +5724,7 @@ function renderTrafficTables(daily, monthly) {
 async function loadTrafficView() {
   const modeBadge = document.getElementById('traffic-mode-badge');
   const source = document.getElementById('traffic-source');
-  const vessel = document.getElementById('traffic-vessel')?.value.trim() || 'vsl-001';
+  const vessel = document.getElementById('traffic-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '';
   const period = document.getElementById('traffic-period')?.value || 'day';
   const days = Math.max(1, Math.min(365, Number(document.getElementById('traffic-days')?.value || 30)));
   const month = document.getElementById('traffic-month')?.value || new Date().toISOString().slice(0, 7);
@@ -5268,7 +5869,7 @@ function toast(msg, type = 'info') {
   el.innerHTML = `
     <i class="bi ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};font-size:16px;flex-shrink:0;"></i>
     <span style="flex:1;">${msg}</span>
-    <span class="toast-dismiss" onclick="document.getElementById('toast-${id}').remove()"><i class="bi bi-x"></i></span>`;
+    <button class="toast-dismiss" onclick="document.getElementById('toast-${id}').remove()" aria-label="Dismiss notification"><i class="bi bi-x" aria-hidden="true"></i></button>`;
 
   document.getElementById('toast-stack').appendChild(el);
   setTimeout(() => el.remove(), 5000);
@@ -5285,19 +5886,36 @@ function startAutoRefresh() {
   startTrafficRefresh();
 }
 
+// ─── API SETUP ────────────────────────────────────────────────────────────────
+function connectApiSetup(useRelative) {
+  if (useRelative) {
+    localStorage.setItem('marine_api_base', '');
+    location.reload();
+    return;
+  }
+  const val = (document.getElementById('api-setup-url').value || '').trim();
+  const errEl = document.getElementById('api-setup-err');
+  if (!val) {
+    errEl.textContent = 'Please enter a URL or use "Use relative URL".';
+    errEl.style.display = 'flex';
+    return;
+  }
+  try { new URL(val); } catch {
+    errEl.textContent = 'Invalid URL — include the scheme, e.g. http://localhost:3000';
+    errEl.style.display = 'flex';
+    return;
+  }
+  errEl.style.display = 'none';
+  localStorage.setItem('marine_api_base', val);
+  location.reload();
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
-  // Check if we need to show the API setup prompt
+  // Check if we need to show the API setup panel
   if (!API_BASE) {
-    const apiBase = prompt(
-      'Marine Portal — Backend API URL\n\nEnter your backend base URL (e.g. http://localhost:3000)\nLeave blank to use relative URLs (same host):',
-      'http://localhost:3000'
-    );
-    if (apiBase && apiBase.trim()) {
-      localStorage.setItem('marine_api_base', apiBase.trim());
-      location.reload();
-      return;
-    }
+    document.getElementById('api-setup-page').style.display = 'flex';
+    return;
   }
 
   syncTenantSettingsFromStorage();
@@ -5324,11 +5942,11 @@ function init() {
     document.getElementById('app').style.display = 'flex';
     showPage(initialPage);
     updateCommandTypeFields();
-    startEdgeStream({
-      tenant_code: tenantSettings.tenant_code || 'tnr13',
-      vessel_code: tenantSettings.vessel_code || 'vsl-001',
-      edge_code: tenantSettings.edge_code || null
-    }).catch(() => {});
+    loadVesselPicker().then(() => {
+      if (selectedEdgeContext) {
+        startEdgeStream(selectedEdgeContext).catch(() => {});
+      }
+    });
   } else {
     document.getElementById('login-page').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -5336,6 +5954,7 @@ function init() {
 
   updateCommandTypeFields();
   startAutoRefresh();
+  document.querySelectorAll('.bi').forEach(icon => { if (!icon.getAttribute('aria-label')) icon.setAttribute('aria-hidden', 'true'); });
 }
 
 // ─── USER MANAGEMENT (hotspot_cmd) ───────────────────────────────────────────
@@ -5362,8 +5981,10 @@ async function sendUserMgmtCmd() {
   const action = document.getElementById('usermgmt-action')?.value || '';
 
   if (!tenant || !vessel || !edge) {
-    showEl('usermgmt-notice', 'Tenant, vessel, và edge là bắt buộc.', 'alert-warn');
+    showEl('usermgmt-notice', 'Chưa chọn tàu. Dùng dropdown ở sidebar để chọn tàu trước.', 'alert-warn');
     if (noticeEl) noticeEl.style.display = 'flex';
+    const warn = document.getElementById('usermgmt-no-edge-warn');
+    if (warn) warn.style.display = 'flex';
     return;
   }
 
@@ -5545,9 +6166,9 @@ function clearQuotaRules() {
 function updateQuotaPreview() {
   const el = document.getElementById('quota-preview');
   if (!el) return;
-  const t = document.getElementById('quota-tenant')?.value.trim() || 'tnr13';
-  const v = document.getElementById('quota-vessel')?.value.trim() || 'vsl-001';
-  const e = document.getElementById('quota-edge')?.value.trim() || 'edge-001';
+  const t = document.getElementById('quota-tenant')?.value.trim() || selectedEdgeContext?.tenant_code || '';
+  const v = document.getElementById('quota-vessel')?.value.trim() || selectedEdgeContext?.vessel_code || '';
+  const e = document.getElementById('quota-edge')?.value.trim() || selectedEdgeContext?.edge_code || '';
   const rules = quotaRules.filter(r => r.username);
   el.textContent = JSON.stringify({
     tenant_code: t, vessel_code: v, edge_code: e,
@@ -5600,6 +6221,25 @@ async function sendQuotaSync() {
   }
 }
 
+// ─── MOBILE SIDEBAR ───────────────────────────────────────────────────────────
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('mobile-nav-btn');
+  const isOpen = sidebar.classList.toggle('sidebar--open');
+  overlay.classList.toggle('sidebar--open', isOpen);
+  if (btn) btn.setAttribute('aria-expanded', String(isOpen));
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('mobile-nav-btn');
+  sidebar.classList.remove('sidebar--open');
+  overlay.classList.remove('sidebar--open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
 document.addEventListener('DOMContentLoaded', init);
 window.addEventListener('hashchange', () => {
   if (document.getElementById('login-page').style.display !== 'none') return;
@@ -5629,5 +6269,8 @@ window.addEventListener('beforeunload', stopEdgeStream);
 window.addEventListener('beforeunload', stopCommandDetailPoll);
 window.addEventListener('beforeunload', stopTrafficStream);
 </script>
+<!-- impeccable-live-start -->
+<script src="http://localhost:8400/live.js"></script>
+<!-- impeccable-live-end -->
 </body>
 </html>
